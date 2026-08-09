@@ -1,0 +1,7 @@
+.git/
+dist/
+*.zip
+*~
+.DS_Store
+*.swp
+.luac

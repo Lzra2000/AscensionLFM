@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>AscensionLFM — native WotLK settings mockup</title>
+<style>
+  :root {
+    --ink: #1a1208;
+    --ink-soft: #3a2e1c;
+    --gold: #ffd100;
+    --gold-dim: #c8a03c;
+    --gold-line: #8a7028;
+    --muted: #5a4a30;
+    --ok: #2a7a3a;
+    --warn: #a87820;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 22px 26px 48px;
+    font-family: "Friz Quadrata TT", "Trebuchet MS", serif;
+    color: var(--ink);
+    background:
+      radial-gradient(900px 480px at 70% -20%, #3a3020, transparent),
+      linear-gradient(180deg, #2a2218, #12100c 60%, #0a0906);
+  }
+  h1 { margin: 0 0 6px; font-size: 1.15rem; color: #f0e2c0; font-weight: normal; }
+  .lead { color: #9c927f; max-width: 52rem; line-height: 1.5; margin: 0 0 16px; font-size: .86rem; font-family: "Trebuchet MS", sans-serif; }
+  code { color: #edcd82; }
+
+  .dialog {
+    width: 520px; min-height: 520px;
+    background:
+      linear-gradient(180deg, rgba(255,220,120,.08), transparent 40%),
+      repeating-linear-gradient(0deg, #b8a47a 0 2px, #c4b088 2px 4px);
+    border: 3px solid #6a5420;
+    box-shadow:
+      inset 0 0 0 2px #d4c090,
+      inset 0 0 0 5px #3a3018,
+      0 0 0 2px #1a1408,
+      0 16px 40px rgba(0,0,0,.7);
+    border-radius: 2px;
+    padding: 10px 12px 12px;
+    display: flex; flex-direction: column;
+    position: relative; overflow: hidden;
+  }
+  .titlebar {
+    display: flex; flex-direction: column; gap: 2px;
+    background: linear-gradient(180deg, #4a3a1c, #2a2010);
+    border: 1px solid var(--gold-line);
+    margin: -2px -4px 0; padding: 8px 32px 8px 12px;
+    box-shadow: inset 0 1px 0 rgba(255,220,100,.25);
+  }
+  .titlebar h2 {
+    margin: 0; font-size: 1rem; color: var(--gold);
+    text-shadow: 0 1px 0 #000, 0 0 6px rgba(255,200,0,.3);
+    letter-spacing: .3px; font-weight: normal;
+  }
+  .titlebar .subhead {
+    margin: 0; font-size: .72rem; color: #c8b896;
+    font-family: "Trebuchet MS", sans-serif; line-height: 1.35;
+  }
+  .close {
+    position: absolute; top: 10px; right: 12px; width: 26px; height: 26px;
+    border-radius: 50%; border: 2px solid #8a7028;
+    background: radial-gradient(circle at 35% 30%, #6a3a2a, #2a1008);
+    color: #f0d9a0; font-size: .9rem; line-height: 22px; text-align: center;
+  }
+
+  .body {
+    flex: 1; padding: 12px 8px 8px;
+    font-family: "Trebuchet MS", sans-serif;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .status {
+    border: 1px solid #8a7028;
+    background: rgba(250,240,210,.55);
+    padding: 8px 10px;
+    font-size: .78rem;
+    color: var(--ink-soft);
+  }
+  .status strong { color: var(--ok); }
+  .status .mode { color: var(--warn); font-weight: bold; }
+
+  .section {
+    border: 1px solid #9a8040;
+    background: rgba(250,240,210,.4);
+    padding: 8px 10px 10px;
+  }
+  .section h3 {
+    margin: 0 0 8px; font-size: .78rem; color: #5a4010;
+    font-family: "Friz Quadrata TT", "Trebuchet MS", serif;
+    letter-spacing: .4px; font-weight: normal;
+    border-bottom: 1px solid rgba(138,112,40,.45);
+    padding-bottom: 4px;
+  }
+  .row { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; margin: 4px 0; font-size: .76rem; }
+  .check {
+    display: inline-flex; align-items: center; gap: 6px; cursor: default;
+  }
+  .check .box {
+    width: 14px; height: 14px; border: 1px solid #6a5420;
+    background: linear-gradient(180deg, #f0e4c0, #d8c890);
+    box-shadow: inset 0 1px 0 #fff8e0;
+    position: relative;
+  }
+  .check.on .box::after {
+    content: ""; position: absolute; left: 3px; top: 1px;
+    width: 5px; height: 8px; border: solid #2a1808;
+    border-width: 0 2px 2px 0; transform: rotate(45deg);
+  }
+  .radio {
+    display: inline-flex; align-items: center; gap: 6px; font-size: .76rem;
+  }
+  .radio .dot {
+    width: 12px; height: 12px; border-radius: 50%;
+    border: 1px solid #6a5420; background: #e8dcb0;
+  }
+  .radio.on .dot {
+    background: radial-gradient(circle at 50% 50%, #2a1808 35%, #e8dcb0 40%);
+  }
+  input[type="text"] {
+    width: 180px; font-size: .74rem; padding: 3px 6px;
+    border: 1px solid #8a7028; background: #f8f0d8; color: var(--ink);
+    font-family: "Trebuchet MS", sans-serif;
+  }
+  .hint { font-size: .68rem; color: var(--muted); margin-top: 4px; line-height: 1.35; }
+
+  .matches {
+    flex: 1; min-height: 120px; max-height: 160px; overflow: auto;
+    border: 1px solid #8a7028; background: rgba(255,248,220,.5);
+    font-size: .72rem;
+  }
+  .match {
+    padding: 5px 8px; border-bottom: 1px solid rgba(138,112,40,.35);
+    display: grid; grid-template-columns: 72px 1fr; gap: 4px 8px;
+  }
+  .match .who { color: #4a3010; font-weight: bold; }
+  .match .when { color: var(--muted); font-size: .66rem; }
+  .match .comp { color: var(--ink-soft); grid-column: 1 / -1; }
+
+  .footer {
+    display: flex; justify-content: flex-end; gap: 8px; padding-top: 4px;
+  }
+  .btn {
+    min-width: 88px; padding: 5px 14px; font-size: .76rem;
+    color: #f0e2c0; text-shadow: 0 1px 0 #000;
+    background: linear-gradient(180deg, #6a5428, #3a2a10);
+    border: 1px solid #8a7028; border-radius: 3px;
+    box-shadow: inset 0 1px 0 rgba(255,220,100,.25);
+    font-family: "Trebuchet MS", sans-serif; text-align: center;
+  }
+</style>
+</head>
+<body>
+  <h1>AscensionLFM — settings window mockup</h1>
+  <p class="lead">
+    Native WotLK DialogFrame / parchment chrome. Slash: <code>/alfm</code> or <code>/mslfm</code>.
+    Modes: Off (default) · Notify only · Seeking (optional auto-whisper) · Hosting (auto-invite from whispers).
+  </p>
+
+  <div class="dialog">
+    <div class="titlebar">
+      <h2>AscensionLFM</h2>
+      <p class="subhead">Manastorm Level Run LFM scanner · v0.1.0</p>
+    </div>
+    <div class="close">×</div>
+
+    <div class="body">
+      <div class="status">
+        Status: <strong>Listening</strong> · Mode: <span class="mode">Notify only</span><br />
+        Last match: <em>Thrall</em> — MS 0/2 T · 1/3 H · 0/3 A · 2/7 D
+      </div>
+
+      <div class="section">
+        <h3>Mode</h3>
+        <div class="row">
+          <span class="radio"><span class="dot"></span> Off</span>
+          <span class="radio on"><span class="dot"></span> Notify only</span>
+          <span class="radio"><span class="dot"></span> Seeking</span>
+          <span class="radio"><span class="dot"></span> Hosting</span>
+        </div>
+        <p class="hint">
+          <b>Seeking:</b> scan public chat for LFM MS; notify; optional auto-whisper leader.<br />
+          <b>Hosting:</b> scan whispers for tank/heal/dps/aura and InviteUnit if a matching slot remains.
+        </p>
+      </div>
+
+      <div class="section">
+        <h3>My roles (seeking) / Accept roles (hosting)</h3>
+        <div class="row">
+          <span class="check on"><span class="box"></span> Tank</span>
+          <span class="check"><span class="box"></span> Healer</span>
+          <span class="check on"><span class="box"></span> Aura</span>
+          <span class="check on"><span class="box"></span> DPS</span>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3>Seeking options</h3>
+        <div class="row">
+          <span class="check"><span class="box"></span> Auto-whisper leader</span>
+          <label>Message <input type="text" value="inv ms tank" /></label>
+        </div>
+        <p class="hint">Rate-limited · skipped if ignored · never whispers when mode is Off/Notify.</p>
+      </div>
+
+      <div class="section">
+        <h3>Hosting options</h3>
+        <div class="row">
+          <span class="check on"><span class="box"></span> Auto-invite matching whispers</span>
+          <label>Max party size <input type="text" value="5" style="width:40px" /></label>
+        </div>
+        <p class="hint">Uses InviteUnit · respects ignore list · skips when party/raid is full.</p>
+      </div>
+
+      <div class="section" style="flex:1; display:flex; flex-direction:column;">
+        <h3>Recent Manastorm LFM matches</h3>
+        <div class="matches">
+          <div class="match">
+            <span class="who">Thrall</span><span class="when">12s ago · channel</span>
+            <span class="comp">LFM MS 0/2 Tanks 0/3 Healers 0/3 Aura 0/7 DPS</span>
+          </div>
+          <div class="match">
+            <span class="who">Jaina</span><span class="when">48s ago · whisper</span>
+            <span class="comp">lfm manastorm need heals + dps</span>
+          </div>
+          <div class="match">
+            <span class="who">Cairne</span><span class="when">2m ago · yell</span>
+            <span class="comp">LFM MS 1/2 Tank 2/3 H 0/7 DPS</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer">
+        <div class="btn">Clear</div>
+        <div class="btn">Close</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

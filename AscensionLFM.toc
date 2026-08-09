@@ -1,0 +1,13 @@
+## Interface: 30300
+## Title: AscensionLFM
+## Notes: Manastorm Level Run LFM scanner — notify, optional auto-whisper, optional host auto-invite.
+## Author: Lzra2000
+## Version: 0.1.0
+## SavedVariables: AscensionLFMDB
+
+core\Bootstrap.lua
+core\Database.lua
+core\Parser.lua
+core\Scanner.lua
+core\Invite.lua
+ui\MainWindow.lua
