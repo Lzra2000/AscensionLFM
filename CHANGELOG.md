@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.1
+
+- Settings UI rebuilt as AscensionSuite-style **Categories** sidebar: General · Seeking · Hosting · Kick · Log.
+- Right parchment page switches per category (no single-column control pile-up); content clipped inside DialogFrame.
+- Mockup updated (`docs/sketch/ascension-lfm-mockup.html`); light UI smoke test for frame + category helpers.
+- All v0.2.0 scanner / slots / invite / kick behavior unchanged (kick still default OFF).
+
 ## 0.2.0
 
 - Scan **LFG** Manastorm lines as well as LFM (notify / seeking; toggle **Scan LFG MS**).
