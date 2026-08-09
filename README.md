@@ -53,13 +53,25 @@ Recognized (case-insensitive), among others:
 
 Public listings need an LFM **or** LFG cue plus Manastorm (`MS` / `Manastorm`). Duplicate spam from the same leader with the same slot fingerprint is suppressed for ~45s.
 
+## Settings UI (`/alfm`)
+
+Native DialogFrame with a left **Categories** sidebar:
+
+| Category | Contents |
+|----------|----------|
+| **General** | Status + mode Off / Notify / Seeking / Hosting |
+| **Seeking** | My roles, Scan LFG MS, auto-whisper + message |
+| **Hosting** | Accept roles, auto-invite, require-role, max size, slot caps T/H/A/D + filled |
+| **Kick** | Opt-in level-59 kick + recent kick log |
+| **Log** | Recent LFM/LFG matches (Clear) |
+
 ## How to enable hosting + slots + 59-kick
 
-1. `/alfm` → Mode **Hosting**.
-2. Check **Accept roles** you want (Tank / Healer / Aura / DPS).
+1. `/alfm` → **General** → Mode **Hosting**.
+2. **Hosting** → check **Accept roles** (Tank / Healer / Aura / DPS).
 3. Set **Max T/H/A/D** slot caps (defaults 2/3/3/7) and **Max size** (15).
 4. Leave **Auto-invite matching role whispers** and **Require role in whisper** on.
-5. Optionally enable **Kick at level 59 + raid warning** (dangerous; default off).
+5. Optionally **Kick** → enable **Kick at level 59 + raid warning** (dangerous; default off).
 
 ## Safety
 

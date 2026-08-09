@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>AscensionLFM — native WotLK settings mockup</title>
+<title>AscensionLFM — native WotLK settings (Categories sidebar)</title>
 <style>
   :root {
     --ink: #1a1208;
@@ -25,11 +25,12 @@
       linear-gradient(180deg, #2a2218, #12100c 60%, #0a0906);
   }
   h1 { margin: 0 0 6px; font-size: 1.15rem; color: #f0e2c0; font-weight: normal; }
-  .lead { color: #9c927f; max-width: 52rem; line-height: 1.5; margin: 0 0 16px; font-size: .86rem; font-family: "Trebuchet MS", sans-serif; }
+  .lead { color: #9c927f; max-width: 72rem; line-height: 1.5; margin: 0 0 16px; font-size: .86rem; font-family: "Trebuchet MS", sans-serif; }
   code { color: #edcd82; }
+  .stage { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
 
   .dialog {
-    width: 540px; min-height: 640px;
+    width: 720px; height: 520px;
     background:
       linear-gradient(180deg, rgba(255,220,120,.08), transparent 40%),
       repeating-linear-gradient(0deg, #b8a47a 0 2px, #c4b088 2px 4px);
@@ -40,7 +41,7 @@
       0 0 0 2px #1a1408,
       0 16px 40px rgba(0,0,0,.7);
     border-radius: 2px;
-    padding: 10px 12px 12px;
+    padding: 10px 12px 10px;
     display: flex; flex-direction: column;
     position: relative; overflow: hidden;
   }
@@ -68,35 +69,88 @@
   }
 
   .body {
-    flex: 1; padding: 12px 8px 8px;
-    font-family: "Trebuchet MS", sans-serif;
-    display: flex; flex-direction: column; gap: 10px;
+    flex: 1; min-height: 0; display: flex; gap: 0;
+    margin-top: 8px; border: 1px solid #6a5420;
+    background: linear-gradient(180deg, #d4c4a0, #b8a47a);
+    box-shadow: inset 0 0 20px rgba(80,50,10,.25);
+    overflow: hidden;
   }
+
+  .sidebar {
+    width: 148px; flex: none;
+    background: linear-gradient(180deg, #3a3020, #241c10);
+    border-right: 2px solid #6a5420;
+    padding: 8px 6px;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .side-lbl {
+    font-size: .62rem; color: #c8a03c; text-transform: uppercase;
+    letter-spacing: .08em; padding: 2px 4px 6px;
+    font-family: "Trebuchet MS", sans-serif;
+  }
+  .nav {
+    padding: 8px 10px; font-size: .78rem; color: #e8d8a8;
+    background: linear-gradient(180deg, #4a3a22, #2a2010);
+    border: 1px solid #6a5420; border-radius: 3px;
+    text-shadow: 0 1px 0 #000;
+    font-family: "Trebuchet MS", sans-serif;
+    cursor: default;
+  }
+  .nav.on {
+    color: #1a1208; font-weight: bold;
+    background: linear-gradient(180deg, #e8c860, #b89030);
+    border-color: #f0d060;
+    text-shadow: none;
+    box-shadow: inset 0 1px 0 rgba(255,255,180,.4), 0 0 0 1px #6a5420;
+  }
+
+  .main {
+    flex: 1; min-width: 0; min-height: 0;
+    display: flex; flex-direction: column; padding: 10px 12px 8px;
+    overflow: hidden;
+  }
+  .main-head { flex: none; margin-bottom: 8px; }
+  .main-head h3 {
+    margin: 0 0 3px; font-size: .98rem; color: #4a3008;
+    text-shadow: 0 1px 0 rgba(255,240,180,.4);
+  }
+  .main-head .sub {
+    margin: 0; font-size: .74rem; color: var(--ink-soft);
+    font-family: "Trebuchet MS", sans-serif; line-height: 1.35;
+  }
+
+  .scroll {
+    flex: 1; min-height: 0; overflow: auto;
+    border: 1px solid #8a7028; background: rgba(255,248,220,.35);
+    box-shadow: inset 0 0 8px rgba(80,50,10,.2);
+    padding: 10px;
+  }
+
   .status {
     border: 1px solid #8a7028;
     background: rgba(250,240,210,.55);
     padding: 8px 10px;
     font-size: .78rem;
     color: var(--ink-soft);
+    margin-bottom: 10px;
+    font-family: "Trebuchet MS", sans-serif;
   }
   .status strong { color: var(--ok); }
   .status .mode { color: var(--warn); font-weight: bold; }
   .status .kick { color: #c04040; font-weight: bold; }
 
-  .section {
-    border: 1px solid #9a8040;
-    background: rgba(250,240,210,.4);
-    padding: 8px 10px 10px;
+  .sec {
+    font-size: .68rem; color: #6a4a18; text-transform: uppercase;
+    letter-spacing: .08em; margin: 0 0 8px;
+    font-family: "Trebuchet MS", sans-serif; font-weight: bold;
   }
-  .section h3 {
-    margin: 0 0 8px; font-size: .78rem; color: #5a4010;
-    font-family: "Friz Quadrata TT", "Trebuchet MS", serif;
-    letter-spacing: .4px; font-weight: normal;
-    border-bottom: 1px solid rgba(138,112,40,.45);
-    padding-bottom: 4px;
+  .sec + .sec { margin-top: 14px; }
+
+  .row {
+    display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center;
+    margin: 4px 0 10px; font-size: .76rem;
+    font-family: "Trebuchet MS", sans-serif;
   }
-  .section h3.danger { color: var(--danger); }
-  .row { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; margin: 4px 0; font-size: .76rem; }
   .check {
     display: inline-flex; align-items: center; gap: 6px; cursor: default;
   }
@@ -121,149 +175,306 @@
   .radio.on .dot {
     background: radial-gradient(circle at 50% 50%, #2a1808 35%, #e8dcb0 40%);
   }
+
+  .toggle {
+    display: flex; gap: 10px; align-items: flex-start;
+    padding: 9px 10px; margin-bottom: 7px;
+    border: 1px solid #8a7028; background: rgba(255,248,220,.5);
+    box-shadow: inset 0 1px 0 rgba(255,255,220,.35);
+    font-family: "Trebuchet MS", sans-serif;
+  }
+  .toggle .tbox {
+    width: 18px; height: 18px; flex: none; margin-top: 1px;
+    border: 2px solid #6a5420; background: #1a1408;
+    box-shadow: inset 0 0 3px #000;
+    position: relative;
+  }
+  .toggle .tbox.on::after {
+    content: ""; position: absolute; inset: 2px;
+    background: linear-gradient(135deg, #f0d060, #c8a030);
+  }
+  .toggle .t {
+    font-size: .82rem; color: #6a3a08; font-weight: bold;
+  }
+  .toggle .d {
+    font-size: .72rem; color: var(--muted); margin-top: 3px; line-height: 1.35;
+  }
+  .toggle.danger .t { color: var(--danger); }
+
   input[type="text"] {
-    width: 180px; font-size: .74rem; padding: 3px 6px;
+    width: 200px; font-size: .74rem; padding: 3px 6px;
     border: 1px solid #8a7028; background: #f8f0d8; color: var(--ink);
     font-family: "Trebuchet MS", sans-serif;
   }
-  input.tiny { width: 32px; text-align: center; }
-  .hint { font-size: .68rem; color: var(--muted); margin-top: 4px; line-height: 1.35; }
-  .filled { font-size: .72rem; color: var(--ink-soft); margin-top: 6px; }
+  input.tiny { width: 36px; text-align: center; }
+  .hint { font-size: .68rem; color: var(--muted); margin: 4px 0 0; line-height: 1.4;
+    font-family: "Trebuchet MS", sans-serif; }
+  .filled { font-size: .74rem; color: var(--ink-soft); margin-top: 8px;
+    font-family: "Trebuchet MS", sans-serif; }
 
-  .matches {
-    flex: 1; min-height: 90px; max-height: 120px; overflow: auto;
+  .matches, .kicks {
     border: 1px solid #8a7028; background: rgba(255,248,220,.5);
-    font-size: .72rem;
+    font-size: .72rem; font-family: "Trebuchet MS", sans-serif;
   }
-  .match {
-    padding: 5px 8px; border-bottom: 1px solid rgba(138,112,40,.35);
-    display: grid; grid-template-columns: 72px 1fr; gap: 4px 8px;
+  .match, .k {
+    padding: 6px 8px; border-bottom: 1px solid rgba(138,112,40,.35);
   }
-  .match .who { color: #4a3010; font-weight: bold; }
+  .match .who { color: #4a3010; font-weight: bold; margin-right: 8px; }
   .match .when { color: var(--muted); font-size: .66rem; }
-  .match .comp { color: var(--ink-soft); grid-column: 1 / -1; }
-
-  .kicks { font-size: .72rem; color: var(--ink-soft); min-height: 36px; }
-  .kicks .k { margin: 2px 0; }
+  .match .comp { display: block; color: var(--ink-soft); margin-top: 2px; }
+  .k b { color: #4a3010; }
 
   .footer {
-    display: flex; justify-content: flex-end; gap: 8px; padding-top: 4px;
+    flex: none; display: flex; align-items: center; gap: 8px;
+    margin-top: 8px; padding-top: 8px; border-top: 1px solid #8a7028;
+  }
+  .footer .status-txt {
+    flex: 1; font-size: .72rem; color: var(--muted);
+    font-family: "Trebuchet MS", sans-serif;
   }
   .btn {
-    min-width: 88px; padding: 5px 14px; font-size: .76rem;
+    min-width: 72px; padding: 5px 14px; font-size: .76rem;
     color: #f0e2c0; text-shadow: 0 1px 0 #000;
     background: linear-gradient(180deg, #6a5428, #3a2a10);
     border: 1px solid #8a7028; border-radius: 3px;
     box-shadow: inset 0 1px 0 rgba(255,220,100,.25);
     font-family: "Trebuchet MS", sans-serif; text-align: center;
   }
+
+  .aside {
+    width: 260px; font-size: .8rem; color: #9c927f; line-height: 1.45;
+    font-family: "Trebuchet MS", sans-serif;
+  }
+  .aside h3 { color: #c8a03c; font-size: .88rem; margin: 0 0 8px; }
+  .aside ul { margin: 0; padding-left: 1.1rem; }
+  .aside li { margin-bottom: 6px; }
+  .page { display: none; }
+  .page.on { display: block; }
 </style>
 </head>
 <body>
-  <h1>AscensionLFM — settings window mockup</h1>
+  <h1>AscensionLFM — Categories sidebar settings (v0.2.1)</h1>
   <p class="lead">
-    Native WotLK DialogFrame / parchment chrome. Slash: <code>/alfm</code> or <code>/mslfm</code>.
-    v0.2.0 — LFM+LFG scan, host role slots, opt-in level-59 kick.
+    AscensionSuite-style native WotLK chrome: left <strong>Categories</strong>, right parchment
+    page per category (not one cramped column). Slash: <code>/alfm</code> · DialogFrame / parchment /
+    <code>UIPanelButton</code> / <code>UICheckButton</code>. Click nav to preview pages.
   </p>
 
-  <div class="dialog">
-    <div class="titlebar">
-      <h2>AscensionLFM</h2>
-      <p class="subhead">Manastorm Level Run LFM/LFG · v0.2.0</p>
-    </div>
-    <div class="close">×</div>
-
-    <div class="body">
-      <div class="status">
-        Status: <strong>Listening</strong> · Mode: <span class="mode">Hosting</span> · <span class="kick">Kick59 ON</span><br />
-        Last match: <em>Thrall</em> — MS 0/2 T · 1/3 H · 0/3 A · 2/7 D
+  <div class="stage">
+    <div class="dialog" id="dlg">
+      <div class="titlebar">
+        <h2>AscensionLFM</h2>
+        <p class="subhead">Manastorm Level Run LFM/LFG · v0.2.1</p>
       </div>
+      <div class="close">×</div>
 
-      <div class="section">
-        <h3>Mode</h3>
-        <div class="row">
-          <span class="radio"><span class="dot"></span> Off</span>
-          <span class="radio"><span class="dot"></span> Notify only</span>
-          <span class="radio"><span class="dot"></span> Seeking</span>
-          <span class="radio on"><span class="dot"></span> Hosting</span>
-        </div>
-        <p class="hint">
-          <b>Seeking:</b> LFM/LFG MS scan; optional auto-whisper LFM leaders.<br />
-          <b>Hosting:</b> role whispers → InviteUnit only if accepted role + open slot.
-        </p>
-      </div>
+      <div class="body">
+        <nav class="sidebar" id="sidebar">
+          <div class="side-lbl">Categories</div>
+          <div class="nav on" data-cat="general">General</div>
+          <div class="nav" data-cat="seeking">Seeking</div>
+          <div class="nav" data-cat="hosting">Hosting</div>
+          <div class="nav" data-cat="kick">Kick</div>
+          <div class="nav" data-cat="log">Log</div>
+        </nav>
 
-      <div class="section">
-        <h3>My roles (seeking) / Accept roles (hosting)</h3>
-        <div class="row">
-          <span class="check on"><span class="box"></span> Tank</span>
-          <span class="check on"><span class="box"></span> Healer</span>
-          <span class="check on"><span class="box"></span> Aura</span>
-          <span class="check on"><span class="box"></span> DPS</span>
-        </div>
-      </div>
-
-      <div class="section">
-        <h3>Seeking options</h3>
-        <div class="row">
-          <span class="check on"><span class="box"></span> Scan LFG MS lines</span>
-          <span class="check"><span class="box"></span> Auto-whisper LFM leader</span>
-          <label>Message <input type="text" value="inv ms tank" /></label>
-        </div>
-      </div>
-
-      <div class="section">
-        <h3>Hosting · role slots</h3>
-        <div class="row">
-          <span class="check on"><span class="box"></span> Auto-invite matching role whispers</span>
-          <span class="check on"><span class="box"></span> Require role in whisper</span>
-        </div>
-        <div class="row">
-          <label>Max size <input class="tiny" type="text" value="15" /></label>
-          <label>Max T <input class="tiny" type="text" value="2" /></label>
-          <label>H <input class="tiny" type="text" value="3" /></label>
-          <label>A <input class="tiny" type="text" value="3" /></label>
-          <label>D <input class="tiny" type="text" value="7" /></label>
-        </div>
-        <div class="filled">Filled: T 1/2  ·  H 0/3  ·  A 1/3  ·  D 2/7</div>
-        <p class="hint">Whisper roles: tank/OT/MT · heal/HPS · Aura of Exp / exp aura · dps/DD. No blind invite.</p>
-      </div>
-
-      <div class="section">
-        <h3 class="danger">Level-59 auto-kick (opt-in · dangerous)</h3>
-        <div class="row">
-          <span class="check on"><span class="box"></span> Enable kick at level 59 + raid warning every 10s</span>
-        </div>
-        <p class="hint">Hosting only · leader/assist · ignores self · RW then UninviteUnit. Default OFF.</p>
-      </div>
-
-      <div class="section">
-        <h3>Recent kicks</h3>
-        <div class="kicks">
-          <div class="k"><b>Bob</b> at level 59</div>
-          <div class="k"><b>Carl</b> at level 60</div>
-        </div>
-      </div>
-
-      <div class="section" style="flex:1; display:flex; flex-direction:column;">
-        <h3>Recent Manastorm LFM/LFG matches</h3>
-        <div class="matches">
-          <div class="match">
-            <span class="who">Thrall</span><span class="when">12s ago · channel/lfm</span>
-            <span class="comp">LFM MS 0/2 Tanks 0/3 Healers 0/3 Aura 0/7 DPS</span>
+        <div class="main">
+          <div class="main-head">
+            <h3 id="head-title">General</h3>
+            <p class="sub" id="head-sub">Mode, status, and safety overview. Scanner stays idle until you leave Off.</p>
           </div>
-          <div class="match">
-            <span class="who">Jaina</span><span class="when">48s ago · yell/lfg</span>
-            <span class="comp">lfg manastorm need heals</span>
+
+          <div class="scroll">
+            <!-- GENERAL -->
+            <div class="page on" data-page="general">
+              <div class="status">
+                Status: <strong>Listening</strong> · Mode: <span class="mode">Hosting</span> · <span class="kick">Kick59 ON</span><br />
+                Last match: <em>Thrall</em> — MS 0/2 T · 1/3 H · 0/3 A · 2/7 D
+              </div>
+              <div class="sec">Mode</div>
+              <div class="row">
+                <span class="radio"><span class="dot"></span> Off</span>
+                <span class="radio"><span class="dot"></span> Notify only</span>
+                <span class="radio"><span class="dot"></span> Seeking</span>
+                <span class="radio on"><span class="dot"></span> Hosting</span>
+              </div>
+              <p class="hint">
+                <b>Off</b> — no scanning side effects.<br />
+                <b>Notify</b> — print MS LFM/LFG matches to chat + Log.<br />
+                <b>Seeking</b> — match open roles; optional auto-whisper LFM leaders.<br />
+                <b>Hosting</b> — role whispers → invite only if accepted role + open slot.
+              </p>
+            </div>
+
+            <!-- SEEKING -->
+            <div class="page" data-page="seeking">
+              <div class="sec">My roles</div>
+              <div class="row">
+                <span class="check on"><span class="box"></span> Tank</span>
+                <span class="check on"><span class="box"></span> Healer</span>
+                <span class="check on"><span class="box"></span> Aura</span>
+                <span class="check on"><span class="box"></span> DPS</span>
+              </div>
+              <div class="sec">Seeking options</div>
+              <div class="toggle">
+                <div class="tbox on"></div>
+                <div>
+                  <div class="t">Scan LFG MS lines</div>
+                  <div class="d">Also notify on LFG Manastorm seekers (no auto-whisper to them).</div>
+                </div>
+              </div>
+              <div class="toggle">
+                <div class="tbox"></div>
+                <div>
+                  <div class="t">Auto-whisper LFM leader</div>
+                  <div class="d">Rate-limited whisper when a listing still needs one of your roles. Off by default.</div>
+                </div>
+              </div>
+              <div class="row" style="margin-top:10px;">
+                <label>Whisper message <input type="text" value="inv ms tank" /></label>
+              </div>
+            </div>
+
+            <!-- HOSTING -->
+            <div class="page" data-page="hosting">
+              <div class="sec">Accept roles</div>
+              <div class="row">
+                <span class="check on"><span class="box"></span> Tank</span>
+                <span class="check on"><span class="box"></span> Healer</span>
+                <span class="check on"><span class="box"></span> Aura</span>
+                <span class="check on"><span class="box"></span> DPS</span>
+              </div>
+              <div class="sec">Invite</div>
+              <div class="toggle">
+                <div class="tbox on"></div>
+                <div>
+                  <div class="t">Auto-invite matching role whispers</div>
+                  <div class="d">InviteUnit only when the whisper role is accepted and that slot is open.</div>
+                </div>
+              </div>
+              <div class="toggle">
+                <div class="tbox on"></div>
+                <div>
+                  <div class="t">Require role in whisper</div>
+                  <div class="d">Default-deny whispers with no tank/heal/aura/dps cue. No blind invites.</div>
+                </div>
+              </div>
+              <div class="sec">Slots</div>
+              <div class="row">
+                <label>Max size <input class="tiny" type="text" value="15" /></label>
+                <label>Max T <input class="tiny" type="text" value="2" /></label>
+                <label>H <input class="tiny" type="text" value="3" /></label>
+                <label>A <input class="tiny" type="text" value="3" /></label>
+                <label>D <input class="tiny" type="text" value="7" /></label>
+              </div>
+              <div class="filled">Filled: T 1/2  ·  H 0/3  ·  A 1/3  ·  D 2/7</div>
+              <p class="hint">Whisper roles: tank/OT/MT · heal/HPS · Aura of Exp / exp aura · dps/DD.</p>
+            </div>
+
+            <!-- KICK -->
+            <div class="page" data-page="kick">
+              <div class="sec">Level-59 auto-kick</div>
+              <div class="toggle danger">
+                <div class="tbox on"></div>
+                <div>
+                  <div class="t">Enable kick at level 59 + raid warning every 10s</div>
+                  <div class="d">Hosting only · leader/assist · ignores self · RW then UninviteUnit. Default OFF.</div>
+                </div>
+              </div>
+              <div class="sec">Recent kicks</div>
+              <div class="kicks">
+                <div class="k"><b>Bob</b> at level 59</div>
+                <div class="k"><b>Carl</b> at level 60</div>
+                <div class="k" style="color:var(--muted);">No more kicks.</div>
+              </div>
+            </div>
+
+            <!-- LOG -->
+            <div class="page" data-page="log">
+              <div class="sec">Recent Manastorm LFM/LFG matches</div>
+              <div class="matches">
+                <div class="match">
+                  <span class="who">Thrall</span><span class="when">12s ago · channel/lfm</span>
+                  <span class="comp">LFM MS 0/2 Tanks 0/3 Healers 0/3 Aura 0/7 DPS</span>
+                </div>
+                <div class="match">
+                  <span class="who">Jaina</span><span class="when">48s ago · yell/lfg</span>
+                  <span class="comp">lfg manastorm need heals</span>
+                </div>
+                <div class="match">
+                  <span class="who">Uther</span><span class="when">2m ago · say/lfm</span>
+                  <span class="comp">lfm ms need tank and aura</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="footer">
+            <span class="status-txt" id="foot">Mode Hosting · Kick59 ON</span>
+            <div class="btn" id="clear-btn" style="display:none;">Clear</div>
+            <div class="btn">Close</div>
           </div>
         </div>
       </div>
-
-      <div class="footer">
-        <div class="btn">Clear</div>
-        <div class="btn">Close</div>
-      </div>
     </div>
+
+    <aside class="aside">
+      <h3>Categories</h3>
+      <ul>
+        <li><b>General</b> — status + mode Off/Notify/Seeking/Hosting</li>
+        <li><b>Seeking</b> — my roles, scan LFG, auto-whisper + message</li>
+        <li><b>Hosting</b> — accept roles, invite toggles, slot maxes + filled</li>
+        <li><b>Kick</b> — opt-in level-59 kick + recent kick log</li>
+        <li><b>Log</b> — recent LFM/LFG matches (Clear)</li>
+      </ul>
+      <p style="margin-top:14px;font-size:.74rem;color:#c8b896;">
+        Everything clipped inside the DialogFrame. Content pages swap; no overlapping pile-up.
+      </p>
+    </aside>
   </div>
+
+<script>
+(function () {
+  var titles = {
+    general: ["General", "Mode, status, and safety overview. Scanner stays idle until you leave Off."],
+    seeking: ["Seeking", "Roles you play and optional auto-whisper when an LFM still needs you."],
+    hosting: ["Hosting", "Accept roles, invite rules, and Manastorm slot caps (default 2/3/3/7)."],
+    kick: ["Kick", "Opt-in level-59 auto-kick with raid warning. Dangerous — default OFF."],
+    log: ["Log", "Recent Manastorm LFM/LFG matches from public chat and whispers."]
+  };
+  var navs = document.querySelectorAll("#sidebar .nav");
+  var pages = document.querySelectorAll(".page");
+  var headT = document.getElementById("head-title");
+  var headS = document.getElementById("head-sub");
+  var clearBtn = document.getElementById("clear-btn");
+  var foot = document.getElementById("foot");
+
+  function show(cat) {
+    for (var i = 0; i < navs.length; i++) {
+      navs[i].classList.toggle("on", navs[i].getAttribute("data-cat") === cat);
+    }
+    for (var j = 0; j < pages.length; j++) {
+      pages[j].classList.toggle("on", pages[j].getAttribute("data-page") === cat);
+    }
+    var info = titles[cat];
+    if (info) {
+      headT.textContent = info[0];
+      headS.textContent = info[1];
+    }
+    clearBtn.style.display = (cat === "log" || cat === "kick") ? "block" : "none";
+    foot.textContent = (cat === "kick")
+      ? "Kick log · Clear removes kick history"
+      : (cat === "log")
+        ? "Match log · Clear removes match history"
+        : "Mode Hosting · Kick59 ON";
+  }
+
+  for (var k = 0; k < navs.length; k++) {
+    navs[k].addEventListener("click", function (ev) {
+      show(ev.currentTarget.getAttribute("data-cat"));
+    });
+  }
+})();
+</script>
 </body>
 </html>
