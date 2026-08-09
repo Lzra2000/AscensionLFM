@@ -25,6 +25,11 @@ local CHAT_EVENTS = {
     "CHAT_MSG_WHISPER",
 }
 
+local ROSTER_EVENTS = {
+    "PARTY_MEMBERS_CHANGED",
+    "RAID_ROSTER_UPDATE",
+}
+
 local function Now()
     return (type(GetTime) == "function" and GetTime()) or os.clock()
 end
@@ -57,7 +62,7 @@ local function Fingerprint(parsed)
     if type(parsed) ~= "table" then
         return ""
     end
-    local bits = {}
+    local bits = { tostring(parsed.listingKind or "") }
     for _, role in ipairs({ "tank", "healer", "aura", "dps" }) do
         local info = parsed.roles and parsed.roles[role]
         if info then
@@ -103,8 +108,13 @@ local function SourceLabel(event)
     return "chat"
 end
 
+local function IsListing(parsed)
+    return parsed and (parsed.isManastormLFM or parsed.isManastormLFG or parsed.isManastormListing)
+end
+
 local function NotifyMatch(leader, parsed, source)
-    local line = string.format("%s — %s (%s)", tostring(leader), parsed.summary or "MS LFM", source)
+    local kind = parsed.isManastormLFG and "LFG" or "LFM"
+    local line = string.format("%s — %s (%s)", tostring(leader), parsed.summary or ("MS " .. kind), source)
     if AscensionLFM.Print then
         AscensionLFM.Print(line)
     end
@@ -114,6 +124,7 @@ local function NotifyMatch(leader, parsed, source)
             text = parsed.raw or parsed.summary,
             summary = parsed.summary,
             source = source,
+            kind = parsed.listingKind or (parsed.isManastormLFG and "lfg" or "lfm"),
             t = time and time() or 0,
         })
     end
@@ -124,6 +135,10 @@ end
 
 local function MaybeAutoWhisper(leader, parsed, db)
     if not db.autoWhisper then
+        return
+    end
+    -- Auto-whisper leaders of LFM listings; LFG seekers are not hosts
+    if parsed.isManastormLFG and not parsed.isManastormLFM then
         return
     end
     if type(SendChatMessage) ~= "function" then
@@ -157,22 +172,32 @@ local function MaybeAutoWhisper(leader, parsed, db)
 end
 
 local function ShouldNotify(db, parsed)
+    if parsed.isManastormLFG and db.scanLfg == false then
+        return false
+    end
     if db.mode == "notify" or db.mode == "hosting" then
         return true
     end
     if db.mode == "seeking" then
+        -- LFG: notify seekers of other seekers only if scanLfg; role filter soft
+        if parsed.isManastormLFG and not parsed.isManastormLFM then
+            return db.scanLfg ~= false
+        end
         return AscensionLFM.Parser.NeedsAnyRole(parsed, db.roles)
     end
     return false
 end
 
-local function HandlePublicLFM(leader, message, event)
+local function HandlePublicListing(leader, message, event)
     local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
     if not db or db.mode == "off" then
         return
     end
     local parsed = AscensionLFM.Parser.Parse(message)
-    if not parsed or not parsed.isManastormLFM then
+    if not IsListing(parsed) then
+        return
+    end
+    if parsed.isManastormLFG and not parsed.isManastormLFM and db.scanLfg == false then
         return
     end
     local window = tonumber(db.dedupeSeconds) or 45
@@ -185,7 +210,7 @@ local function HandlePublicLFM(leader, message, event)
         NotifyMatch(leader, parsed, SourceLabel(event))
     end
 
-    if db.mode == "seeking" and AscensionLFM.Parser.NeedsAnyRole(parsed, db.roles) then
+    if db.mode == "seeking" and parsed.isManastormLFM and AscensionLFM.Parser.NeedsAnyRole(parsed, db.roles) then
         MaybeAutoWhisper(leader, parsed, db)
     end
 end
@@ -198,14 +223,17 @@ local function HandleWhisper(sender, message)
 
     if db.mode == "notify" or db.mode == "seeking" then
         local parsed = AscensionLFM.Parser.Parse(message)
-        if parsed and parsed.isManastormLFM then
+        if IsListing(parsed) then
+            if parsed.isManastormLFG and not parsed.isManastormLFM and db.scanLfg == false then
+                return
+            end
             local window = tonumber(db.dedupeSeconds) or 45
             if not IsDupe(sender, parsed, window) then
                 Remember(sender, parsed)
                 if ShouldNotify(db, parsed) then
                     NotifyMatch(sender, parsed, "whisper")
                 end
-                if db.mode == "seeking" then
+                if db.mode == "seeking" and parsed.isManastormLFM then
                     MaybeAutoWhisper(sender, parsed, db)
                 end
             end
@@ -220,6 +248,15 @@ local function HandleWhisper(sender, message)
     end
 end
 
+local function HandleRoster()
+    if AscensionLFM.Slots and AscensionLFM.Slots.SyncFromRoster then
+        AscensionLFM.Slots.SyncFromRoster()
+    end
+    if AscensionLFM.MainWindow and AscensionLFM.MainWindow.RefreshSlots then
+        AscensionLFM.MainWindow.RefreshSlots()
+    end
+end
+
 local frame
 
 function Scanner.Start()
@@ -230,7 +267,14 @@ function Scanner.Start()
     for _, ev in ipairs(CHAT_EVENTS) do
         frame:RegisterEvent(ev)
     end
+    for _, ev in ipairs(ROSTER_EVENTS) do
+        frame:RegisterEvent(ev)
+    end
     frame:SetScript("OnEvent", function(_, event, message, sender)
+        if event == "PARTY_MEMBERS_CHANGED" or event == "RAID_ROSTER_UPDATE" then
+            HandleRoster()
+            return
+        end
         if type(message) ~= "string" or message == "" then
             return
         end
@@ -247,15 +291,19 @@ function Scanner.Start()
         if event == "CHAT_MSG_WHISPER" then
             HandleWhisper(sender, message)
         else
-            HandlePublicLFM(sender, message, event)
+            HandlePublicListing(sender, message, event)
         end
     end)
+    if AscensionLFM.Kick and AscensionLFM.Kick.Start then
+        AscensionLFM.Kick.Start()
+    end
 end
 
 function Scanner.GetRecent()
     return recent
 end
 
-Scanner._HandlePublicLFM = HandlePublicLFM
+Scanner._HandlePublicLFM = HandlePublicListing
+Scanner._HandlePublicListing = HandlePublicListing
 Scanner._HandleWhisper = HandleWhisper
 Scanner._Fingerprint = Fingerprint

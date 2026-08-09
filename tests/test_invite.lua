@@ -16,6 +16,7 @@ end
 
 dofile("core/Database.lua")
 dofile("core/Parser.lua")
+dofile("core/Slots.lua")
 dofile("core/Invite.lua")
 
 local AscensionLFM = _G.AscensionLFM
@@ -23,11 +24,14 @@ AscensionLFM.Database.Init()
 local db = AscensionLFM.Database.Get()
 db.mode = "hosting"
 db.autoInvite = true
-db.roles = { tank = true, healer = true, aura = false, dps = true }
-db.maxPartySize = 5
+db.roles = { tank = true, healer = true, aura = true, dps = true }
+db.maxPartySize = 15
 db.inviteCooldown = 0
+db.requireRoleWhisper = true
+db.slotMax = { tank = 2, healer = 3, aura = 3, dps = 7 }
 
 local Invite = AscensionLFM.Invite
+local Slots = AscensionLFM.Slots
 local failed = 0
 local passed = 0
 
@@ -40,36 +44,85 @@ local function check(name, cond, detail)
     end
 end
 
+Slots.ClearAll()
 check("group size includes player", Invite.GetGroupSize() == 3)
-check("not full at 3/5", Invite.IsGroupFull(5) == false)
+check("not full at 3/15", Invite.IsGroupFull(15) == false)
 
 Invite._ResetCooldowns()
 local ok = Invite.TryHostInvite("Bob", "inv ms tank")
 check("host invite tank", ok == true)
 check("InviteUnit called", invited[1] == "Bob")
+check("tank assigned", Slots.GetAssigned("Bob") == "tank")
+check("tank filled 1", Slots.CountFilled("tank") == 1)
 
 Invite._ResetCooldowns()
 invited = {}
 ok = Invite.TryHostInvite("Ann", "aura ready")
-check("aura filtered out", ok == false)
+check("aura accepted when role enabled", ok == true)
+check("aura assigned", Slots.GetAssigned("Ann") == "aura")
 
 Invite._ResetCooldowns()
 invited = {}
 ok = Invite.TryHostInvite("Carl", "inv ms heal")
 check("host invite heal", ok == true)
 
-_G.GetNumPartyMembers = function() return 4 end -- size 5
+-- Slot full blocks invite
+Slots.ClearAll()
+Slots.Assign("T1", "tank")
+Slots.Assign("T2", "tank")
+check("tank slots full", Slots.HasOpenSlot("tank") == false)
 Invite._ResetCooldowns()
 invited = {}
+local reason
+ok, reason = Invite.TryHostInvite("T3", "tank")
+check("slot full blocks", ok == false)
+check("slot full reason", reason == "slot full")
+
+-- Aura of Exp
+Slots.ClearAll()
+Invite._ResetCooldowns()
+invited = {}
+ok = Invite.TryHostInvite("AuraGuy", "Aura of Exp")
+check("Aura of Exp invite", ok == true)
+check("Aura of Exp role", Slots.GetAssigned("AuraGuy") == "aura")
+
+-- No role = no blind invite
+Invite._ResetCooldowns()
+invited = {}
+ok, reason = Invite.TryHostInvite("Quiet", "inv ms please")
+check("no role denied", ok == false)
+check("no role reason", reason == "no role" or reason == "no parse")
+
+-- Role filtered
+db.roles.dps = false
+Invite._ResetCooldowns()
+invited = {}
+ok = Invite.TryHostInvite("DD", "dps")
+check("dps filtered", ok == false)
+db.roles.dps = true
+
+_G.GetNumPartyMembers = function() return 14 end -- size 15
+Invite._ResetCooldowns()
+invited = {}
+Slots.ClearAll()
 ok, reason = Invite.TryHostInvite("Dana", "tank")
 check("full party blocks", ok == false)
-check("full reason", reason == "full" or reason == "disabled" or true)
+check("full reason", reason == "full")
 
 _G.IsIgnored = function(name) return name == "Evil" end
 _G.GetNumPartyMembers = function() return 1 end
 Invite._ResetCooldowns()
 ok = Invite.InvitePlayer("Evil")
 check("ignore blocks invite", ok == false)
+
+-- Reconcile leavers
+local newMap, removed = Slots.ReconcileAssigned(
+    { bob = "tank", ann = "healer", gone = "dps" },
+    { bob = true, ann = true }
+)
+check("reconcile keeps bob", newMap.bob == "tank")
+check("reconcile drops gone", newMap.gone == nil)
+check("reconcile removed 1", removed == 1)
 
 io.write(string.format("invite tests: %d passed, %d failed\n", passed, failed))
 if failed > 0 then

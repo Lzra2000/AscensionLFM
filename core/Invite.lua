@@ -1,5 +1,5 @@
 -- AscensionLFM: core/Invite.lua
--- Hosting auto-invite via InviteUnit; party fullness + rate limits + ignore.
+-- Hosting auto-invite via InviteUnit; slots + party fullness + rate limits + ignore.
 
 local AscensionLFM = _G.AscensionLFM
 if type(AscensionLFM) ~= "table" then
@@ -42,7 +42,7 @@ function Invite.GetGroupSize()
 end
 
 function Invite.IsGroupFull(maxSize)
-    maxSize = tonumber(maxSize) or 5
+    maxSize = tonumber(maxSize) or 15
     if maxSize < 2 then
         maxSize = 2
     end
@@ -92,7 +92,7 @@ local function CanInvite(name, db)
     return true
 end
 
-function Invite.InvitePlayer(name)
+function Invite.InvitePlayer(name, role)
     local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
     local ok, reason = CanInvite(name, db)
     if not ok then
@@ -107,13 +107,20 @@ function Invite.InvitePlayer(name)
     end
     lastInviteAt[LowerName(name)] = Now()
     lastInviteGlobal = Now()
+    if role and AscensionLFM.Slots and AscensionLFM.Slots.Assign then
+        AscensionLFM.Slots.Assign(name, role)
+    end
     if AscensionLFM.Print then
-        AscensionLFM.Print("invited " .. tostring(name))
+        local roleBit = role and (" as " .. role) or ""
+        AscensionLFM.Print("invited " .. tostring(name) .. roleBit)
+    end
+    if AscensionLFM.MainWindow and AscensionLFM.MainWindow.RefreshSlots then
+        AscensionLFM.MainWindow.RefreshSlots()
     end
     return true
 end
 
---- Hosting path: parse whisper for a role we accept, then invite.
+--- Hosting path: parse whisper for a role we accept + open slot, then invite.
 function Invite.TryHostInvite(sender, message)
     local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
     if not db or db.mode ~= "hosting" or not db.autoInvite then
@@ -123,26 +130,35 @@ function Invite.TryHostInvite(sender, message)
     if not parsed then
         return false, "no parse"
     end
-    -- Prefer role-request / any parse that mentions a role we accept
     local role = AscensionLFM.Parser.RequestedRole(parsed)
     if not role then
+        if db.requireRoleWhisper ~= false then
+            return false, "no role"
+        end
         return false, "no role"
     end
     if not (db.roles and db.roles[role]) then
         return false, "role filtered"
     end
+    if AscensionLFM.Slots and AscensionLFM.Slots.HasOpenSlot then
+        if not AscensionLFM.Slots.HasOpenSlot(role) then
+            return false, "slot full"
+        end
+    end
     -- Soft Manastorm hint: accept pure role whispers while hosting MS runs
     local text = tostring(message or ""):lower()
     local msHint = text:find("ms", 1, true) or text:find("manastorm", 1, true)
         or text:find("inv", 1, true) or parsed.isRoleRequest or parsed.isManastormLFM
+        or parsed.isManastormLFG
     if not msHint then
-        -- Still allow bare "tank" / "heal" / "dps" / "aura" while hosting
-        local bare = text:match("^%s*(tank[s]?|heal[ers]*|heals?|dps|aura[s]?)%s*$")
+        local bare = text:match(
+            "^%s*(tank[s]?|ot|mt|heal[ers]*|heals?|hps|dps|aura[s]?|dd|damage|aura%s+of%s+exp[%w]*|exp%s+aura|aoe%s+aura)%s*$"
+        )
         if not bare then
             return false, "not ms-related"
         end
     end
-    return Invite.InvitePlayer(sender)
+    return Invite.InvitePlayer(sender, role)
 end
 
 Invite._CanInvite = CanInvite
