@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.0
+
+- Scan **LFG** Manastorm lines as well as LFM (notify / seeking; toggle **Scan LFG MS**).
+- Hosting whisper roles expanded: OT/MT, HPS, DD/Damage, **Aura of Exp** / exp aura / AoE aura (case-insensitive).
+- Per-role **slot caps** (default 2/3/3/7) with filled tracking; no invite when that role is full; UI max editors + filled row.
+- Default-deny invites when whisper has **no role**; overall max size default 15 for MS level runs.
+- Roster sync on `PARTY_MEMBERS_CHANGED` / `RAID_ROSTER_UPDATE` keeps whisper-assigned roles for present members.
+- **Opt-in** level-59 auto-kick: raid warning every 10s naming targets, then `UninviteUnit`; kick log in UI (default off; hosting + lead/assist only).
+- Settings UI expanded for LFG scan, slots, kick enable, recent kicks; mockup updated.
+
 ## 0.1.0
 
 - Initial release: Manastorm Level Run LFM scanner for Ascension WotLK 3.3.5a.

@@ -34,6 +34,7 @@ check("need tank mentioned", p and p.roles.tank and p.roles.tank.open)
 p = Parser.Parse("LFM Manastorm 1/2 Tank 2/3 H 0/7 DPS")
 check("Manastorm word", p and p.isManastormLFM)
 check("partial fills tank", p and p.roles.tank.filled == 1 and p.roles.tank.total == 2)
+check("H alias healer", p and p.roles.healer and p.roles.healer.filled == 2 and p.roles.healer.total == 3)
 
 -- Missing aura
 p = Parser.Parse("LFM MS 0/2 Tanks 1/3 Healers 3/7 DPS")
@@ -45,9 +46,22 @@ p = Parser.Parse("LFM MS 0/7 DPS 0/3 Heals 0/2 Tanks")
 check("shuffled dps first", p and p.roles.dps and p.roles.dps.total == 7)
 check("heals alias", p and p.roles.healer and p.roles.healer.total == 3)
 
+-- LFG listings
+p = Parser.Parse("LFG MS tank")
+check("LFG MS is listing", p and p.isManastormLFG == true and p.isManastormListing == true)
+check("LFG not LFM", p and p.isManastormLFM == false)
+check("LFG tank open", p and p.roles.tank and p.roles.tank.open)
+
+p = Parser.Parse("lfg manastorm need heals")
+check("lfg manastorm", p and p.isManastormLFG and p.roles.healer and p.roles.healer.open)
+
+p = Parser.Parse("LFG MS 0/2 Tanks 0/3 Healers")
+check("LFG with slots", p and p.isManastormLFG and p.roles.tank.total == 2)
+
 -- Non-match
 check("trade spam nil", Parser.Parse("WTS epic mount cheap") == nil)
 check("lfm without ms nil", Parser.Parse("LFM ICC 25 need tank") == nil)
+check("lfg without ms nil", Parser.Parse("LFG ICC need tank") == nil)
 check("ms without lfm soft", Parser.Parse("ms tank inv") ~= nil) -- role request path
 
 -- NeedsAnyRole
@@ -66,10 +80,37 @@ check("bare heal", p and Parser.RequestedRole(p) == "healer")
 p = Parser.Parse("dps please")
 check("dps please", p and Parser.RequestedRole(p) == "dps")
 
+p = Parser.Parse("OT")
+check("OT is tank", p and Parser.RequestedRole(p) == "tank")
+
+p = Parser.Parse("MT ready")
+check("MT is tank", p and Parser.RequestedRole(p) == "tank")
+
+p = Parser.Parse("HPS")
+check("HPS is healer", p and Parser.RequestedRole(p) == "healer")
+
+p = Parser.Parse("Aura of Exp")
+check("Aura of Exp", p and Parser.RequestedRole(p) == "aura")
+
+p = Parser.Parse("exp aura inv")
+check("exp aura", p and Parser.RequestedRole(p) == "aura")
+
+p = Parser.Parse("AoE aura")
+check("AoE aura", p and Parser.RequestedRole(p) == "aura")
+
+p = Parser.Parse("DD")
+check("DD is dps", p and Parser.RequestedRole(p) == "dps")
+
 -- Full slots not open
 p = Parser.Parse("LFM MS 2/2 Tanks 3/3 Healers 7/7 DPS")
 check("all full tank closed", p and p.roles.tank.open == false)
 check("all full needs none", Parser.NeedsAnyRole(p, { tank = true, healer = true, dps = true }) == false)
+
+-- Slot totals helper
+p = Parser.Parse("LFM MS 0/2 Tanks 0/3 Healers 0/3 Aura 0/7 DPS")
+local totals = Parser.SlotTotals(p)
+check("slot totals tank", totals and totals.tank == 2)
+check("slot totals aura", totals and totals.aura == 3)
 
 io.write(string.format("parser tests: %d passed, %d failed\n", passed, failed))
 if failed > 0 then

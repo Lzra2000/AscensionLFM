@@ -19,14 +19,29 @@ local DEFAULTS = {
         aura = false,
         dps = true,
     },
+    -- Manastorm level-run style defaults (2/3/3/7)
+    slotMax = {
+        tank = 2,
+        healer = 3,
+        aura = 3,
+        dps = 7,
+    },
+    assignedRoles = {}, -- [nameLower] = role
+    scanLfg = true, -- also scan LFG Manastorm lines
+    requireRoleWhisper = true, -- default-deny blind invites without a role
     autoWhisper = false,
     whisperMessage = "inv ms tank",
     autoInvite = true, -- only used while mode == "hosting"
-    maxPartySize = 5,
+    maxPartySize = 15, -- typical MS level-run raid size
     dedupeSeconds = 45,
     whisperCooldown = 30,
     inviteCooldown = 3,
+    -- Dangerous: opt-in level-59 auto-kick + raid warning
+    autoKickLevel59 = false,
+    kickLevel = 59,
+    kickWarnInterval = 10,
     matchHistory = {}, -- { {leader=, text=, source=, t=}, ... } max 30
+    kickHistory = {}, -- { {name=, level=, t=}, ... } max 20
 }
 
 local function DeepCopy(src)
@@ -90,6 +105,11 @@ end
 function Database.ClearMatches()
     local db = Database.Get()
     db.matchHistory = {}
+end
+
+function Database.ClearKicks()
+    local db = Database.Get()
+    db.kickHistory = {}
 end
 
 function Database.Defaults()
