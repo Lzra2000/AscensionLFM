@@ -17,10 +17,10 @@ end
 local toc = f:read("*a")
 f:close()
 
-if not toc:find("## Version: 0.3.1", 1, true) then
-    Fail("toc version should be 0.3.1")
+if not toc:find("## Version: 0.4.0", 1, true) then
+    Fail("toc version should be 0.4.0")
 end
-Ok("version 0.3.1")
+Ok("version 0.4.0")
 
 -- Forward-slash lua paths break Ascension load for many clients.
 if toc:find("core/Database.lua", 1, true)
@@ -37,8 +37,8 @@ for line in toc:gmatch("[^\r\n]+") do
         table.insert(files, path)
     end
 end
-if #files < 8 then
-    Fail("expected >= 8 lua files in toc, got " .. tostring(#files))
+if #files < 12 then
+    Fail("expected >= 12 lua files in toc, got " .. tostring(#files))
 end
 Ok(#files .. " lua files in toc")
 

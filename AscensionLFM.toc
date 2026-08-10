@@ -1,14 +1,18 @@
 ## Interface: 30300
 ## Title: AscensionLFM
-## Notes: Manastorm Level Run LFM/LFG scanner — notify, optional auto-whisper, host slots + auto-invite, LFM post/repost, opt-in level-59 kick.
+## Notes: Manastorm LFM/LFG — Full Auto Hosting, reject re-whisper, queue, presets, post/repost, opt-in Kick59.
 ## Author: Lzra2000
-## Version: 0.3.1
+## Version: 0.4.0
 ## SavedVariables: AscensionLFMDB
 ## DefaultState: enabled
 
 core\Database.lua
 core\Parser.lua
 core\Slots.lua
+core\Activity.lua
+core\Reject.lua
+core\Presets.lua
+core\Queue.lua
 core\Invite.lua
 core\Kick.lua
 core\Poster.lua

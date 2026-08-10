@@ -1,5 +1,6 @@
 -- AscensionLFM: core/Invite.lua
 -- Hosting auto-invite via InviteUnit; slots + party fullness + rate limits + ignore.
+-- On rejectable failures, optionally Reject.TryRewhisper; always queues applicants.
 
 local AscensionLFM = _G.AscensionLFM
 if type(AscensionLFM) ~= "table" then
@@ -92,6 +93,15 @@ local function CanInvite(name, db)
     return true
 end
 
+local function PlayApplicantSound(db)
+    if not db or not db.soundOnApplicant then
+        return
+    end
+    if type(PlaySound) == "function" then
+        pcall(PlaySound, "TellMessage")
+    end
+end
+
 function Invite.InvitePlayer(name, role)
     local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
     local ok, reason = CanInvite(name, db)
@@ -110,6 +120,12 @@ function Invite.InvitePlayer(name, role)
     if role and AscensionLFM.Slots and AscensionLFM.Slots.Assign then
         AscensionLFM.Slots.Assign(name, role)
     end
+    if AscensionLFM.Activity and AscensionLFM.Activity.Push then
+        AscensionLFM.Activity.Push("invite", tostring(name) .. (role and (" as " .. role) or ""), {
+            name = name,
+            role = role,
+        })
+    end
     if AscensionLFM.Print then
         local roleBit = role and (" as " .. role) or ""
         AscensionLFM.Print("invited " .. tostring(name) .. roleBit)
@@ -120,28 +136,56 @@ function Invite.InvitePlayer(name, role)
     return true
 end
 
+local function AfterHostResult(sender, message, role, ok, reason)
+    local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
+    local status = ok and "invited" or "blocked"
+    if AscensionLFM.Queue and AscensionLFM.Queue.Push then
+        AscensionLFM.Queue.Push(sender, role, message, status, reason)
+    end
+    if not ok and AscensionLFM.Reject and AscensionLFM.Reject.TryRewhisper then
+        AscensionLFM.Reject.TryRewhisper(sender, reason, role)
+    end
+end
+
 --- Hosting path: parse whisper for a role we accept + open slot, then invite.
 function Invite.TryHostInvite(sender, message)
     local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
-    if not db or db.mode ~= "hosting" or not db.autoInvite then
+    if not db or db.mode ~= "hosting" then
         return false, "disabled"
     end
+    -- Queue + sound even when auto-invite is off (manual Queue actions)
     local parsed = AscensionLFM.Parser.Parse(message)
+    local role = parsed and AscensionLFM.Parser.RequestedRole(parsed) or nil
+
+    PlayApplicantSound(db)
+
+    if not db.autoInvite then
+        if AscensionLFM.Queue and AscensionLFM.Queue.Push then
+            AscensionLFM.Queue.Push(sender, role, message, "pending", "auto-invite off")
+        end
+        return false, "disabled"
+    end
+
     if not parsed then
+        AfterHostResult(sender, message, nil, false, "no parse")
         return false, "no parse"
     end
-    local role = AscensionLFM.Parser.RequestedRole(parsed)
+    role = AscensionLFM.Parser.RequestedRole(parsed)
     if not role then
         if db.requireRoleWhisper ~= false then
+            AfterHostResult(sender, message, nil, false, "no role")
             return false, "no role"
         end
+        AfterHostResult(sender, message, nil, false, "no role")
         return false, "no role"
     end
     if not (db.roles and db.roles[role]) then
+        AfterHostResult(sender, message, role, false, "role filtered")
         return false, "role filtered"
     end
     if AscensionLFM.Slots and AscensionLFM.Slots.HasOpenSlot then
         if not AscensionLFM.Slots.HasOpenSlot(role) then
+            AfterHostResult(sender, message, role, false, "slot full")
             return false, "slot full"
         end
     end
@@ -155,13 +199,111 @@ function Invite.TryHostInvite(sender, message)
             "^%s*(tank[s]?|ot|mt|heal[ers]*|heals?|hps|dps|aura[s]?|dd|damage|aura%s+of%s+exp[%w]*|exp%s+aura|aoe%s+aura)%s*$"
         )
         if not bare then
+            AfterHostResult(sender, message, role, false, "not ms-related")
             return false, "not ms-related"
         end
     end
-    return Invite.InvitePlayer(sender, role)
+    local ok, reason = Invite.InvitePlayer(sender, role)
+    AfterHostResult(sender, message, role, ok, reason)
+    return ok, reason
+end
+
+local function FirstOpenAcceptedRole(db, parsed)
+    local order = { "tank", "healer", "aura", "dps" }
+    for _, role in ipairs(order) do
+        if db.roles and db.roles[role] then
+            local info = parsed and parsed.roles and parsed.roles[role]
+            local mentioned = info and (info.mentioned or info.open)
+            if mentioned then
+                if AscensionLFM.Slots and AscensionLFM.Slots.HasOpenSlot then
+                    if AscensionLFM.Slots.HasOpenSlot(role) then
+                        return role
+                    end
+                else
+                    return role
+                end
+            end
+        end
+    end
+    return nil
+end
+
+local function FirstOpenHostRole(db)
+    local order = { "tank", "healer", "aura", "dps" }
+    for _, role in ipairs(order) do
+        if db.roles and db.roles[role] then
+            if AscensionLFM.Slots and AscensionLFM.Slots.HasOpenSlot then
+                if AscensionLFM.Slots.HasOpenSlot(role) then
+                    return role
+                end
+            else
+                return role
+            end
+        end
+    end
+    return nil
+end
+
+--- Hosting: public LFG MS poster → InviteUnit if role matches an open accepted slot.
+function Invite.TryLfgInvite(leader, message, parsed)
+    local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
+    if not db or db.mode ~= "hosting" then
+        return false, "disabled"
+    end
+    if not db.autoInvite or db.autoInviteLfg == false then
+        return false, "lfg invite off"
+    end
+    if type(leader) ~= "string" or leader == "" then
+        return false, "bad name"
+    end
+    parsed = parsed or (AscensionLFM.Parser and AscensionLFM.Parser.Parse and AscensionLFM.Parser.Parse(message))
+    if not parsed or not parsed.isManastormLFG then
+        return false, "not lfg"
+    end
+    -- Pure LFM hosts are not LFG seekers
+    if parsed.isManastormLFM and not parsed.isManastormLFG then
+        return false, "not lfg"
+    end
+
+    local role = AscensionLFM.Parser and AscensionLFM.Parser.RequestedRole and AscensionLFM.Parser.RequestedRole(parsed)
+    if parsed.genericNeed and not db.lfgInviteWithoutRole then
+        role = nil
+    elseif not role then
+        role = FirstOpenAcceptedRole(db, parsed)
+    end
+    if not role then
+        if db.lfgInviteWithoutRole then
+            role = FirstOpenHostRole(db)
+        end
+    end
+    if not role then
+        if AscensionLFM.Queue and AscensionLFM.Queue.Push then
+            AscensionLFM.Queue.Push(leader, nil, message, "blocked", "no role")
+        end
+        return false, "no role"
+    end
+    if not (db.roles and db.roles[role]) then
+        AfterHostResult(leader, message, role, false, "role filtered")
+        return false, "role filtered"
+    end
+    if AscensionLFM.Slots and AscensionLFM.Slots.HasOpenSlot then
+        if not AscensionLFM.Slots.HasOpenSlot(role) then
+            AfterHostResult(leader, message, role, false, "slot full")
+            return false, "slot full"
+        end
+    end
+
+    PlayApplicantSound(db)
+    local ok, reason = Invite.InvitePlayer(leader, role)
+    AfterHostResult(leader, message, role, ok, reason)
+    if ok and AscensionLFM.Print then
+        AscensionLFM.Print("LFG auto-invite " .. tostring(leader) .. " as " .. role)
+    end
+    return ok, reason
 end
 
 Invite._CanInvite = CanInvite
+Invite._FirstOpenAcceptedRole = FirstOpenAcceptedRole
 Invite._ResetCooldowns = function()
     lastInviteAt = {}
     lastInviteGlobal = 0

@@ -33,7 +33,7 @@ See `INSTALL.txt` inside the zip for a short checklist.
 1. **Off** — Listening OFF (no chat scan).
 2. **Notify only** (default) — print matching Manastorm LFM/LFG lines to chat and list them in the Log. No auto-whisper / auto-invite.
 3. **Seeking** — notify when a listing still needs one of **your** roles; optional **auto-whisper** the LFM leader (rate-limited, respect ignore list). LFG lines are notified when **Scan LFG MS** is on (no auto-whisper to seekers).
-4. **Hosting** — scan incoming whispers for tank/heal/aura/dps (incl. Aura of Exp / OT / MT / HPS) and **InviteUnit** only when that role is accepted **and** a host slot remains.
+4. **Hosting** — (a) whisper applicants with matching roles → **InviteUnit**; (b) **LFG auto-invite**: players who post `LFG MS …` with a role you need and an open slot are invited from public chat.
 
 ## Hosting: slots + invites
 
@@ -88,7 +88,7 @@ Native DialogFrame with a left **Categories** sidebar:
 |----------|----------|
 | **General** | Status (Listening ON/OFF) + mode Off / Notify / Seeking / Hosting |
 | **Seeking** | My roles, Scan LFG MS, auto-whisper + message |
-| **Hosting** | Accept roles, auto-invite, require-role, max size, slot caps T/H/A/D + filled |
+| **Hosting** | Full Auto master, accept roles, whisper + **LFG auto-invite**, reject-rewhisper, slots, presets |
 | **Post** | LFM preview, channel, Post once, Scan raid/party, auto-repost |
 | **Kick** | Opt-in level-59 kick + recent kick log |
 | **Log** | Recent LFM/LFG matches (Clear) |

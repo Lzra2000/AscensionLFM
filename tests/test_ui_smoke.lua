@@ -148,7 +148,7 @@ SlashCmdList = SlashCmdList or {}
 
 -- Load Database + MainWindow (no Scanner/Invite needed for UI smoke).
 dofile("core/Database.lua")
-AscensionLFM.VERSION = "0.3.1"
+AscensionLFM.VERSION = "0.4.0"
 AscensionLFM.Slots = {
     Snapshot = function()
         return {
@@ -215,15 +215,22 @@ local f = MW.GetFrame()
 check("frame created", type(f) == "table")
 check("frame named", f._name == "AscensionLFMFrame")
 check("frame size width", f._width == 720)
-check("frame size height", f._height == 540)
+check("frame size height", f._height == 680)
 check("default category general", MW.GetActiveCategory() == "general")
 check("UISpecialFrames registered", UISpecialFrames[1] == "AscensionLFMFrame")
 
-local cats = { "general", "seeking", "hosting", "post", "kick", "log" }
+local cats = { "general", "seeking", "hosting", "post", "queue", "kick", "log" }
 for i = 1, #cats do
     MW.SelectCategory(cats[i])
     check("select " .. cats[i], MW.GetActiveCategory() == cats[i])
 end
+
+MW.SelectCategory("queue")
+check("queue category active", MW.GetActiveCategory() == "queue")
+check("RefreshQueue exists", type(MW.RefreshQueue) == "function")
+MW.RefreshQueue()
+check("RefreshActivity exists", type(MW.RefreshActivity) == "function")
+MW.RefreshActivity()
 
 MW.SelectCategory("post")
 check("post category active", MW.GetActiveCategory() == "post")
@@ -247,14 +254,17 @@ AscensionLFM.Database.SetMode("hosting")
 MW.SelectCategory("general")
 check("mode hosting persisted", AscensionLFM.Database.Get().mode == "hosting")
 
--- Kick default remains off; autoRepost default off
+-- Kick default remains off; autoRepost / fullAuto default off
 check("kick default off", AscensionLFM.Database.Get().autoKickLevel59 == false)
 check("autoRepost default off", AscensionLFM.Database.Get().autoRepost == false)
+check("fullAuto default off", AscensionLFM.Database.Get().fullAutoHosting == false)
+check("rejectRewhisper default off", AscensionLFM.Database.Get().rejectRewhisper == false)
 -- Fresh Init default mode is notify (Listening ON)
 _G.AscensionLFMDB = nil
 AscensionLFM.Database.Init()
 check("default mode notify", AscensionLFM.Database.Get().mode == "notify")
 check("default autoRepost off after init", AscensionLFM.Database.Get().autoRepost == false)
+check("default fullAuto off after init", AscensionLFM.Database.Get().fullAutoHosting == false)
 
 if failed > 0 then
     io.stderr:write(string.format("test_ui_smoke: %d failed, %d passed\n", failed, passed))

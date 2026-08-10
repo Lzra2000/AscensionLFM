@@ -219,9 +219,12 @@ function Parser.Parse(message)
         hasAnyRole = true
         break
     end
+    local genericNeed = false
     if not hasAnyRole then
         roles.dps = { open = true, filled = nil, total = nil, mentioned = true }
         table.insert(parts, "need any")
+        -- Flag so hosting LFG auto-invite can require an explicit role keyword.
+        genericNeed = true
     end
 
     local kind = lfm and "lfm" or "lfg"
@@ -246,6 +249,7 @@ function Parser.Parse(message)
         isManastormListing = true,
         listingKind = kind,
         isRoleRequest = false,
+        genericNeed = genericNeed,
         roles = roles,
         summary = summary,
         raw = raw,
@@ -272,6 +276,23 @@ function Parser.NeedsAnyRole(parsed, wantRoles)
         end
     end
     return false
+end
+
+--- Roles that still have open slots in a listing (and optionally filtered by wantRoles).
+-- @return { tank=true, ... }
+function Parser.NeededRoles(parsed, wantRoles)
+    local out = {}
+    if type(parsed) ~= "table" or type(parsed.roles) ~= "table" then
+        return out
+    end
+    for role, info in pairs(parsed.roles) do
+        if info and (info.open or (info.mentioned and info.open ~= false)) then
+            if not wantRoles or wantRoles[role] then
+                out[role] = true
+            end
+        end
+    end
+    return out
 end
 
 --- Detect which single role a whisper is requesting (hosting).

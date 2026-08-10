@@ -227,6 +227,9 @@ function Poster.PostOnce(msg, channel, channelName, nowOverride)
         db.postChannel = channel
         db.lastPostAt = (type(time) == "function" and time()) or 0
     end
+    if AscensionLFM.Activity and AscensionLFM.Activity.Push then
+        AscensionLFM.Activity.Push("post", channel .. ": " .. msg)
+    end
     if AscensionLFM.Print then
         AscensionLFM.Print("posted LFM (" .. channel .. "): " .. msg)
     end
@@ -291,6 +294,24 @@ function Poster.Tick(now)
             if db.autoRepost then
                 db.autoRepost = false
                 lastStatus = "stopped: full"
+                if db.announceFull then
+                    local fullMsg = tostring(db.fullAnnounceMessage or "LFM MS FULL — thanks!")
+                    if fullMsg ~= "" and type(SendChatMessage) == "function" then
+                        local ch = NormalizeChannel(db.postChannel)
+                        if ch == "CHANNEL" then
+                            local id = ResolveChannelIndex(db.postChannelName)
+                            if id then
+                                pcall(SendChatMessage, fullMsg, "CHANNEL", nil, id)
+                            end
+                        else
+                            pcall(SendChatMessage, fullMsg, ch)
+                        end
+                    end
+                    lastStatus = "stopped: full (announced)"
+                end
+                if AscensionLFM.Activity and AscensionLFM.Activity.Push then
+                    AscensionLFM.Activity.Push("full", "auto-repost stopped (" .. tostring(fullReason or "slots") .. ")")
+                end
             end
         elseif reason == "waiting" then
             lastStatus = "waiting"

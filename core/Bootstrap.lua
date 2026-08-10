@@ -8,7 +8,7 @@ if type(AscensionLFM) ~= "table" then
     _G.AscensionLFM = AscensionLFM
 end
 
-AscensionLFM.VERSION = "0.3.1"
+AscensionLFM.VERSION = "0.4.0"
 AscensionLFM.ADDON_NAME = "AscensionLFM"
 
 local function Print(msg)
@@ -29,6 +29,54 @@ local function ModeLabel(mode)
     return "Off (Listening OFF)"
 end
 
+local function OnOff(v)
+    return v and "ON" or "off"
+end
+
+local function PrintStatus()
+    local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
+    if not db then
+        Print("Database not ready — is the addon enabled and /reload done?")
+        return
+    end
+    local mode = db.mode or "notify"
+    Print("v" .. AscensionLFM.VERSION .. " · mode=" .. ModeLabel(mode))
+    Print(string.format("Full Auto Hosting=%s · autoInvite=%s · autoRepost=%s · rejectRewhisper=%s",
+        OnOff(db.fullAutoHosting), OnOff(db.autoInvite), OnOff(db.autoRepost), OnOff(db.rejectRewhisper)))
+    Print(string.format("autoWhisper=%s · variants=%s · Kick59=%s · announceFull=%s",
+        OnOff(db.autoWhisper), OnOff(db.useWhisperVariants ~= false),
+        OnOff(db.autoKickLevel59), OnOff(db.announceFull)))
+    Print(string.format("sounds: match=%s applicant=%s · channel=%s interval=%ss",
+        OnOff(db.soundOnMatch), OnOff(db.soundOnApplicant),
+        tostring(db.postChannel or "YELL"),
+        tostring(db.repostInterval or 60)))
+    local snap = AscensionLFM.Slots and AscensionLFM.Slots.Snapshot and AscensionLFM.Slots.Snapshot()
+    if snap then
+        local bits = {}
+        for _, role in ipairs({ "tank", "healer", "aura", "dps" }) do
+            local s = snap[role]
+            if s then
+                table.insert(bits, string.format("%s %d/%d", role:sub(1, 1):upper(), s.filled, s.max))
+            end
+        end
+        local gsz = AscensionLFM.Invite and AscensionLFM.Invite.GetGroupSize and AscensionLFM.Invite.GetGroupSize() or "?"
+        Print("slots: " .. table.concat(bits, " · ") .. " · group " .. tostring(gsz) .. "/" .. tostring(db.maxPartySize or 15))
+    end
+    local q = (type(db.applicantQueue) == "table" and #db.applicantQueue) or 0
+    local act = (type(db.activityLog) == "table" and #db.activityLog) or 0
+    local matches = (type(db.matchHistory) == "table" and #db.matchHistory) or 0
+    Print(string.format("queue=%d · activity=%d · matches=%d", q, act, matches))
+    if AscensionLFM.Poster and AscensionLFM.Poster.GetStatus then
+        local st = AscensionLFM.Poster.GetStatus()
+        if st then
+            Print(string.format("repost: %s · status=%s · full=%s · countdown=%ss",
+                OnOff(st.enabled), tostring(st.status or "?"),
+                tostring(st.isFull), tostring(st.countdown or 0)))
+        end
+    end
+    Print("slash OK — /alfm UI · /alfm test")
+end
+
 local function InjectTestMatch()
     local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
     if not db then
@@ -45,6 +93,9 @@ local function InjectTestMatch()
         kind = "lfm",
         t = time and time() or 0,
     })
+    if AscensionLFM.Activity and AscensionLFM.Activity.Push then
+        AscensionLFM.Activity.Push("match", "TestLeader — MS test (test)")
+    end
     if AscensionLFM.MainWindow and AscensionLFM.MainWindow.RefreshMatches then
         pcall(AscensionLFM.MainWindow.RefreshMatches)
     end
@@ -70,10 +121,7 @@ local function RegisterSlash()
     SlashCmdList["ASCENSIONLFM"] = function(msg)
         msg = tostring(msg or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
         if msg == "status" then
-            local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
-            local mode = (db and db.mode) or "notify"
-            Print("mode=" .. ModeLabel(mode) .. " version=" .. AscensionLFM.VERSION)
-            Print("slash OK — try /alfm to toggle UI, /alfm test for Log")
+            PrintStatus()
             return
         end
         if msg == "test" then
@@ -83,6 +131,7 @@ local function RegisterSlash()
         if msg == "help" then
             Print("/alfm | /mslfm — toggle UI")
             Print("/alfm status | test | help")
+            Print("Full Auto Hosting: /alfm → Hosting → master toggle (default OFF)")
             return
         end
         if AscensionLFM.MainWindow and AscensionLFM.MainWindow.Toggle then
@@ -120,6 +169,7 @@ bootFrame:SetScript("OnEvent", function(self, event, arg1)
         local mode = (db and db.mode) or "notify"
         Print("v" .. AscensionLFM.VERSION .. " — mode=" .. ModeLabel(mode))
         Print("/alfm · /mslfm · /alfm status · /alfm test")
+        Print("Full Auto Hosting default OFF · Kick59 opt-in OFF")
         self:UnregisterEvent("PLAYER_LOGIN")
     end
 end)
