@@ -86,8 +86,11 @@ local function NewFrame()
                     SetText = function(_, value) text = value or "" end,
                     GetText = function() return text end,
                     SetJustifyH = Noop,
+                    SetJustifyV = Noop,
                     SetTextColor = Noop,
                     SetWidth = Noop,
+                    SetHeight = Noop,
+                    SetNonSpaceWrap = Noop,
                     Show = Noop,
                     Hide = Noop,
                 }
@@ -119,7 +122,10 @@ local function NewFrame()
             or key == "SetJustifyH" or key == "SetTextColor"
             or key == "SetBackdrop" or key == "SetBackdropColor" or key == "SetBackdropBorderColor"
             or key == "SetFrameStrata" or key == "SetFrameLevel" or key == "SetID"
-            or key == "RegisterForClicks" then
+            or key == "RegisterForClicks"
+            or key == "SetScrollChild" or key == "EnableMouseWheel"
+            or key == "SetVerticalScroll" or key == "GetVerticalScroll"
+            or key == "GetVerticalScrollRange" then
             return Noop
         end
         return Noop
@@ -148,7 +154,7 @@ SlashCmdList = SlashCmdList or {}
 
 -- Load Database + MainWindow (no Scanner/Invite needed for UI smoke).
 dofile("core/Database.lua")
-AscensionLFM.VERSION = "0.4.4"
+AscensionLFM.VERSION = "0.4.5"
 AscensionLFM.Slots = {
     Snapshot = function()
         return {
@@ -215,7 +221,7 @@ local f = MW.GetFrame()
 check("frame created", type(f) == "table")
 check("frame named", f._name == "AscensionLFMFrame")
 check("frame size width", f._width == 720)
-check("frame size height", f._height == 900)
+check("frame size height", f._height == 560)
 check("default category general", MW.GetActiveCategory() == "general")
 check("UISpecialFrames registered", UISpecialFrames[1] == "AscensionLFMFrame")
 

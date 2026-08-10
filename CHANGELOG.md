@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.5
+
+- **UI overlap fix:** category pages are scrollable; toggle rows taller (58px) with 10px gaps.
+- Shorter Hosting helper text; Reject tmpl moved below Sound; Post Role Check status on its own line.
+- Dialog height 560 (fits 768+ screens); Hosting/Seeking/Post scroll with mouse wheel.
+
 ## 0.4.4
 
 - **Broader role-whisper fallbacks:** `healers` / `heiler` / `H` / `T` / `A` / `D` /
