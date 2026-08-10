@@ -154,7 +154,7 @@ SlashCmdList = SlashCmdList or {}
 
 -- Load Database + MainWindow (no Scanner/Invite needed for UI smoke).
 dofile("core/Database.lua")
-AscensionLFM.VERSION = "0.4.13"
+AscensionLFM.VERSION = "0.4.14"
 AscensionLFM.Slots = {
     Snapshot = function()
         return {
