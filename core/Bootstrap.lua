@@ -8,7 +8,7 @@ if type(AscensionLFM) ~= "table" then
     _G.AscensionLFM = AscensionLFM
 end
 
-AscensionLFM.VERSION = "0.4.17"
+AscensionLFM.VERSION = "0.4.18"
 AscensionLFM.ADDON_NAME = "AscensionLFM"
 
 local function Print(msg)
@@ -49,12 +49,13 @@ local function PrintStatus()
     if AscensionLFM.Kick and AscensionLFM.Kick.GetStatus then
         local ks = AscensionLFM.Kick.GetStatus()
         if ks then
-            Print(string.format("kick: last=%s · can=%s · group=%s · pending=%s · hosting=%s",
+            Print(string.format("kick: last=%s · can=%s · group=%s · pending=%s · hosting=%s · gaveUp=%d",
                 tostring(ks.last or "?"),
                 OnOff(ks.canKick),
                 tostring(ks.group or "?"),
                 tostring(ks.pending or 0),
-                OnOff(ks.hosting)))
+                OnOff(ks.hosting),
+                tonumber(ks.gaveUp) or 0))
         end
     end
     if AscensionLFM.RoleCheck and AscensionLFM.RoleCheck.GetStatus then

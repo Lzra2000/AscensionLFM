@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.4.18
+
+- **Fix Kick59 infinite re-warn spam:** if `UninviteUnit` kept failing for a
+  target (e.g. privilege edge case on some cores), the addon warned the raid
+  and silently retried forever — same identical raid warning every
+  `kickWarnInterval`, with the failure reason only ever printed to the host's
+  own chat, never visible to the raid. Now gives up after 3 failed attempts
+  per target, prints a clear "giving up — remove manually" message + logs it
+  to Activity, and stops re-warning about that target (until they leave and
+  rejoin, which resets the retry budget). Warn message now shows
+  `retry N/3` on repeat attempts so it's visibly different from the first try.
+  `/alfm status` kick line now shows `gaveUp=N`.
+- **Fix Activity log kind validation:** `aura`/`wipe`/`shield`/`regroup`/
+  `rolecheck` activity entries were silently relabeled `[match]` in the Log
+  tab because `Activity.lua`'s kind whitelist never included them.
+
 ## 0.4.17
 
 - **Bugfix batch (code review):** `Parser.lua` bare-role whisper match used a

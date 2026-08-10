@@ -15,6 +15,7 @@ local DEFAULT_LEVEL = 59
 local DEFAULT_INTERVAL = 10
 local KICK_DELAY = 0.6
 local KICK_STAGGER = 0.35
+local MAX_KICK_ATTEMPTS = 3
 
 local frame
 local lastWarnAt = 0
@@ -23,6 +24,8 @@ local lastStatus = "idle"
 local lastDetail = nil
 -- { targets = { {name=, level=}... }, readyAt = number }
 local pending = nil
+local failedAttempts = {} -- [nameLower] = count of failed UninviteUnit attempts
+local gaveUp = {} -- [nameLower] = true once MAX_KICK_ATTEMPTS reached — stop re-warning
 
 local function Now()
     return (type(GetTime) == "function" and GetTime()) or os.clock()
@@ -112,14 +115,24 @@ function Kick.ShouldWarn(now, lastAt, interval)
 end
 
 --- Pure: build raid-warning text naming targets.
-function Kick.BuildWarnMessage(targets, kickLevel)
+-- @param attempts optional { [nameLower]=failedCount } — appends "retry N/MAX"
+--   for targets on a previous failed attempt, so the raid can see this is a
+--   retry rather than an identical-looking duplicate warning.
+function Kick.BuildWarnMessage(targets, kickLevel, attempts)
     kickLevel = tonumber(kickLevel) or DEFAULT_LEVEL
     if type(targets) ~= "table" or #targets == 0 then
         return nil
     end
     local names = {}
     for _, t in ipairs(targets) do
-        table.insert(names, string.format("%s (%d)", tostring(t.name), tonumber(t.level) or kickLevel))
+        local suffix = ""
+        if type(attempts) == "table" then
+            local n = tonumber(attempts[LowerName(t.name)])
+            if n and n > 0 then
+                suffix = string.format(", retry %d/%d", n + 1, MAX_KICK_ATTEMPTS)
+            end
+        end
+        table.insert(names, string.format("%s (%d%s)", tostring(t.name), tonumber(t.level) or kickLevel, suffix))
     end
     return string.format(
         "AscensionLFM: level %d — kicking: %s",
@@ -297,13 +310,33 @@ local function ProcessPending(now)
         return "none"
     end
     local ok, err = DoKick(t.name)
+    local key = LowerName(t.name)
     if ok then
         LogKick(t.name, t.level)
         SetStatus("kicked", t.name)
+        failedAttempts[key] = nil
+        gaveUp[key] = nil
     else
-        SetStatus("kick failed", tostring(err or t.name))
-        if AscensionLFM.Print then
-            AscensionLFM.Print(string.format("kick failed for %s (%s)", tostring(t.name), tostring(err)))
+        failedAttempts[key] = (failedAttempts[key] or 0) + 1
+        if failedAttempts[key] >= MAX_KICK_ATTEMPTS then
+            gaveUp[key] = true
+            SetStatus("gave up", t.name)
+            if AscensionLFM.Print then
+                AscensionLFM.Print(string.format(
+                    "Kick59: giving up on %s after %d failed attempts (%s) — remove manually",
+                    tostring(t.name), failedAttempts[key], tostring(err)))
+            end
+            if AscensionLFM.Activity and AscensionLFM.Activity.Push then
+                AscensionLFM.Activity.Push("kick", string.format(
+                    "gave up kicking %s after %d attempts (%s)",
+                    tostring(t.name), failedAttempts[key], tostring(err)))
+            end
+        else
+            SetStatus("kick failed", tostring(err or t.name))
+            if AscensionLFM.Print then
+                AscensionLFM.Print(string.format("kick failed for %s (%s) — attempt %d/%d",
+                    tostring(t.name), tostring(err), failedAttempts[key], MAX_KICK_ATTEMPTS))
+            end
         end
     end
     if #pending.targets == 0 then
@@ -354,8 +387,26 @@ function Kick.Tick(now)
     end
 
     local roster = Kick.BuildRoster()
-    local targets = Kick.SelectTargets(roster, kickLevel, PlayerName())
-    if #targets == 0 then
+
+    -- Drop stale give-up / attempt tracking for players no longer in roster,
+    -- so someone who leaves and rejoins later gets a fresh retry budget.
+    local present = {}
+    for _, m in ipairs(roster) do
+        present[LowerName(m.name)] = true
+    end
+    for key in pairs(failedAttempts) do
+        if not present[key] then
+            failedAttempts[key] = nil
+        end
+    end
+    for key in pairs(gaveUp) do
+        if not present[key] then
+            gaveUp[key] = nil
+        end
+    end
+
+    local rawTargets = Kick.SelectTargets(roster, kickLevel, PlayerName())
+    if #rawTargets == 0 then
         -- Distinguish “nobody high enough” from “levels still 0 / unknown”.
         local unknown = 0
         local known = 0
@@ -375,7 +426,22 @@ function Kick.Tick(now)
         return "none"
     end
 
-    local msg = Kick.BuildWarnMessage(targets, kickLevel)
+    -- Skip targets we've already given up on (MAX_KICK_ATTEMPTS failed
+    -- UninviteUnit attempts) — without this, a target that can't actually be
+    -- kicked (e.g. UninviteUnit failing every time) gets re-warned forever,
+    -- every kickWarnInterval, with no visible feedback to the raid.
+    local targets = {}
+    for _, t in ipairs(rawTargets) do
+        if not gaveUp[LowerName(t.name)] then
+            table.insert(targets, t)
+        end
+    end
+    if #targets == 0 then
+        SetStatus("given up", #rawTargets)
+        return "given up"
+    end
+
+    local msg = Kick.BuildWarnMessage(targets, kickLevel, failedAttempts)
     SendWarn(msg, groupKind)
     lastWarnAt = now
     -- Defer UninviteUnit slightly: same-frame chat+uninvite is flaky on some
@@ -391,6 +457,10 @@ end
 function Kick.GetStatus()
     local db = DB()
     local can, groupKind = Kick.CanKick()
+    local gaveUpCount = 0
+    for _ in pairs(gaveUp) do
+        gaveUpCount = gaveUpCount + 1
+    end
     return {
         enabled = db and db.autoKickLevel59 and true or false,
         hosting = IsHosting(db),
@@ -399,6 +469,7 @@ function Kick.GetStatus()
         canKick = can and true or false,
         group = groupKind,
         pending = pending and #pending.targets or 0,
+        gaveUp = gaveUpCount,
     }
 end
 
@@ -440,6 +511,8 @@ function Kick._ResetForTests()
     lastStatus = "idle"
     lastDetail = nil
     pending = nil
+    failedAttempts = {}
+    gaveUp = {}
 end
 
 function Kick._SetLastWarnAt(t)
@@ -450,6 +523,15 @@ function Kick._GetPending()
     return pending
 end
 
+function Kick._GetGaveUp()
+    return gaveUp
+end
+
+function Kick._GetFailedAttempts()
+    return failedAttempts
+end
+
 Kick.DEFAULT_LEVEL = DEFAULT_LEVEL
 Kick.DEFAULT_INTERVAL = DEFAULT_INTERVAL
 Kick.KICK_DELAY = KICK_DELAY
+Kick.MAX_KICK_ATTEMPTS = MAX_KICK_ATTEMPTS

@@ -163,6 +163,70 @@ end
 st = Kick.Tick(5000)
 check("levels unknown", st == "levels unknown", tostring(st))
 
+--------------------------------------------------------------------
+-- Give up after MAX_KICK_ATTEMPTS failed UninviteUnit attempts (no
+-- infinite re-warn spam when a target can't actually be removed).
+--------------------------------------------------------------------
+Kick._ResetForTests()
+db.mode = "hosting"
+db.fullAutoHosting = false
+db.autoKickLevel59 = true
+db.kickLevel = 59
+db.kickWarnInterval = 10
+_G.IsRaidLeader = function() return true end
+_G.IsRaidOfficer = function() return false end
+_G.IsPartyLeader = function() return false end
+_G.UnitIsPartyLeader = function() return true end
+_G.GetNumRaidMembers = function() return 2 end
+_G.GetNumPartyMembers = function() return 0 end
+_G.UnitName = function(u)
+    if u == "player" then return "Host" end
+    if u == "raid1" then return "Host" end
+    if u == "raid2" then return "Flunky" end
+    return nil
+end
+_G.UnitLevel = function(u)
+    if u == "raid1" then return 60 end
+    if u == "raid2" then return 59 end
+    return 0
+end
+_G.GetRaidRosterInfo = function(i)
+    if i == 1 then return "Host", 2, 1, 0 end
+    if i == 2 then return "Flunky", 0, 1, 0 end
+    return nil
+end
+local giveUpWarns = {}
+_G.SendChatMessage = function(m, ch) table.insert(giveUpWarns, m) end
+_G.UninviteUnit = function() error("simulated uninvite failure") end
+
+local gt = 1000
+local gst1 = Kick.Tick(gt)
+check("giveup: cycle1 warns", gst1 == "warned", tostring(gst1))
+Kick.Tick(gt + Kick.KICK_DELAY + 0.01) -- fails attempt 1
+
+gt = gt + 10
+local gst2 = Kick.Tick(gt)
+check("giveup: cycle2 warns", gst2 == "warned", tostring(gst2))
+check("giveup: retry suffix on cycle2", giveUpWarns[2] and giveUpWarns[2]:find("retry 2/3", 1, true) ~= nil,
+    tostring(giveUpWarns[2]))
+Kick.Tick(gt + Kick.KICK_DELAY + 0.01) -- fails attempt 2
+
+gt = gt + 10
+local gst3 = Kick.Tick(gt)
+check("giveup: cycle3 warns", gst3 == "warned", tostring(gst3))
+Kick.Tick(gt + Kick.KICK_DELAY + 0.01) -- fails attempt 3 -> gives up
+
+check("giveup: warned exactly 3 times total", #giveUpWarns == 3, tostring(#giveUpWarns))
+check("giveup: marked as given up", Kick._GetGaveUp()["flunky"] == true)
+
+gt = gt + 10
+local gst4 = Kick.Tick(gt)
+check("giveup: cycle4 does not re-warn", gst4 == "given up", tostring(gst4))
+check("giveup: still only 3 warns total (no spam)", #giveUpWarns == 3, tostring(#giveUpWarns))
+
+local gks = Kick.GetStatus()
+check("giveup: status exposes count", gks.gaveUp == 1, tostring(gks.gaveUp))
+
 io.write(string.format("kick tests: %d passed, %d failed\n", passed, failed))
 if failed > 0 then
     os.exit(1)

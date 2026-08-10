@@ -18,6 +18,12 @@ local VALID_KINDS = {
     match = true,
     full = true,
     preset = true,
+    kick = true,
+    aura = true,
+    wipe = true,
+    shield = true,
+    regroup = true,
+    rolecheck = true,
 }
 
 local function DB()
