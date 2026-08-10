@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.15
+
+- **Status diagnosis:** `/alfm status` always reports RoleCheck (or MODULE MISSING),
+  and shows `unassigned=N` plus names when group members have no T/H/A/D role yet —
+  explains stuck LFM lines like `Aura 0/3` with a nearly full raid. Sync / Scan
+  print the same hint so you know to click **RW**.
+
 ## 0.4.14
 
 - **Debug / harden Mini HUD:** every button prints on fail (no silent clicks);

@@ -803,7 +803,7 @@ function MainWindow.Init()
 
     local sub = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     sub:SetPoint("TOP", title, "BOTTOM", 0, -2)
-    sub:SetText("Manastorm Level Run LFM/LFG · v" .. tostring(AscensionLFM.VERSION or "0.4.14"))
+    sub:SetText("Manastorm Level Run LFM/LFG · v" .. tostring(AscensionLFM.VERSION or "0.4.15"))
     SetInk(sub, MUTED)
 
     local shell = CreateFrame("Frame", FRAME_NAME .. "Shell", frame)
@@ -1525,8 +1525,10 @@ function MainWindow.Init()
     scanBtn:SetPoint("LEFT", rebuildBtn, "RIGHT", 6, 0)
     scanBtn:SetText("Scan raid/party")
     scanBtn:SetScript("OnClick", function()
+        local unassigned = 0
         if AscensionLFM.Slots and AscensionLFM.Slots.ScanRaid then
-            AscensionLFM.Slots.ScanRaid()
+            local _, _, u = AscensionLFM.Slots.ScanRaid()
+            unassigned = tonumber(u) or 0
         end
         if AscensionLFM.Poster and AscensionLFM.Poster.RefreshMessage then
             AscensionLFM.Poster.RefreshMessage()
@@ -1535,6 +1537,10 @@ function MainWindow.Init()
         MainWindow.RefreshPost()
         if AscensionLFM.Print then
             AscensionLFM.Print("scanned raid/party fills")
+            if unassigned > 0 then
+                AscensionLFM.Print(string.format(
+                    "%d in group without role — Mini HUD RW, reply T/H/A/D", unassigned))
+            end
         end
     end)
 

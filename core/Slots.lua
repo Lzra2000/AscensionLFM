@@ -236,6 +236,37 @@ local function CollectPresentNames()
     return present
 end
 
+--- Pure: names in presentSet with no assigned role.
+-- @return list of nameLower, count
+function Slots.ListUnassigned(presentSet, assignedMap)
+    local out = {}
+    if type(presentSet) ~= "table" then
+        return out, 0
+    end
+    assignedMap = assignedMap or {}
+    for name, _ in pairs(presentSet) do
+        if type(name) == "string" and name ~= "" and not assignedMap[name] then
+            table.insert(out, name)
+        end
+    end
+    table.sort(out)
+    return out, #out
+end
+
+--- Live: members currently in group without a remembered role.
+-- @return names (lower), count
+function Slots.UnassignedMembers()
+    local present = CollectPresentNames()
+    local db = DB()
+    EnsureDBSlots(db)
+    local map = assigned
+    if db and type(db.assignedRoles) == "table" then
+        map = db.assignedRoles
+    end
+    return Slots.ListUnassigned(present, map)
+end
+
+
 --- Drop assigned roles for players who left the group; keep whisper roles for unknowns.
 function Slots.SyncFromRoster()
     local db = DB()
@@ -281,13 +312,14 @@ end
 --- Recount filled from current party/raid roster + assignedRoles map.
 -- Drops leavers via SyncFromRoster, then returns a fresh Snapshot.
 -- Does not invent roles for unassigned members (whisper/host assign still required).
--- @return snapshot, removedCount
+-- @return snapshot, removedCount, unassignedCount
 function Slots.ScanRaid()
     local removed = Slots.SyncFromRoster() or 0
     if AscensionLFM.AuraBalance and AscensionLFM.AuraBalance.Balance then
         AscensionLFM.AuraBalance.Balance()
     end
     local snap = Slots.Snapshot()
+    local _, unassigned = Slots.UnassignedMembers()
     if AscensionLFM.Poster and AscensionLFM.Poster.RefreshMessage then
         AscensionLFM.Poster.RefreshMessage()
     end
@@ -299,7 +331,7 @@ function Slots.ScanRaid()
             AscensionLFM.MainWindow.RefreshPost()
         end
     end
-    return snap, removed
+    return snap, removed, unassigned
 end
 
 function Slots._SetAssignedForTests(map)

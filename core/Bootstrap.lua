@@ -8,7 +8,7 @@ if type(AscensionLFM) ~= "table" then
     _G.AscensionLFM = AscensionLFM
 end
 
-AscensionLFM.VERSION = "0.4.14"
+AscensionLFM.VERSION = "0.4.15"
 AscensionLFM.ADDON_NAME = "AscensionLFM"
 
 local function Print(msg)
@@ -57,19 +57,25 @@ local function PrintStatus()
                 OnOff(ks.hosting)))
         end
     end
-    local rc = AscensionLFM.RoleCheck and AscensionLFM.RoleCheck.GetStatus and AscensionLFM.RoleCheck.GetStatus()
-    if rc then
-        Print(string.format("roleCheck: %s · window=%ss · autoResync=%s · autoMoveAura=%s",
-            tostring(rc.status or "idle"),
-            tostring(db.roleCheckWindow or db.roleCheckDuration or 60),
-            OnOff(db.roleCheckAutoResync ~= false),
-            OnOff(db.autoMoveAura ~= false)))
-        Print(string.format("roleCheck: canWarn=%s · group=%s · hosting=%s · lastStart=%s · replies=%s",
-            OnOff(rc.canWarn),
-            tostring(rc.group or "?"),
-            OnOff(rc.hosting),
-            tostring(rc.lastStart or "?"),
-            tostring(rc.responses or 0)))
+    if AscensionLFM.RoleCheck and AscensionLFM.RoleCheck.GetStatus then
+        local okRc, rc = pcall(AscensionLFM.RoleCheck.GetStatus)
+        if okRc and rc then
+            Print(string.format("roleCheck: %s · window=%ss · autoResync=%s · autoMoveAura=%s",
+                tostring(rc.status or "idle"),
+                tostring(db.roleCheckWindow or db.roleCheckDuration or 60),
+                OnOff(db.roleCheckAutoResync ~= false),
+                OnOff(db.autoMoveAura ~= false)))
+            Print(string.format("roleCheck: canWarn=%s · group=%s · hosting=%s · lastStart=%s · replies=%s",
+                OnOff(rc.canWarn),
+                tostring(rc.group or "?"),
+                OnOff(rc.hosting),
+                tostring(rc.lastStart or "?"),
+                tostring(rc.responses or 0)))
+        else
+            Print("roleCheck: GetStatus failed — " .. tostring(rc))
+        end
+    else
+        Print("roleCheck: MODULE MISSING — reinstall AscensionLFM.zip (RoleCheck.lua)")
     end
     Print(string.format("sounds: match=%s applicant=%s · channel=%s interval=%ss",
         OnOff(db.soundOnMatch), OnOff(db.soundOnApplicant),
@@ -85,7 +91,21 @@ local function PrintStatus()
             end
         end
         local gsz = AscensionLFM.Invite and AscensionLFM.Invite.GetGroupSize and AscensionLFM.Invite.GetGroupSize() or "?"
-        Print("slots: " .. table.concat(bits, " · ") .. " · group " .. tostring(gsz) .. "/" .. tostring(db.maxPartySize or 15))
+        local unNames, unN = {}, 0
+        if AscensionLFM.Slots.UnassignedMembers then
+            unNames, unN = AscensionLFM.Slots.UnassignedMembers()
+        end
+        Print("slots: " .. table.concat(bits, " · ") .. " · group " .. tostring(gsz) .. "/" .. tostring(db.maxPartySize or 15)
+            .. " · unassigned=" .. tostring(unN or 0))
+        if unN and unN > 0 then
+            local show = {}
+            for i = 1, math.min(5, #unNames) do
+                table.insert(show, unNames[i])
+            end
+            Print("unassigned: " .. table.concat(show, ", ")
+                .. (unN > 5 and (" +" .. tostring(unN - 5) .. " more") or "")
+                .. " — click Mini HUD RW, have them reply T/H/A/D")
+        end
     end
     local q = (type(db.applicantQueue) == "table" and #db.applicantQueue) or 0
     local act = (type(db.activityLog) == "table" and #db.activityLog) or 0
