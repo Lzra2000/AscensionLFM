@@ -1,6 +1,6 @@
 # AscensionLFM
 
-WotLK **3.3.5a** addon for Ascension that scans chat and whispers for **Manastorm Level Run** **LFM** and **LFG** messages, notifies you of matches, and optionally auto-whispers leaders or auto-invites applicants when you host — with per-role slot caps, an LFM post/repost composer, and an opt-in level-59 auto-kick.
+WotLK **3.3.5a** addon for Ascension that scans chat and whispers for **Manastorm Level Run** **LFM** and **LFG** messages, notifies you of matches, and optionally auto-whispers leaders or auto-invites applicants when you host — with per-role slot caps, Full Auto Hosting, reject re-whisper, applicant queue, LFM post/repost, and an opt-in level-59 auto-kick.
 
 ## Install (EN)
 
@@ -24,7 +24,7 @@ See `INSTALL.txt` inside the zip for a short checklist.
 |---------|--------|
 | `/alfm` / `/mslfm` | Open settings |
 | `/alfmshow` | Same |
-| `/alfm status` | Print current mode + confirm slash loaded |
+| `/alfm status` | Rich status (Full Auto, invites, repost, slots, queue) |
 | `/alfm test` | Inject a fake match into the Log |
 | `/alfm help` | List commands |
 
@@ -53,9 +53,20 @@ Open **Post** in `/alfm` (separate from Hosting to avoid crowding).
 2. Pick channel: **Yell / Say / Guild / Channel** (channel name optional for custom chat channels).
 3. **Post once** sends via `SendChatMessage`.
 4. **Scan raid/party** recounts filled from the current roster + assigned roles; while Mode is **Hosting** (or auto-repost is on), roster events auto-refresh fills and the preview.
-5. **Auto-repost** (default **OFF**): interval seconds (default **60**, minimum **30**). Only while Mode=**Hosting**. Rebuilds the message each tick; **stops** when all role caps are filled or the group hits Max size. Status shows next-repost countdown and last post time.
+5. **Auto-repost** (default **OFF**): interval seconds (default **60**, minimum **30**). Only while Mode=**Hosting**. Rebuilds the message each tick; **stops** when all role caps are filled or the group hits Max size. Optional **Announce FULL** posts one public FULL line when stopping.
 
-Kick59 stays opt-in default OFF; invite path unchanged.
+## Full Auto Hosting (default OFF)
+
+`/alfm` → **Hosting** → enable **Full Auto Hosting (master)**. This:
+
+1. Sets Mode to **Hosting**
+2. Turns on whisper auto-invite + LFG auto-invite + roster scan + auto-repost + reject-rewhisper
+
+Turn it off anytime to clear that bundle (spam safety). Kick59 is never included — stays opt-in OFF on its own page.
+
+## Queue + reject re-whisper
+
+**Queue** lists recent hosting whispers (role + status) with **Invite** / **Reject+whisp**. Reject templates support `{role}` `{filled}` `{max}`, are rate-limited, and respect ignore lists.
 
 ## Opt-in level-59 kick
 
@@ -86,28 +97,37 @@ Native DialogFrame with a left **Categories** sidebar:
 
 | Category | Contents |
 |----------|----------|
-| **General** | Status (Listening ON/OFF) + mode Off / Notify / Seeking / Hosting |
-| **Seeking** | My roles, Scan LFG MS, auto-whisper + message |
-| **Hosting** | Full Auto master, accept roles, whisper + **LFG auto-invite**, reject-rewhisper, slots, presets |
-| **Post** | LFM preview, channel, Post once, Scan raid/party, auto-repost |
+| **General** | Status (Listening ON/OFF, Full Auto) + mode Off / Notify / Seeking / Hosting |
+| **Seeking** | My roles, Scan LFG MS, auto-whisper + rotating variants, leader blacklist, match sound |
+| **Hosting** | Full Auto master, accept roles, whisper + LFG auto-invite, reject-rewhisper, presets, slots |
+| **Post** | LFM preview, channel, Post once, Scan raid/party, auto-repost, announce FULL |
+| **Queue** | Applicant whispers — Invite / Reject+rewhisper |
 | **Kick** | Opt-in level-59 kick + recent kick log |
-| **Log** | Recent LFM/LFG matches (Clear) |
+| **Log** | Match history + activity (posts / invites / rejects) |
 
-## How to enable hosting + slots + post + 59-kick
+## How to enable Full Auto Hosting
+
+1. `/alfm` → **Hosting** → enable **Full Auto Hosting (master)** (default OFF).
+2. Confirm Accept roles / slot caps (or load preset **MS 2/3/3/7**).
+3. **Post** → pick channel; auto-repost is already on via Full Auto (interval ≥ 30s).
+4. Watch **Queue** for applicants; reject-rewhisper is on via Full Auto.
+5. `/alfm status` for a live dump. Kick59 stays off unless you enable it under **Kick**.
+
+## How to enable hosting manually (without Full Auto)
 
 1. `/alfm` → **General** → Mode **Hosting**.
 2. **Hosting** → check **Accept roles** (Tank / Healer / Aura / DPS).
 3. Set **Max T/H/A/D** slot caps (defaults 2/3/3/7) and **Max size** (15).
-4. Leave **Auto-invite matching role whispers** and **Require role in whisper** on.
+4. Leave **Auto-invite matching role whispers**, **Auto-invite LFG seekers**, and **Require role in whisper** on.
 5. **Post** → **Scan raid/party** (optional) → pick channel → **Post once**, or enable **Auto-repost** (interval ≥ 30s).
 6. Optionally **Kick** → enable **Kick at level 59 + raid warning** (dangerous; default off).
 
 ## Safety
 
-- Default mode is **Notify** (Log only). Auto-invite, auto-whisper, auto-repost, and level-59 kick remain **opt-in**; kick and auto-repost default off.
+- Default mode is **Notify** (Log only). **Full Auto Hosting**, auto-invite, auto-whisper, auto-repost, reject-rewhisper, and level-59 kick remain **opt-in**; Full Auto, kick, and auto-repost default off.
 - Never invites when the group is at **Max size** or the role **slot is full**.
-- Auto-repost stops when slots are full or Max size is reached.
-- Skips ignored players; rate-limits whispers/invites; kick RW cadence 10s; repost min interval 30s.
+- Auto-repost stops when slots are full or Max size is reached (optional FULL announce).
+- Skips ignored players; rate-limits whispers/invites/rejects; kick RW cadence 10s; repost min interval 30s.
 - Classic chat/party APIs only (`InviteUnit`, `UninviteUnit`, `SendChatMessage`, roster APIs). No `C_*`, Draft/HoF, or Rapid Rolling hooks.
 
 ## Development

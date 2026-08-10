@@ -15,7 +15,8 @@ ENGLISH
 4. Type /alfm (or /mslfm) to open settings. If nothing happens: check the AddOns list that
    AscensionLFM is enabled (folder must be AscensionLFM), then /reload. Try /alfm status —
    if that prints, the addon loaded. Default mode is Notify (Listening ON).
-5. Optional: /alfm test injects a fake match so you can verify the Log UI. /alfm help lists commands.
+5. Full Auto Hosting: /alfm → Hosting → enable the master toggle (default OFF). Kick59 stays OFF.
+6. Optional: /alfm test injects a fake match so you can verify the Log UI. /alfm help lists commands.
 
 DEUTSCH
 -------
@@ -30,4 +31,5 @@ DEUTSCH
 3. Addon in der Charakter-AddOns-Liste aktivieren, einloggen oder /reload.
 4. /alfm (oder /mslfm) öffnet die Einstellungen. Passiert nichts: AddOns-Liste prüfen
    (Ordner AscensionLFM, Häkchen an), dann /reload. /alfm status muss eine Zeile drucken.
-5. Optional: /alfm test · /alfm help
+5. Full Auto Hosting: /alfm → Hosting → Master-Schalter (Standard AUS). Kick59 bleibt AUS.
+6. Optional: /alfm test · /alfm help
