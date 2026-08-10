@@ -22,10 +22,11 @@ See `INSTALL.txt` inside the zip for a short checklist.
 
 | Command | Action |
 |---------|--------|
-| `/alfm` | Open settings |
-| `/mslfm` | Same |
-| `/alfm status` | Print current mode |
+| `/alfm` / `/mslfm` | Open settings |
+| `/alfmshow` | Same |
+| `/alfm status` | Print current mode + confirm slash loaded |
 | `/alfm test` | Inject a fake match into the Log |
+| `/alfm help` | List commands |
 
 ## Modes (default: **Notify** — Listening ON)
 

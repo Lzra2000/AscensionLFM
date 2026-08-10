@@ -559,22 +559,45 @@ function MainWindow.SelectCategory(id)
     RefreshStatus()
 end
 
+local function CreateMainFrame()
+    -- Prefer native dialog chrome; fall back if the template is missing on a client.
+    local ok, f = pcall(CreateFrame, "Frame", FRAME_NAME, UIParent, "UIPanelDialogTemplate")
+    if not ok or not f then
+        f = CreateFrame("Frame", FRAME_NAME, UIParent)
+        if f.SetBackdrop then
+            f:SetBackdrop({
+                bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+                edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+                tile = true,
+                tileSize = 32,
+                edgeSize = 32,
+                insets = { left = 11, right = 12, top = 12, bottom = 11 },
+            })
+            f:SetBackdropColor(0, 0, 0, 1)
+        end
+    end
+    return f
+end
+
 function MainWindow.Init()
     if frame then
         return
     end
 
-    frame = CreateFrame("Frame", FRAME_NAME, UIParent, "UIPanelDialogTemplate")
+    frame = CreateMainFrame()
     frame:SetSize(FRAME_WIDTH, FRAME_HEIGHT)
     frame:SetPoint("CENTER")
     frame:SetFrameStrata("DIALOG")
+    frame:SetFrameLevel(100)
     frame:EnableMouse(true)
     frame:SetMovable(true)
     frame:RegisterForDrag("LeftButton")
     frame:SetScript("OnDragStart", frame.StartMoving)
     frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
     frame:Hide()
-    tinsert(UISpecialFrames, FRAME_NAME)
+    if type(UISpecialFrames) == "table" then
+        tinsert(UISpecialFrames, FRAME_NAME)
+    end
 
     local title = _G[FRAME_NAME .. "Title"] or frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     if not _G[FRAME_NAME .. "Title"] then
@@ -585,7 +608,7 @@ function MainWindow.Init()
 
     local sub = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     sub:SetPoint("TOP", title, "BOTTOM", 0, -2)
-    sub:SetText("Manastorm Level Run LFM/LFG · v" .. tostring(AscensionLFM.VERSION or "0.3.0"))
+    sub:SetText("Manastorm Level Run LFM/LFG · v" .. tostring(AscensionLFM.VERSION or "0.3.1"))
     SetInk(sub, MUTED)
 
     local shell = CreateFrame("Frame", FRAME_NAME .. "Shell", frame)
@@ -1133,6 +1156,9 @@ function MainWindow.Toggle()
     if not frame then
         MainWindow.Init()
     end
+    if not frame then
+        error("AscensionLFMFrame failed to create")
+    end
     if frame:IsShown() then
         frame:Hide()
     else
@@ -1143,6 +1169,9 @@ end
 function MainWindow.Show()
     if not frame then
         MainWindow.Init()
+    end
+    if not frame then
+        error("AscensionLFMFrame failed to create")
     end
     frame:Show()
 end
