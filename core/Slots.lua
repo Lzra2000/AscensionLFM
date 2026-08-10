@@ -266,6 +266,40 @@ function Slots.UnassignedMembers()
     return Slots.ListUnassigned(present, map)
 end
 
+--- Assign the local player a host role if still unassigned (Hosting / Full Auto).
+-- Prefers db.hostRole, else first open accepted role, else dps.
+-- @return assignedRole or nil
+function Slots.EnsureHostAssigned()
+    local me
+    if type(UnitName) == "function" then
+        me = UnitName("player")
+    end
+    if type(me) ~= "string" or me == "" then
+        return nil
+    end
+    if Slots.GetAssigned(me) then
+        return nil
+    end
+    local db = DB()
+    local role = db and db.hostRole
+    if type(role) ~= "string" or role == "" then
+        role = nil
+    end
+    if not role and db and type(db.roles) == "table" then
+        for _, r in ipairs({ "tank", "healer", "aura", "dps" }) do
+            if db.roles[r] and Slots.HasOpenSlot(r) then
+                role = r
+                break
+            end
+        end
+    end
+    role = role or "dps"
+    if Slots.Assign(me, role) then
+        return role
+    end
+    return nil
+end
+
 
 --- Drop assigned roles for players who left the group; keep whisper roles for unknowns.
 function Slots.SyncFromRoster()
@@ -315,6 +349,10 @@ end
 -- @return snapshot, removedCount, unassignedCount
 function Slots.ScanRaid()
     local removed = Slots.SyncFromRoster() or 0
+    local db = DB()
+    if db and (db.mode == "hosting" or db.fullAutoHosting) then
+        Slots.EnsureHostAssigned()
+    end
     if AscensionLFM.AuraBalance and AscensionLFM.AuraBalance.Balance then
         AscensionLFM.AuraBalance.Balance()
     end

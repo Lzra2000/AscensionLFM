@@ -224,8 +224,11 @@ local function FirstOpenAcceptedRole(db, parsed)
     return nil
 end
 
-local function FirstOpenHostRole(db)
+local function FirstOpenHostRole(db, preferSupport)
     local order = { "tank", "healer", "aura", "dps" }
+    if preferSupport then
+        order = { "tank", "healer", "aura" }
+    end
     for _, role in ipairs(order) do
         if db.roles and db.roles[role] then
             if AscensionLFM.Slots and AscensionLFM.Slots.HasOpenSlot then
@@ -238,6 +241,12 @@ local function FirstOpenHostRole(db)
         end
     end
     return nil
+end
+
+local function SeatsLeft(db)
+    local maxSize = tonumber(db and db.maxPartySize) or 15
+    local size = Invite.GetGroupSize()
+    return maxSize - size, maxSize, size
 end
 
 --- Hosting: public LFG MS poster → InviteUnit if role matches an open accepted slot.
@@ -253,8 +262,30 @@ function Invite.TryLfgInvite(leader, message, parsed)
         return false, "bad name"
     end
     parsed = parsed or (AscensionLFM.Parser and AscensionLFM.Parser.Parse and AscensionLFM.Parser.Parse(message))
+    -- GuessRole fallback when Parse misses glued tags / odd phrasing
     if not parsed or not parsed.isManastormLFG then
-        return false, "not lfg"
+        local text = tostring(message or ""):lower()
+        local looksLfg = text:find("lfg", 1, true) or text:find("looking for group", 1, true)
+        local looksMs = text:find("manastorm", 1, true) or text:find("%f[%w]ms%f[%W]")
+            or text:find("%f[%w]ms%d") or text:find("%f[%w]ms$")
+        local guess = AscensionLFM.Parser and AscensionLFM.Parser.GuessRole
+            and AscensionLFM.Parser.GuessRole(message)
+        if looksLfg and looksMs and guess then
+            parsed = {
+                isManastormLFG = true,
+                isManastormLFM = false,
+                isManastormListing = true,
+                listingKind = "lfg",
+                roles = {
+                    [guess] = { open = true, mentioned = true },
+                },
+                genericNeed = false,
+                summary = tostring(message or ""),
+                raw = tostring(message or ""),
+            }
+        else
+            return false, "not lfg"
+        end
     end
     -- Pure LFM hosts are not LFG seekers
     if parsed.isManastormLFM and not parsed.isManastormLFG then
@@ -269,7 +300,14 @@ function Invite.TryLfgInvite(leader, message, parsed)
     end
     if not role then
         if db.lfgInviteWithoutRole then
-            role = FirstOpenHostRole(db)
+            role = FirstOpenHostRole(db, false)
+        end
+    end
+    if not role then
+        local guess = AscensionLFM.Parser and AscensionLFM.Parser.GuessRole
+            and AscensionLFM.Parser.GuessRole(message)
+        if guess then
+            role = guess
         end
     end
     if not role then
@@ -278,6 +316,17 @@ function Invite.TryLfgInvite(leader, message, parsed)
         end
         return false, "no role"
     end
+
+    -- Last 1–2 seats: do not burn them on DPS while tank/heal/aura still open
+    local left = SeatsLeft(db)
+    if left <= 2 and role == "dps" then
+        local support = FirstOpenHostRole(db, true)
+        if support then
+            AfterHostResult(leader, message, role, false, "prefer support seat")
+            return false, "prefer support seat"
+        end
+    end
+
     if not (db.roles and db.roles[role]) then
         AfterHostResult(leader, message, role, false, "role filtered")
         return false, "role filtered"

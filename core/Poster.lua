@@ -72,11 +72,18 @@ function Poster.BuildMessage(snapshot)
 end
 
 --- Pure: true when every role cap is filled (max>0 roles only) OR group size >= maxPartySize.
-function Poster.IsFull(snapshot, groupSize, maxPartySize)
+-- Optional unassignedCount: near-full raid with people lacking T/H/A/D pauses LFM spam
+-- until RW sync (avoids forever posting "Aura 0/3" at 14/15).
+function Poster.IsFull(snapshot, groupSize, maxPartySize, unassignedCount)
     groupSize = tonumber(groupSize) or 0
     maxPartySize = tonumber(maxPartySize) or 15
+    unassignedCount = tonumber(unassignedCount) or 0
     if maxPartySize > 0 and groupSize >= maxPartySize then
         return true, "maxPartySize"
+    end
+    -- Nearly full + unassigned bodies: seats are taken; roles just unknown → stop repost
+    if unassignedCount > 0 and maxPartySize > 0 and groupSize >= (maxPartySize - 1) then
+        return true, "unassigned"
     end
     snapshot = snapshot or {}
     local anyCap = false
@@ -169,6 +176,14 @@ local function LiveGroupSize()
     return (party or 0) + 1
 end
 
+local function LiveUnassignedCount()
+    if AscensionLFM.Slots and AscensionLFM.Slots.UnassignedMembers then
+        local _, n = AscensionLFM.Slots.UnassignedMembers()
+        return tonumber(n) or 0
+    end
+    return 0
+end
+
 --- Build (or refresh) the current LFM text from slots.
 function Poster.RefreshMessage()
     lastMessage = Poster.BuildMessage(LiveSnapshot())
@@ -251,7 +266,7 @@ function Poster.GetStatus()
     local interval = Poster.ClampInterval(db and db.repostInterval)
     local now = Now()
     local snap = LiveSnapshot()
-    local full, fullReason = Poster.IsFull(snap, LiveGroupSize(), db and db.maxPartySize)
+    local full, fullReason = Poster.IsFull(snap, LiveGroupSize(), db and db.maxPartySize, LiveUnassignedCount())
     local countdown = 0
     if nextPostAt > now then
         countdown = math.floor(nextPostAt - now + 0.5)
@@ -283,7 +298,7 @@ function Poster.Tick(now)
 
     local snap = LiveSnapshot()
     lastMessage = Poster.BuildMessage(snap)
-    local full, fullReason = Poster.IsFull(snap, LiveGroupSize(), db.maxPartySize)
+    local full, fullReason = Poster.IsFull(snap, LiveGroupSize(), db.maxPartySize, LiveUnassignedCount())
     local ok, reason = Poster.ShouldRepost(
         now,
         lastPostAt,
@@ -293,6 +308,10 @@ function Poster.Tick(now)
         full
     )
     if not ok then
+        if reason == "full" and fullReason == "unassigned" then
+            lastStatus = "need RW (unassigned)"
+            return lastStatus
+        end
         if reason == "full" then
             lastStatus = "full (" .. tostring(fullReason or "slots") .. ")"
             -- Stop auto-repost when full so it does not keep ticking posts later
