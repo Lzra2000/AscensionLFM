@@ -85,13 +85,15 @@ Turn it off anytime to clear that automation bundle (spam safety). Accept-role c
 
 ## Opt-in level-59 kick
 
-**Default OFF.** While **Hosting** and enabled:
+**Default OFF** (not part of Full Auto). While **Hosting** (or Full Auto) and enabled:
 
 1. Every **10 seconds**, if any party/raid member (not you) is level **≥ 59**, send a **Raid Warning** (or party/yell fallback) naming them.
-2. Then **UninviteUnit** those players.
+2. After a short delay, **UninviteUnit** those players (staggered if several).
 3. Log the kick (chat + UI “Recent kicks”).
 
-Requires group leader (party) or raid leader/assist. No-ops safely otherwise.
+Requires group leader (party) or raid leader/assist. Levels prefer `UnitLevel` when the
+raid roster still shows `0`. If nothing happens, `/alfm status` shows the last kick reason
+(`disabled` / `not hosting` / `no privilege` / `levels unknown` / `warned` / …).
 
 ## Parser examples
 

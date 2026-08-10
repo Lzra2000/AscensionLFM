@@ -8,7 +8,7 @@ if type(AscensionLFM) ~= "table" then
     _G.AscensionLFM = AscensionLFM
 end
 
-AscensionLFM.VERSION = "0.4.6"
+AscensionLFM.VERSION = "0.4.7"
 AscensionLFM.ADDON_NAME = "AscensionLFM"
 
 local function Print(msg)
@@ -46,6 +46,17 @@ local function PrintStatus()
     Print(string.format("autoWhisper=%s · variants=%s · Kick59=%s · announceFull=%s",
         OnOff(db.autoWhisper), OnOff(db.useWhisperVariants ~= false),
         OnOff(db.autoKickLevel59), OnOff(db.announceFull)))
+    if AscensionLFM.Kick and AscensionLFM.Kick.GetStatus then
+        local ks = AscensionLFM.Kick.GetStatus()
+        if ks then
+            Print(string.format("kick: last=%s · can=%s · group=%s · pending=%s · hosting=%s",
+                tostring(ks.last or "?"),
+                OnOff(ks.canKick),
+                tostring(ks.group or "?"),
+                tostring(ks.pending or 0),
+                OnOff(ks.hosting)))
+        end
+    end
     local rc = AscensionLFM.RoleCheck and AscensionLFM.RoleCheck.GetStatus and AscensionLFM.RoleCheck.GetStatus()
     if rc then
         Print(string.format("roleCheck: %s · window=%ss · autoResync=%s · autoMoveAura=%s",
@@ -171,6 +182,7 @@ bootFrame:SetScript("OnEvent", function(self, event, arg1)
         end
         RegisterSlash()
         SafeStart("Scanner.Start", AscensionLFM.Scanner and AscensionLFM.Scanner.Start)
+        SafeStart("Kick.Start", AscensionLFM.Kick and AscensionLFM.Kick.Start)
         SafeStart("Poster.Start", AscensionLFM.Poster and AscensionLFM.Poster.Start)
         SafeStart("RoleCheck.EnsureTicker", AscensionLFM.RoleCheck and AscensionLFM.RoleCheck.EnsureTicker)
         SafeStart("MainWindow.Init", AscensionLFM.MainWindow and AscensionLFM.MainWindow.Init)
