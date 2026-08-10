@@ -136,13 +136,47 @@ function Invite.InvitePlayer(name, role)
     return true
 end
 
+-- "no role"/"no parse" means Parser found NO role-related content at all in
+-- the message — that alone doesn't tell us whether this was a failed
+-- application ("inv ms please" — clearly trying to apply, just forgot a
+-- role, a clarifying reply is genuinely useful) or an unrelated whisper
+-- (trade, a question, someone complaining) where an automatic "please
+-- whisper a role" reply reads as a bizarre unprompted message and can
+-- spiral (they reply confused, that reply also doesn't parse as a role,
+-- triggers another auto-reply...). So for these two reasons specifically,
+-- only auto-reply if the message itself has some minimal ms/invite signal.
+-- Genuine detected-but-unfulfillable requests ("slot full"/"full"/
+-- "role filtered") always get the automatic reply — a role WAS recognized
+-- there, so we're already confident it was a real application. The host can
+-- still manually Reject+whisper any queued entry regardless of reason.
+local NO_AUTO_REJECT_REASONS = {
+    ["no role"] = true,
+    ["no parse"] = true,
+}
+
+local function LooksLikeApplicationAttempt(message)
+    local text = tostring(message or ""):lower()
+    if text:find("manastorm", 1, true) then
+        return true
+    end
+    if text:find("%f[%w]ms%f[%W]") or text:find("%f[%w]ms$") or text:find("^ms%f[%W]") then
+        return true
+    end
+    if text:find("inv", 1, true) then
+        return true
+    end
+    return false
+end
+
 local function AfterHostResult(sender, message, role, ok, reason)
     local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
     local status = ok and "invited" or "blocked"
     if AscensionLFM.Queue and AscensionLFM.Queue.Push then
         AscensionLFM.Queue.Push(sender, role, message, status, reason)
     end
-    if not ok and AscensionLFM.Reject and AscensionLFM.Reject.TryRewhisper then
+    local skipAutoReject = NO_AUTO_REJECT_REASONS[tostring(reason or "")]
+        and not LooksLikeApplicationAttempt(message)
+    if not ok and not skipAutoReject and AscensionLFM.Reject and AscensionLFM.Reject.TryRewhisper then
         AscensionLFM.Reject.TryRewhisper(sender, reason, role)
     end
 end

@@ -13,10 +13,17 @@ local invited = {}
 _G.InviteUnit = function(name)
     table.insert(invited, name)
 end
+local whispersSent = {}
+_G.SendChatMessage = function(msg, chan, lang, target)
+    table.insert(whispersSent, { msg = msg, chan = chan, target = target })
+end
 
 dofile("core/Database.lua")
 dofile("core/Parser.lua")
 dofile("core/Slots.lua")
+dofile("core/Activity.lua")
+dofile("core/Reject.lua")
+dofile("core/Queue.lua")
 dofile("core/Invite.lua")
 
 local AscensionLFM = _G.AscensionLFM
@@ -168,6 +175,41 @@ ok, reason = Invite.TryHostInvite("DpsWhisperOk", "dps")
 check("whisper last seat allows dps when no support open", ok == true, tostring(reason))
 _G.IsRaidLeader = function() return false end
 _G.GetNumRaidMembers = function() return 0 end
+
+-- Regression: unrelated whispers ("no role"/"no parse") must NOT trigger an
+-- automatic reject-rewhisper — that's what made the addon whisper a random
+-- player "please whisper a role" after THEY whispered the host about
+-- something unrelated, which reads as a bizarre unprompted reply.
+db.rejectRewhisper = true
+db.roles = { tank = true, healer = true, aura = true, dps = true }
+db.slotMax = { tank = 2, healer = 3, aura = 3, dps = 7 }
+Slots.ClearAll()
+Invite._ResetCooldowns()
+if AscensionLFM.Reject and AscensionLFM.Reject._ResetForTests then
+    AscensionLFM.Reject._ResetForTests()
+end
+whispersSent = {}
+ok, reason = Invite.TryHostInvite("Qoochi", "i didnt whisper you so dont whisper me XD")
+check("unrelated whisper not invited", ok == false)
+check("unrelated whisper reason is no-role/no-parse", reason == "no role" or reason == "no parse", tostring(reason))
+check("unrelated whisper gets no auto-reply", #whispersSent == 0, whispersSent[1] and whispersSent[1].msg or "none")
+
+-- ... but a genuine detected-and-unfulfillable request still auto-replies
+db.roles = { tank = true, healer = false, aura = false, dps = false }
+db.slotMax = { tank = 0, healer = 0, aura = 0, dps = 0 }
+Slots.ClearAll()
+Invite._ResetCooldowns()
+if AscensionLFM.Reject and AscensionLFM.Reject._ResetForTests then
+    AscensionLFM.Reject._ResetForTests()
+end
+whispersSent = {}
+ok, reason = Invite.TryHostInvite("RealApplicant", "tank")
+check("slot-full request still gets auto-reply", #whispersSent == 1, tostring(#whispersSent))
+check("slot-full auto-reply mentions tank", whispersSent[1] and whispersSent[1].msg:find("tank", 1, true) ~= nil,
+    whispersSent[1] and whispersSent[1].msg or "none")
+
+db.roles.tank = true
+db.slotMax = { tank = 2, healer = 3, aura = 3, dps = 7 }
 
 io.write(string.format("invite tests: %d passed, %d failed\n", passed, failed))
 if failed > 0 then

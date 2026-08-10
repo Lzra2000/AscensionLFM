@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.4.20
+
+- **Fix: unrelated whispers triggered a confusing auto-reply.** Reported
+  live: a player whispered the host about something completely unrelated
+  ("i didnt whisper you so dont whisper me XD"), and got an automated
+  "Please whisper a role: tank / heal / aura / dps." reply back — because
+  every whisper received while hosting is parsed as a potential
+  application, and Reject Re-whisper auto-replies whenever no role is
+  found. Now: for the "no role"/"no parse" case specifically, the
+  auto-reply only fires if the message itself has some minimal ms/invite
+  signal (mentions ms/manastorm/inv — e.g. "inv ms please", which is
+  clearly a forgotten-role application and still gets the clarifying
+  reply). A message with zero MS/invite signal stays silent instead of
+  auto-whispering a stranger out of nowhere. Genuine detected-but-full/
+  filtered requests are unaffected — those still always get the automatic
+  reply since a role was actually recognized. Manual Reject+whisper from
+  the Queue tab still works regardless of reason.
+
 ## 0.4.19
 
 - **Fix inconsistent "last seats prefer support" policy:** the v0.4.16
