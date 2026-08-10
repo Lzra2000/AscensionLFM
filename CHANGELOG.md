@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.23
+
+- **Fix: unbounded SavedVariables growth in the regroup watch list.**
+  `db.regroupRoster` (Mini HUD "Regrp" watch list) is correctly capped at
+  `REGROUP_MAX` (40) with FIFO eviction, but the paired `db.regroupDisplay`
+  lookup table (keeps original name casing for `InviteUnit`) was never
+  pruned to match — every name ever seen present in your group stayed in
+  SavedVariables forever, growing unbounded over months of play. Now
+  pruned to match the roster on every update.
+- **Cleanup:** `Scanner.lua`'s `IsGroupChatEvent()` checked for
+  `CHAT_MSG_RAID_WARNING`, which was never registered in `CHAT_EVENTS` and
+  is a one-way leader/assist broadcast players can't reply through anyway
+  — removed the unreachable check.
+
 ## 0.4.22
 
 - **New: "My host role" picker (Hosting tab).** `Slots.EnsureHostAssigned()`

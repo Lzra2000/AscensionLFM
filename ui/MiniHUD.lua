@@ -460,6 +460,29 @@ local function CollectPresentSet()
     return present
 end
 
+--- regroupDisplay (case-preserving name lookup) has no cap of its own — it's
+-- meant to mirror regroupRoster, which IS capped (FIFO evicted) at
+-- REGROUP_MAX. Without pruning, every name ever seen present stays in
+-- regroupDisplay forever even after RememberName evicts it from the roster
+-- list, growing SavedVariables unboundedly over months of play. Call this
+-- after any regroupRoster update to keep the two in sync.
+local function PruneDisplayToRoster(db)
+    if not db or type(db.regroupRoster) ~= "table" or type(db.regroupDisplay) ~= "table" then
+        return
+    end
+    local keep = {}
+    for _, n in ipairs(db.regroupRoster) do
+        if type(n) == "string" and n ~= "" then
+            keep[LowerName(n)] = true
+        end
+    end
+    for key in pairs(db.regroupDisplay) do
+        if not keep[key] then
+            db.regroupDisplay[key] = nil
+        end
+    end
+end
+
 --- Snapshot current party/raid into the regroup watch list (survives leavers).
 -- Call BEFORE Slots.ScanRaid/SyncFromRoster so leavers are still known this tick
 -- only via the existing watch list (present set is already without them).
@@ -486,6 +509,7 @@ function MiniHUD.RememberPresent()
         end
     end
     db.regroupRoster = list
+    PruneDisplayToRoster(db)
     return n
 end
 
@@ -506,6 +530,7 @@ function MiniHUD.RememberPlayer(name)
     end
     db.regroupRoster = MiniHUD.RememberName(db.regroupRoster, name, REGROUP_MAX)
     db.regroupDisplay[LowerName(name)] = name
+    PruneDisplayToRoster(db)
     return true
 end
 

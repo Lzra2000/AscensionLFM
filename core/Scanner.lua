@@ -308,12 +308,15 @@ local function HandlePublicListing(leader, message, event)
     end
 end
 
+-- Group-chat classification for role-check-reply routing. RAID_WARNING was
+-- checked here before but never registered in CHAT_EVENTS (players can't
+-- reply "in raid warning" — that channel is a one-way leader/assist
+-- broadcast) so the check was unreachable dead code; dropped for clarity.
 local function IsGroupChatEvent(event)
     return event == "CHAT_MSG_PARTY"
         or event == "CHAT_MSG_PARTY_LEADER"
         or event == "CHAT_MSG_RAID"
         or event == "CHAT_MSG_RAID_LEADER"
-        or event == "CHAT_MSG_RAID_WARNING"
 end
 
 local function TryRoleCheckReply(sender, message)

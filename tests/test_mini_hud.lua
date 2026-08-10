@@ -166,6 +166,26 @@ AscensionLFM.Database.Get().regroupDisplay = {}
 check("RememberPlayer", MiniHUD.RememberPlayer("BobTheTank") == true)
 check("display casing", AscensionLFM.Database.Get().regroupDisplay.bobthetank == "BobTheTank")
 
+-- Regression: regroupDisplay must not grow unboundedly past what
+-- regroupRoster (FIFO-capped at REGROUP_MAX) actually keeps.
+MiniHUD._ResetForTests()
+AscensionLFM.Database.Get().regroupRoster = {}
+AscensionLFM.Database.Get().regroupDisplay = {}
+for i = 1, MiniHUD.REGROUP_MAX + 10 do
+    MiniHUD.RememberPlayer("Player" .. i)
+end
+local rosterCount = #AscensionLFM.Database.Get().regroupRoster
+local displayCount = 0
+for _ in pairs(AscensionLFM.Database.Get().regroupDisplay) do
+    displayCount = displayCount + 1
+end
+check("roster capped at REGROUP_MAX", rosterCount == MiniHUD.REGROUP_MAX, tostring(rosterCount))
+check("display pruned to match roster (no unbounded growth)", displayCount == rosterCount,
+    string.format("roster=%d display=%d", rosterCount, displayCount))
+check("evicted player1 dropped from display", AscensionLFM.Database.Get().regroupDisplay.player1 == nil)
+check("recent player is still in display",
+    AscensionLFM.Database.Get().regroupDisplay["player" .. (MiniHUD.REGROUP_MAX + 10)] == "Player" .. (MiniHUD.REGROUP_MAX + 10))
+
 -- RW works without Hosting (announce fallback like Wipe)
 MiniHUD._ResetForTests()
 _G._chats = {}
