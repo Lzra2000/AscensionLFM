@@ -13,6 +13,7 @@ AscensionLFM.MiniHUD = MiniHUD
 
 local FRAME_NAME = "AscensionLFMMiniHUD"
 local DEFAULT_WIPE = "WIPE"
+local DEFAULT_SHIELD = "KILL MOBS — boss shield still up!"
 local ANNOUNCE_GAP = 2
 
 local frame
@@ -61,6 +62,18 @@ function MiniHUD.BuildWipeMessage(custom)
     local msg = tostring(custom or ""):gsub("^%s+", ""):gsub("%s+$", "")
     if msg == "" then
         msg = DEFAULT_WIPE
+    end
+    if #msg > 255 then
+        msg = msg:sub(1, 255)
+    end
+    return msg
+end
+
+--- Pure: kill-mobs / boss-shield warning text.
+function MiniHUD.BuildShieldMessage(custom)
+    local msg = tostring(custom or ""):gsub("^%s+", ""):gsub("%s+$", "")
+    if msg == "" then
+        msg = DEFAULT_SHIELD
     end
     if #msg > 255 then
         msg = msg:sub(1, 255)
@@ -188,6 +201,22 @@ function MiniHUD.ActionWipe()
     return ok, ch
 end
 
+function MiniHUD.ActionShield()
+    if not RateOk() then
+        return false, "rate limited"
+    end
+    local db = DB()
+    local msg = MiniHUD.BuildShieldMessage(db and db.shieldAnnounceMessage)
+    local ok, ch = SendGroupAnnounce(msg)
+    if ok then
+        Print("Shield → " .. tostring(ch) .. ": " .. msg)
+        if AscensionLFM.Activity and AscensionLFM.Activity.Push then
+            AscensionLFM.Activity.Push("shield", msg)
+        end
+    end
+    return ok, ch
+end
+
 function MiniHUD.ActionFull()
     if not RateOk() then
         return false, "rate limited"
@@ -276,8 +305,8 @@ local function SetExpanded(on)
         return
     end
     if expanded then
-        frame:SetWidth(320)
-        frame:SetHeight(58)
+        frame:SetWidth(340)
+        frame:SetHeight(72)
         if frame.titleFS then
             frame.titleFS:SetText("AscensionLFM")
         end
@@ -288,6 +317,7 @@ local function SetExpanded(on)
         end
         if frame.collapseBtn then
             frame.collapseBtn:SetText("×")
+            frame.collapseBtn:Show()
         end
         if statusFS then
             statusFS:Show()
@@ -339,8 +369,8 @@ local function BuildFrame()
     end
     local f = CreateFrame("Frame", FRAME_NAME, UIParent)
     f:SetFrameStrata("HIGH")
-    f:SetWidth(320)
-    f:SetHeight(58)
+    f:SetWidth(340)
+    f:SetHeight(72)
     f:SetMovable(true)
     f:EnableMouse(true)
     f:RegisterForDrag("LeftButton")
@@ -397,11 +427,15 @@ local function BuildFrame()
     end)
     f.collapseBtn = collapse
 
-    local y = -28
+    local y = -26
     local x = 6
     local function place(btn)
         btn:SetPoint("TOPLEFT", x, y)
         x = x + (btn:GetWidth() or 40) + 3
+    end
+    local function newRow()
+        y = y - 22
+        x = 6
     end
 
     buttons.lfm = MakeBtn(f, "LFM", 40, function()
@@ -424,10 +458,17 @@ local function BuildFrame()
     end, true)
     place(buttons.wipe)
 
+    buttons.mobs = MakeBtn(f, "Mobs", 44, function()
+        return MiniHUD.ActionShield()
+    end, true)
+    place(buttons.mobs)
+
     buttons.full = MakeBtn(f, "FULL", 42, function()
         return MiniHUD.ActionFull()
     end)
     place(buttons.full)
+
+    newRow()
 
     buttons.t = MakeBtn(f, "T", 24, function()
         return MiniHUD.ActionNeed("tank")
@@ -453,7 +494,7 @@ local function BuildFrame()
     statusFS:SetPoint("BOTTOMLEFT", 8, 4)
     statusFS:SetPoint("BOTTOMRIGHT", -8, 4)
     statusFS:SetJustifyH("LEFT")
-    statusFS:SetText("LFM · RW · Sync · Wipe · FULL · Need")
+    statusFS:SetText("Wipe · Mobs=kill adds (boss shield) · Need T/H/A/D")
     statusFS:SetTextColor(0.65, 0.58, 0.4)
 
     frame = f
@@ -523,4 +564,5 @@ function MiniHUD._ResetForTests()
 end
 
 MiniHUD.DEFAULT_WIPE = DEFAULT_WIPE
+MiniHUD.DEFAULT_SHIELD = DEFAULT_SHIELD
 MiniHUD.ANNOUNCE_GAP = ANNOUNCE_GAP

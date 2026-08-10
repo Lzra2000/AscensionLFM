@@ -42,7 +42,7 @@
   /* === Mini HUD (expanded) === */
   .hud {
     position: absolute; left: 48px; top: 88px;
-    width: 318px;
+    width: 340px;
     background: linear-gradient(180deg, #3a3020, #1e180e);
     border: 2px solid var(--line);
     box-shadow:
@@ -122,13 +122,16 @@
         <button class="btn">RW</button>
         <button class="btn">Sync</button>
         <button class="btn danger">Wipe</button>
+        <button class="btn danger">Mobs</button>
         <button class="btn">FULL</button>
+      </div>
+      <div class="row" style="margin-top:4px">
         <button class="btn need">T</button>
         <button class="btn need">H</button>
         <button class="btn need">A</button>
         <button class="btn need">D</button>
       </div>
-      <div class="hint">LFM posts · RW role check · Sync roles · Wipe RW · FULL · Need T/H/A/D</div>
+      <div class="hint">Mobs = kill adds so boss shield drops · Wipe · Need T/H/A/D</div>
     </div>
 
     <!-- Collapsed -->
@@ -146,6 +149,7 @@
       <li><b>RW</b> — start Role Check raid warning</li>
       <li><b>Sync</b> — resync roles / filled counts</li>
       <li><b>Wipe</b> — raid warning <code>WIPE</code> (party/yell fallback)</li>
+      <li><b>Mobs</b> — raid warning <code>KILL MOBS — boss shield still up!</code></li>
       <li><b>FULL</b> — announce FULL line</li>
       <li><b>T H A D</b> — short “need tank/heal/aura/dps” yell</li>
       <li>Title click → full settings · toggle in General if you hide it</li>
