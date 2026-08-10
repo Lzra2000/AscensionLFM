@@ -156,6 +156,9 @@ function Invite.TryHostInvite(sender, message)
     -- Queue + sound even when auto-invite is off (manual Queue actions)
     local parsed = AscensionLFM.Parser.Parse(message)
     local role = parsed and AscensionLFM.Parser.RequestedRole(parsed) or nil
+    if not role and AscensionLFM.Parser.GuessRole then
+        role = AscensionLFM.Parser.GuessRole(message)
+    end
 
     PlayApplicantSound(db)
 
@@ -166,18 +169,14 @@ function Invite.TryHostInvite(sender, message)
         return false, "disabled"
     end
 
-    if not parsed then
-        AfterHostResult(sender, message, nil, false, "no parse")
-        return false, "no parse"
-    end
-    role = AscensionLFM.Parser.RequestedRole(parsed)
     if not role then
+        local why = parsed and "no role" or "no parse"
         if db.requireRoleWhisper ~= false then
-            AfterHostResult(sender, message, nil, false, "no role")
-            return false, "no role"
+            AfterHostResult(sender, message, nil, false, why)
+            return false, why
         end
-        AfterHostResult(sender, message, nil, false, "no role")
-        return false, "no role"
+        AfterHostResult(sender, message, nil, false, why)
+        return false, why
     end
     if not (db.roles and db.roles[role]) then
         AfterHostResult(sender, message, role, false, "role filtered")
@@ -189,19 +188,16 @@ function Invite.TryHostInvite(sender, message)
             return false, "slot full"
         end
     end
-    -- Soft Manastorm hint: accept pure role whispers while hosting MS runs
+    -- Soft Manastorm hint: accept pure role whispers while hosting MS runs.
+    -- GuessRole / isRoleRequest / letter roles always count as related.
     local text = tostring(message or ""):lower()
     local msHint = text:find("ms", 1, true) or text:find("manastorm", 1, true)
-        or text:find("inv", 1, true) or parsed.isRoleRequest or parsed.isManastormLFM
-        or parsed.isManastormLFG
+        or text:find("inv", 1, true) or (parsed and parsed.isRoleRequest)
+        or (parsed and parsed.isManastormLFM) or (parsed and parsed.isManastormLFG)
+        or role ~= nil
     if not msHint then
-        local bare = text:match(
-            "^%s*(tank[s]?|ot|mt|heal[ers]*|heals?|hps|dps|aura[s]?|dd|damage|aura%s+of%s+exp[%w]*|exp%s+aura|aoe%s+aura)%s*$"
-        )
-        if not bare then
-            AfterHostResult(sender, message, role, false, "not ms-related")
-            return false, "not ms-related"
-        end
+        AfterHostResult(sender, message, role, false, "not ms-related")
+        return false, "not ms-related"
     end
     local ok, reason = Invite.InvitePlayer(sender, role)
     AfterHostResult(sender, message, role, ok, reason)

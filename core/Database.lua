@@ -14,7 +14,7 @@ AscensionLFM.Database = Database
 -- Default "notify": Log fills from public LFM/LFG MS lines; kick/auto-invite stay off.
 local DEFAULTS = {
     mode = "notify",
-    defaultsRev = 3, -- bumped when shipping default-mode / stock-copy changes
+    defaultsRev = 4, -- bumped when shipping default-mode / stock-copy changes
     roles = {
         tank = true,
         healer = false,
@@ -70,8 +70,8 @@ local DEFAULTS = {
     rejectTemplates = {
         ["slot full"] = "Sorry, {role} is full ({filled}/{max}).",
         full = "Group is full — thanks!",
-        ["no role"] = "Please whisper a role: tank / heal / aura / dps.",
-        ["no parse"] = "Please whisper a role: tank / heal / aura / dps.",
+        ["no role"] = "Please whisper a role: tank/heal/aura/dps (or T/H/A/D).",
+        ["no parse"] = "Please whisper a role: tank/heal/aura/dps (or T/H/A/D).",
         ["role filtered"] = "Not looking for {role} right now — thanks!",
     },
     rejectCooldown = 30,
@@ -81,7 +81,7 @@ local DEFAULTS = {
     soundOnMatch = false,
     soundOnApplicant = false,
     -- RW Role Check + Aura 1-per-subgroup auto-move
-    roleCheckMessage = "ROLE CHECK — whisper tank / heal / aura / dps",
+    roleCheckMessage = "ROLE CHECK — whisper tank/heal/aura/dps (or T/H/A/D)",
     roleCheckDuration = 60,
     roleCheckWindow = 60,
     roleCheckMinInterval = 30,
@@ -135,13 +135,26 @@ function Database.Init()
             _G.AscensionLFMDB.defaultsRev = 2
             rev = 2
         end
-        -- v0.4.2: shorter default Role Check raid warning if still on the old stock text.
-        if rev < 3 then
-            local oldMsg = "ROLE CHECK — whisper me tank / heal / aura / dps to sync MS slots"
-            if _G.AscensionLFMDB.roleCheckMessage == oldMsg then
+        -- v0.4.2/0.4.4: refresh stock Role Check raid warning if still on an old default.
+        if rev < 4 then
+            local oldMsgs = {
+                ["ROLE CHECK — whisper me tank / heal / aura / dps to sync MS slots"] = true,
+                ["ROLE CHECK — whisper tank / heal / aura / dps"] = true,
+            }
+            if oldMsgs[tostring(_G.AscensionLFMDB.roleCheckMessage or "")] then
                 _G.AscensionLFMDB.roleCheckMessage = DEFAULTS.roleCheckMessage
             end
-            _G.AscensionLFMDB.defaultsRev = 3
+            -- v0.4.3 saved Full Auto with healer/aura accept off → heal whispers role-filtered.
+            if _G.AscensionLFMDB.fullAutoHosting then
+                if type(_G.AscensionLFMDB.roles) ~= "table" then
+                    _G.AscensionLFMDB.roles = DeepCopy(DEFAULTS.roles)
+                end
+                _G.AscensionLFMDB.roles.tank = true
+                _G.AscensionLFMDB.roles.healer = true
+                _G.AscensionLFMDB.roles.aura = true
+                _G.AscensionLFMDB.roles.dps = true
+            end
+            _G.AscensionLFMDB.defaultsRev = 4
         end
     end
 end

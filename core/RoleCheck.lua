@@ -11,7 +11,7 @@ end
 local RoleCheck = {}
 AscensionLFM.RoleCheck = RoleCheck
 
-local DEFAULT_MSG = "ROLE CHECK — whisper tank / heal / aura / dps"
+local DEFAULT_MSG = "ROLE CHECK — whisper tank/heal/aura/dps (or T/H/A/D)"
 local DEFAULT_DURATION = 60
 local MIN_RW_GAP = 30
 local MIN_DURATION = 15
@@ -110,20 +110,31 @@ function RoleCheck.ParseWhisperRole(message)
             end
         end
     end
+    if AscensionLFM.Parser and AscensionLFM.Parser.GuessRole then
+        local role = AscensionLFM.Parser.GuessRole(message)
+        if role then
+            return role
+        end
+    end
     local t = tostring(message or ""):lower()
+    t = t:gsub("^%s+", ""):gsub("%s+$", ""):gsub("[!%?%.%,%;%:]+$", "")
     if t == "" then
         return nil
     end
-    if t:find("tank", 1, true) or t:find("%f[%w]ot%f[%W]") or t:find("%f[%w]mt%f[%W]") or t == "ot" or t == "mt" then
+    if t == "t" or t == "tank" or t == "tanks" or t == "ot" or t == "mt"
+        or t:find("tank", 1, true) or t:find("%f[%w]ot%f[%W]") or t:find("%f[%w]mt%f[%W]") then
         return "tank"
     end
-    if t:find("heal", 1, true) or t:find("hps", 1, true) then
+    if t == "h" or t == "heal" or t == "heals" or t == "healer" or t == "healers" or t == "heiler" or t == "hps"
+        or t:find("heal", 1, true) or t:find("hps", 1, true) or t:find("heiler", 1, true) then
         return "healer"
     end
-    if t:find("aura", 1, true) or t:find("exp%s*aura") or t:find("aoe%s*aura") then
+    if t == "a" or t == "aura" or t == "auras"
+        or t:find("aura", 1, true) or t:find("exp%s*aura") or t:find("aoe%s*aura") then
         return "aura"
     end
-    if t:find("dps", 1, true) or t:find("%f[%w]dd%f[%W]") or t == "dd" or t:find("damage", 1, true) then
+    if t == "d" or t == "dps" or t == "dd" or t == "damage" or t == "dmg"
+        or t:find("dps", 1, true) or t:find("%f[%w]dd%f[%W]") or t:find("damage", 1, true) then
         return "dps"
     end
     return nil

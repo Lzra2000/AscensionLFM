@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.4
+
+- **Broader role-whisper fallbacks:** `healers` / `heiler` / `H` / `T` / `A` / `D` /
+  `dmg` / trailing punctuation (`healers!`) map to Tank/Healer/Aura/DPS for auto-invite
+  and RW Role Check. New `Parser.GuessRole` used when the strict parse misses.
+- **One-time migration:** saved **Full Auto Hosting** installs that still had Healer/Aura
+  accept off (pre-0.4.3) get all four accept roles enabled on first login to 0.4.4.
+
 ## 0.4.3
 
 - **Fix Full Auto whisper invites:** turning **Full Auto Hosting** ON now enables Accept
