@@ -1136,7 +1136,7 @@ function MainWindow.Init()
     --------------------------------------------------------------------
     -- Hosting
     --------------------------------------------------------------------
-    local hosting = BuildCategoryPage(pageHost, CAT_HOSTING, 1060)
+    local hosting = BuildCategoryPage(pageHost, CAT_HOSTING, 1120)
     CreateSectionLabel(hosting, "Full Auto", -4)
     widgets.fullAuto = CreateToggleRow(hosting, -22,
         "Full Auto Hosting (master)",
@@ -1232,17 +1232,15 @@ function MainWindow.Init()
     hostRoleAutoBtn:SetScript("OnClick", ClearHostRole)
 
     local hostRoleHint = hosting:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    hostRoleHint:SetPoint("TOPLEFT", 4, -202)
+    hostRoleHint:SetPoint("TOPLEFT", 4, -210)
     hostRoleHint:SetPoint("RIGHT", -4, 0)
     hostRoleHint:SetJustifyH("LEFT")
-    if hostRoleHint.SetNonSpaceWrap then
-        hostRoleHint:SetNonSpaceWrap(true)
-    end
-    hostRoleHint:SetText("Sets your own slot immediately. Auto lets the host auto-pick an open accepted role again (default).")
+    hostRoleHint:SetText("Sets your own slot immediately.\n"
+        .. "Auto lets the host auto-pick an open accepted role again (default).")
     SetInk(hostRoleHint, MUTED)
 
-    CreateSectionLabel(hosting, "Invite + reject", -250)
-    local hy = -268
+    CreateSectionLabel(hosting, "Invite + reject", -258)
+    local hy = -276
     widgets.autoInvite = CreateToggleRow(hosting, hy,
         "Auto-invite matching role whispers",
         "InviteUnit when role accepted + slot open. Full Auto turns this on.",
@@ -1714,7 +1712,7 @@ function MainWindow.Init()
         end)
 
     local intLbl = post:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    intLbl:SetPoint("TOPLEFT", 4, -368)
+    intLbl:SetPoint("TOPLEFT", 4, -406)
     intLbl:SetText("Interval (sec, min 30)")
     SetInk(intLbl, INK)
 
@@ -1750,13 +1748,13 @@ function MainWindow.Init()
     widgets.repostInterval = intEdit
 
     postStatusFS = post:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    postStatusFS:SetPoint("TOPLEFT", 4, -396)
+    postStatusFS:SetPoint("TOPLEFT", 4, -434)
     postStatusFS:SetPoint("RIGHT", -4, 0)
     postStatusFS:SetJustifyH("LEFT")
     SetInk(postStatusFS, MUTED)
 
     local postHint = post:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    postHint:SetPoint("TOPLEFT", 4, -418)
+    postHint:SetPoint("TOPLEFT", 4, -456)
     postHint:SetPoint("RIGHT", -4, 0)
     postHint:SetJustifyH("LEFT")
     postHint:SetText("Example: LFM MS 0/2 Tanks 0/3 Healers 0/3 Aura 0/7 DPS — filled from Hosting slots + Scan.")
@@ -1828,9 +1826,9 @@ function MainWindow.Init()
             RefreshStatus()
         end)
 
-    CreateSectionLabel(kick, "Recent kicks", -80)
+    CreateSectionLabel(kick, "Recent kicks", -92)
     local kickBox = CreateFrame("Frame", nil, kick)
-    kickBox:SetPoint("TOPLEFT", 0, -98)
+    kickBox:SetPoint("TOPLEFT", 0, -110)
     kickBox:SetPoint("BOTTOMRIGHT", 0, 0)
     ApplyInset(kickBox)
     local ky = -10

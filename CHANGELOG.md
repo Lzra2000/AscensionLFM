@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.4.24
+
+- **Fix real UI overlap in Post tab:** the "Interval (sec, min 30)" label +
+  edit box was positioned at y=-368, landing squarely inside the "Announce
+  FULL when stopping" toggle row's frame (y=-336 to -394, which has its own
+  visible bordered backdrop) — the interval field rendered on top of that
+  toggle's description text. Pre-existing since this tab was built; found by
+  systematically recomputing every tab's layout math after the Hosting tab
+  changes in v0.4.22/23. Moved the interval row (and postStatusFS/postHint
+  below it) down past the toggle.
+- **Fix near-zero-gap section header in Kick tab:** "Recent kicks" section
+  label sat at y=-80, exactly flush against the "Enable kick at level 59…"
+  toggle row's bottom edge (0px gap, vs. 8-20px everywhere else in the UI).
+  Added normal spacing.
+- Re-verified the Hosting tab's new "My host role" section (v0.4.22) against
+  the deepest element (~y=-1048) with only ~12px of scroll-range headroom
+  under `contentHeight=1060` — bumped to 1120 for real margin, since this is
+  a scrollable page and too little headroom means the scroll range can't
+  reach the bottom-most content, not just a visual issue.
+- Systematically re-simulated exact pixel math for every tab (General,
+  Seeking, Hosting, Post) confirming no other overlaps.
+
 ## 0.4.23
 
 - **Fix: unbounded SavedVariables growth in the regroup watch list.**
