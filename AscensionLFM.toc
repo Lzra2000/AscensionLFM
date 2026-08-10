@@ -1,8 +1,8 @@
 ## Interface: 30300
 ## Title: AscensionLFM
-## Notes: Manastorm LFM/LFG — Full Auto, LFG invite, RW Role Check, Aura 1/group auto-move, post/repost, Kick59.
+## Notes: Manastorm LFM/LFG — Full Auto, Mini HUD, RW Role Check, Aura auto-move, post/repost, Kick59.
 ## Author: Lzra2000
-## Version: 0.4.8
+## Version: 0.4.9
 ## SavedVariables: AscensionLFMDB
 ## DefaultState: enabled
 
@@ -19,5 +19,6 @@ core\AuraBalance.lua
 core\RoleCheck.lua
 core\Poster.lua
 core\Scanner.lua
+ui\MiniHUD.lua
 ui\MainWindow.lua
 core\Bootstrap.lua

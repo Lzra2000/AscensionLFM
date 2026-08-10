@@ -8,7 +8,7 @@ if type(AscensionLFM) ~= "table" then
     _G.AscensionLFM = AscensionLFM
 end
 
-AscensionLFM.VERSION = "0.4.8"
+AscensionLFM.VERSION = "0.4.9"
 AscensionLFM.ADDON_NAME = "AscensionLFM"
 
 local function Print(msg)
@@ -192,11 +192,12 @@ bootFrame:SetScript("OnEvent", function(self, event, arg1)
         SafeStart("Poster.Start", AscensionLFM.Poster and AscensionLFM.Poster.Start)
         SafeStart("RoleCheck.EnsureTicker", AscensionLFM.RoleCheck and AscensionLFM.RoleCheck.EnsureTicker)
         SafeStart("MainWindow.Init", AscensionLFM.MainWindow and AscensionLFM.MainWindow.Init)
+        SafeStart("MiniHUD.Start", AscensionLFM.MiniHUD and AscensionLFM.MiniHUD.Start)
         local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
         local mode = (db and db.mode) or "notify"
         Print("v" .. AscensionLFM.VERSION .. " — mode=" .. ModeLabel(mode))
         Print("/alfm · /mslfm · /alfm status · /alfm test")
-        Print("Full Auto Hosting default OFF · Kick59 opt-in OFF")
+        Print("Mini HUD ON by default · Full Auto OFF · Kick59 opt-in OFF")
         self:UnregisterEvent("PLAYER_LOGIN")
     end
 end)

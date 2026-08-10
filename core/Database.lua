@@ -62,6 +62,14 @@ local DEFAULTS = {
     lastPostAt = 0, -- wall-clock unix when last post succeeded (display)
     announceFull = false, -- optional one FULL line when stop-when-full fires
     fullAnnounceMessage = "LFM MS FULL — thanks!",
+    wipeAnnounceMessage = "WIPE",
+    -- Mini Quick HUD (floating bar — no /alfm needed)
+    miniHudShow = true,
+    miniHudExpanded = true,
+    miniHudPoint = "CENTER",
+    miniHudRelPoint = "CENTER",
+    miniHudX = 0,
+    miniHudY = 180,
     -- Full Auto Hosting master (default OFF — spam safety)
     fullAutoHosting = false,
     -- Reject re-whisper (default OFF; Full Auto turns on)

@@ -7,7 +7,7 @@ WotLK **3.3.5a** addon for Ascension that scans chat and whispers for **Manastor
 1. Download **`AscensionLFM.zip`** from [Releases](https://github.com/Lzra2000/AscensionLFM/releases) — **not** GitHub “Source code” / Code → Download ZIP (that becomes `AscensionLFM-main` and **will not** appear in the AddOns list).
 2. Extract so you have exactly `Interface/AddOns/AscensionLFM/AscensionLFM.toc` (folder name must match the `.toc` basename).
 3. Enable the addon on the character select AddOns list, then login or `/reload`.
-4. `/alfm` opens settings. Default mode is **Notify** (Listening ON). Use `/alfm test` to inject a fake Log entry.
+4. `/alfm` opens settings. Default mode is **Notify** (Listening ON). A **Mini Quick HUD** appears for LFM/RW/Wipe/Need clicks without typing `/alfm`. Use `/alfm test` to inject a fake Log entry.
 
 See `INSTALL.txt` inside the zip for a short checklist.
 
@@ -114,7 +114,7 @@ Native DialogFrame with a left **Categories** sidebar:
 
 | Category | Contents |
 |----------|----------|
-| **General** | Status (Listening ON/OFF, Full Auto) + mode Off / Notify / Seeking / Hosting |
+| **General** | Status, mode, Mini Quick HUD toggle |
 | **Seeking** | My roles, Scan LFG MS, auto-whisper + rotating variants, leader blacklist, match sound |
 | **Hosting** | Full Auto master, accept roles, invites, reject-rewhisper, presets, slots, **RW Role Check** |
 | **Post** | LFM preview, channel, Post once, Scan, **RW Role Check / Resync**, auto-repost, announce FULL |
@@ -157,6 +157,20 @@ Im Modus **Hosting** (oder Full Auto), als Raid-Lead/Assist:
 - Never invites when the group is at **Max size** or the role **slot is full**.
 - Auto-repost stops when slots are full or Max size is reached (optional FULL announce).
 - Skips ignored players; rate-limits whispers/invites/rejects; kick RW cadence 10s; repost min interval 30s; Role Check RW min 30s.
+- Classic chat/party APIs only (`InviteUnit`, `UninviteUnit`, `SendChatMessage`, roster APIs). No `C_*`, Draft/HoF, or Rapid Rolling hooks.
+
+## Development
+
+```bash
+sh scripts/check.sh
+```
+
+Runs `luac5.1 -p` on all Lua files and pure Lua unit tests (parser / invite / slots / kick / poster / rolecheck / defaults).
+
+## License
+
+All Rights Reserved. Not affiliated with Ascension or Blizzard.
+nored players; rate-limits whispers/invites/rejects; kick RW cadence 10s; repost min interval 30s; Role Check RW min 30s.
 - Classic chat/party APIs only (`InviteUnit`, `UninviteUnit`, `SendChatMessage`, roster APIs). No `C_*`, Draft/HoF, or Rapid Rolling hooks.
 
 ## Development

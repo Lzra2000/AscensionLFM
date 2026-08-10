@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>AscensionLFM — Mini Quick HUD (v0.4.9 preview)</title>
+<style>
+  :root {
+    --ink: #f0e2c0;
+    --gold: #ffd100;
+    --gold-dim: #c8a03c;
+    --line: #6a5420;
+    --ok: #2a7a3a;
+    --danger: #8a3030;
+    --panel: #2a2010;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; padding: 28px;
+    font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+    color: var(--ink);
+    background:
+      radial-gradient(800px 420px at 20% 10%, #3a3020, transparent),
+      linear-gradient(180deg, #1a1610, #0a0906);
+  }
+  h1 { margin: 0 0 6px; font-size: 1.2rem; color: var(--gold); font-weight: normal;
+       font-family: "Friz Quadrata TT", "Trebuchet MS", serif; }
+  .lead { max-width: 46rem; color: #9c927f; line-height: 1.5; margin: 0 0 22px; font-size: .9rem; }
+  code { color: #edcd82; }
+  .stage {
+    position: relative; width: min(960px, 100%); height: 420px;
+    border: 1px solid #3a3020; border-radius: 4px; overflow: hidden;
+    background:
+      linear-gradient(180deg, rgba(0,0,0,.15), transparent 30%),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Cpath d='M0 40h80M40 0v80' stroke='%23221810' stroke-width='1'/%3E%3C/svg%3E"),
+      linear-gradient(180deg, #243018, #1a2210 55%, #12180c);
+  }
+  .stage-label {
+    position: absolute; left: 14px; top: 12px; font-size: .72rem;
+    color: #7a9070; letter-spacing: .06em; text-transform: uppercase;
+  }
+
+  /* === Mini HUD (expanded) === */
+  .hud {
+    position: absolute; left: 48px; top: 88px;
+    width: 318px;
+    background: linear-gradient(180deg, #3a3020, #1e180e);
+    border: 2px solid var(--line);
+    box-shadow:
+      inset 0 0 0 1px #a89050,
+      0 10px 28px rgba(0,0,0,.55);
+    border-radius: 3px;
+    padding: 5px 6px 7px;
+  }
+  .hud.collapsed { width: auto; padding: 4px; }
+  .title {
+    display: flex; align-items: center; gap: 6px;
+    padding: 2px 4px 5px; cursor: grab;
+    border-bottom: 1px solid #4a3a1c; margin-bottom: 6px;
+  }
+  .hud.collapsed .title { border: 0; margin: 0; padding: 0; }
+  .brand {
+    flex: 1; font-size: .74rem; color: var(--gold);
+    text-shadow: 0 1px 0 #000; letter-spacing: .02em;
+  }
+  .chip {
+    font-size: .62rem; color: #2a2010; background: var(--gold-dim);
+    padding: 1px 6px; border-radius: 2px; font-weight: bold;
+  }
+  .x {
+    width: 18px; height: 18px; border-radius: 50%;
+    border: 1px solid #8a7028; background: #3a2010;
+    color: #f0d9a0; font-size: .7rem; line-height: 16px; text-align: center;
+  }
+  .row { display: flex; flex-wrap: wrap; gap: 4px; }
+  .btn {
+    min-width: 36px; height: 22px; padding: 0 8px;
+    border: 1px solid #6a5420; border-radius: 2px;
+    background: linear-gradient(180deg, #5a4828, #2a2010);
+    color: #f0e2c0; font-size: .72rem; text-shadow: 0 1px 0 #000;
+    box-shadow: inset 0 1px 0 rgba(255,220,100,.18);
+  }
+  .btn.danger {
+    background: linear-gradient(180deg, #6a3030, #2a1010);
+    border-color: #8a4040; color: #ffd0d0;
+  }
+  .btn.ok {
+    background: linear-gradient(180deg, #3a5a30, #1a2810);
+    border-color: #4a7040;
+  }
+  .btn.need { min-width: 28px; padding: 0 6px; }
+  .hint {
+    margin-top: 6px; font-size: .62rem; color: #8a7a58; line-height: 1.35;
+  }
+
+  .hud2 { left: 48px; top: 250px; }
+  .note {
+    margin-top: 18px; max-width: 46rem; color: #9c927f; font-size: .84rem; line-height: 1.5;
+  }
+  ul { margin: 8px 0 0; padding-left: 1.2rem; }
+  li { margin: 4px 0; }
+</style>
+</head>
+<body>
+  <h1>AscensionLFM — Mini Quick HUD</h1>
+  <p class="lead">
+    Floating click bar so you never need <code>/alfm</code> mid-run.
+    Drag the title · click brand to open full settings · <strong>X</strong> collapses to a chip.
+  </p>
+
+  <div class="stage">
+    <div class="stage-label">In-world preview · WotLK gold chrome</div>
+
+    <!-- Expanded -->
+    <div class="hud" title="Expanded">
+      <div class="title">
+        <div class="brand">AscensionLFM</div>
+        <span class="chip">HOST</span>
+        <div class="x">×</div>
+      </div>
+      <div class="row">
+        <button class="btn ok">LFM</button>
+        <button class="btn">RW</button>
+        <button class="btn">Sync</button>
+        <button class="btn danger">Wipe</button>
+        <button class="btn">FULL</button>
+        <button class="btn need">T</button>
+        <button class="btn need">H</button>
+        <button class="btn need">A</button>
+        <button class="btn need">D</button>
+      </div>
+      <div class="hint">LFM posts · RW role check · Sync roles · Wipe RW · FULL · Need T/H/A/D</div>
+    </div>
+
+    <!-- Collapsed -->
+    <div class="hud collapsed hud2" title="Collapsed">
+      <div class="title">
+        <button class="btn ok">ALFM</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <strong>Buttons</strong>
+    <ul>
+      <li><b>LFM</b> — post current LFM line (Post channel)</li>
+      <li><b>RW</b> — start Role Check raid warning</li>
+      <li><b>Sync</b> — resync roles / filled counts</li>
+      <li><b>Wipe</b> — raid warning <code>WIPE</code> (party/yell fallback)</li>
+      <li><b>FULL</b> — announce FULL line</li>
+      <li><b>T H A D</b> — short “need tank/heal/aura/dps” yell</li>
+      <li>Title click → full settings · toggle in General if you hide it</li>
+    </ul>
+  </div>
+</body>
+</html>
