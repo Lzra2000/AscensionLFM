@@ -800,7 +800,7 @@ function MainWindow.Init()
 
     local sub = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     sub:SetPoint("TOP", title, "BOTTOM", 0, -2)
-    sub:SetText("Manastorm Level Run LFM/LFG · v" .. tostring(AscensionLFM.VERSION or "0.4.6"))
+    sub:SetText("Manastorm Level Run LFM/LFG · v" .. tostring(AscensionLFM.VERSION or "0.4.7"))
     SetInk(sub, MUTED)
 
     local shell = CreateFrame("Frame", FRAME_NAME .. "Shell", frame)
@@ -1702,7 +1702,7 @@ function MainWindow.Init()
     CreateSectionLabel(kick, "Level-59 auto-kick", -4)
     widgets.autoKick = CreateToggleRow(kick, -22,
         "Enable kick at level 59 + raid warning every 10s",
-        "Hosting only · leader/assist · ignores self · RW then UninviteUnit. Default OFF.",
+        "Hosting/Full Auto · lead/assist · ignores self · RW then kick (deferred). /alfm status shows why. Default OFF.",
         true,
         function(on)
             AscensionLFM.Database.Get().autoKickLevel59 = on and true or false

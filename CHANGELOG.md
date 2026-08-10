@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.7
+
+- **Fix Kick59:** roster level `0` no longer blocks kicks — prefer `UnitLevel` when
+  `GetRaidRosterInfo` reports 0/unknown; also try `UnitName` when roster name is empty.
+- Privilege: `UnitIsPartyLeader("player")` accepted (party + raid lead on Ascension).
+- Uninvite is deferred ~0.6s after the raid warning and staggered per target (same-frame
+  chat+uninvite was unreliable); bare name retry for `Name-Realm`.
+- `/alfm status` prints kick last-reason / canKick / pending. Kick ticker also starts from
+  login directly (not only via Scanner).
+
 ## 0.4.6
 
 - **Fix Aura auto-group:** respect 5-player raid subgroup cap (swap when full), apply
