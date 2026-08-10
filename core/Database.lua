@@ -14,7 +14,7 @@ AscensionLFM.Database = Database
 -- Default "notify": Log fills from public LFM/LFG MS lines; kick/auto-invite stay off.
 local DEFAULTS = {
     mode = "notify",
-    defaultsRev = 2, -- bumped when shipping default-mode changes
+    defaultsRev = 3, -- bumped when shipping default-mode / stock-copy changes
     roles = {
         tank = true,
         healer = false,
