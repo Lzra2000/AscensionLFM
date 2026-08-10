@@ -77,6 +77,20 @@ Database.Init()
 check("custom RW msg kept",
     Database.Get().roleCheckMessage == "Custom ROLE CHECK please whisper me")
 
+-- v0.4.4: saved Full Auto with healer/aura off → enable all accept roles once
+_G.AscensionLFMDB = {
+    mode = "hosting",
+    defaultsRev = 3,
+    fullAutoHosting = true,
+    autoInvite = true,
+    roles = { tank = true, healer = false, aura = false, dps = true },
+}
+Database.Init()
+local migrated = Database.Get()
+check("full auto migrate rev 4", tonumber(migrated.defaultsRev) == 4)
+check("full auto migrate healer on", migrated.roles.healer == true)
+check("full auto migrate aura on", migrated.roles.aura == true)
+
 -- Restore notify for scanner path tests
 Database.SetMode("notify")
 Database.ClearMatches()
