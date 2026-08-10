@@ -311,14 +311,20 @@ local function SendWarn(msg, groupKind)
         if ok then
             return true
         end
-        pcall(SendChatMessage, msg, "YELL")
-        return true
+        ok = pcall(SendChatMessage, msg, "YELL")
+        return ok and true or false
     end
-    local ok = pcall(SendChatMessage, msg, "PARTY")
-    if not ok then
-        pcall(SendChatMessage, msg, "YELL")
+    if groupKind == "party" then
+        local ok = pcall(SendChatMessage, msg, "PARTY")
+        if ok then
+            return true
+        end
+        ok = pcall(SendChatMessage, msg, "YELL")
+        return ok and true or false
     end
-    return true
+    -- Solo / unknown: yell so Mini HUD RW still does something
+    local ok = pcall(SendChatMessage, msg, "YELL")
+    return ok and true or false
 end
 
 local function IsHosting(db)
@@ -463,11 +469,16 @@ function RoleCheck.StartCheck(msgOrNow)
     end
     local can, groupKind = RoleCheck.CanRaidWarn()
     if not can then
-        lastStartReason = "no privilege"
-        if AscensionLFM.Print then
-            AscensionLFM.Print("Role Check: need raid lead/assist (or party lead)")
+        if groupKind == "none" then
+            -- Solo host warming up: still open the window and yell the RW
+            groupKind = "yell"
+        else
+            lastStartReason = "no privilege"
+            if AscensionLFM.Print then
+                AscensionLFM.Print("Role Check: need raid lead/assist (or party lead)")
+            end
+            return false, "no privilege"
         end
-        return false, "no privilege"
     end
 
     local msg = RoleCheck.BuildMessage(msgOverride or (db and db.roleCheckMessage))
@@ -481,7 +492,14 @@ function RoleCheck.StartCheck(msgOrNow)
     activeUntil = now + dur
     lastRwAt = now
     lastStartReason = "started:" .. tostring(groupKind)
-    SendWarn(msg, groupKind)
+    local sent = SendWarn(msg, groupKind)
+    if not sent then
+        lastStartReason = "send failed"
+        if AscensionLFM.Print then
+            AscensionLFM.Print("Role Check: warn failed to send")
+        end
+        -- Keep window open anyway so whispers still count
+    end
     if AscensionLFM.Activity and AscensionLFM.Activity.Push then
         AscensionLFM.Activity.Push("rolecheck", "RW role check started (" .. dur .. "s)")
     end

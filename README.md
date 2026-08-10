@@ -35,7 +35,7 @@ Floating bar (default **ON**) — mid-run clicks without typing `/alfm`:
 | Button | Action |
 |--------|--------|
 | **LFM** | Post current LFM line (Post channel) |
-| **RW** | Start Role Check raid warning |
+| **RW** | Role Check warn (+ listen window if Hosting); yell/party fallback like Wipe |
 | **Sync** | Resync roles / filled counts |
 | **Wipe** | Raid warning `WIPE` |
 | **Mobs** | Raid warning `KILL MOBS — boss shield still up!` |
@@ -82,7 +82,7 @@ While **Mode = Hosting** (or Full Auto) and you are raid lead/assist (party lead
 4. Status shows `Role check active — Xs left · N responses`
 5. When the window ends (if **Auto-resync** is on) — or anytime via **Resync roles now** — leavers are removed, whispered roles re-applied, filled counts and the LFM preview refresh
 
-RW is rate-limited (minimum **30s** between warnings). **Resync roles now** works without a prior RW (roster cleanup + recount only). If the button does nothing, `/alfm status` shows `roleCheck: canWarn=… · lastStart=…`.
+RW is rate-limited (minimum **30s** between full listen-window starts). The Mini HUD **RW** button always announces (party/yell fallback like Wipe) even outside Hosting; the listen window still needs Hosting/Full Auto. **Resync roles now** works without a prior RW. `/alfm status` shows `roleCheck: canWarn=… · lastStart=…`.
 
 **Aura auto-move** (default ON, Hosting): at most one Aura player per raid group (1–8). Extra Auras move (or swap into full groups) one at a time after assign / scan / resync; skipped in combat.
 

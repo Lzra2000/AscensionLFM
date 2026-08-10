@@ -77,11 +77,16 @@ local ok, reason = RoleCheck.StartCheck()
 check("refuse when not hosting", ok == false and reason == "not hosting")
 
 db.mode = "hosting"
+-- In a raid but not lead/assist → no privilege
+_G.GetNumRaidMembers = function() return 2 end
+_G.GetNumPartyMembers = function() return 0 end
+_G.IsRaidLeader = function() return false end
+_G.IsRaidOfficer = function() return false end
+_G.UnitIsPartyLeader = function() return false end
 ok, reason = RoleCheck.StartCheck()
-check("refuse without privilege", ok == false and reason == "no privilege")
+check("refuse without privilege", ok == false and reason == "no privilege", tostring(reason))
 
 _G.GetNumRaidMembers = function() return 3 end
-_G.GetNumPartyMembers = function() return 0 end
 _G.IsRaidLeader = function() return true end
 _G.IsRaidOfficer = function() return false end
 _G.UnitIsPartyLeader = function() return false end
@@ -181,6 +186,23 @@ local st = RoleCheck.GetStatus()
 check("status canWarn", st.canWarn == true)
 check("status hosting", st.hosting == true)
 check("status lastStart", type(st.lastStart) == "string" and st.lastStart:find("started", 1, true) ~= nil)
+
+-- Solo (no group): StartCheck still opens window + yell
+RoleCheck._ResetForTests()
+db.mode = "hosting"
+db.fullAutoHosting = false
+_G.GetNumRaidMembers = function() return 0 end
+_G.GetNumPartyMembers = function() return 0 end
+_G.UnitIsPartyLeader = function() return false end
+_G.IsRaidLeader = function() return false end
+_G._lastRW = nil
+_G._now = 7000
+_G.SendChatMessage = function(msg, ch)
+    _G._lastRW = { msg = msg, ch = ch }
+end
+ok, reason = RoleCheck.StartCheck()
+check("solo start ok", ok == true, tostring(reason))
+check("solo yells", _G._lastRW and _G._lastRW.ch == "YELL", tostring(_G._lastRW and _G._lastRW.ch))
 
 if failed > 0 then
     io.stderr:write(string.format("test_rolecheck: %d failed, %d passed\n", failed, passed))
