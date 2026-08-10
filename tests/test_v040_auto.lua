@@ -64,6 +64,13 @@ check("rejectable full", Reject.IsRejectableReason("full") == true)
 check("rejectable no role", Reject.IsRejectableReason("no role") == true)
 check("rejectable role filtered", Reject.IsRejectableReason("role filtered") == true)
 check("not rejectable cooldown", Reject.IsRejectableReason("per-name cooldown") == false)
+check("not rejectable global cooldown", Reject.IsRejectableReason("global cooldown") == false)
+-- Regression: "prefer support seat" (v0.4.19) was a real, understood block
+-- reason (a dps applicant recognized but deliberately held back for the
+-- last open seats) but was missing from REJECTABLE, so those applicants
+-- got silently dropped with zero feedback — unlike "slot full"/"role
+-- filtered" which correctly get an auto-reply.
+check("rejectable prefer support seat", Reject.IsRejectableReason("prefer support seat") == true)
 
 -- Reject disabled by default
 Reject._ResetForTests()

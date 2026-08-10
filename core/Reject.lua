@@ -20,6 +20,7 @@ local DEFAULT_TEMPLATES = {
     ["no role"] = "Please whisper a role: tank / heal / aura / dps.",
     ["no parse"] = "Please whisper a role: tank / heal / aura / dps.",
     ["role filtered"] = "Not looking for {role} right now — thanks!",
+    ["prefer support seat"] = "Saving the last couple seats for tank/heal/aura — try again if one opens up!",
 }
 
 local REJECTABLE = {
@@ -28,6 +29,7 @@ local REJECTABLE = {
     ["no role"] = true,
     ["no parse"] = true,
     ["role filtered"] = true,
+    ["prefer support seat"] = true,
 }
 
 local function Now()

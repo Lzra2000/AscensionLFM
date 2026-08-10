@@ -160,10 +160,15 @@ db.roles = { tank = true, healer = true, aura = true, dps = true }
 db.maxPartySize = 15
 Slots.ClearAll()
 Invite._ResetCooldowns()
-invited = {}
+db.rejectRewhisper = true
+if AscensionLFM.Reject and AscensionLFM.Reject._ResetForTests then
+    AscensionLFM.Reject._ResetForTests()
+end
+whispersSent = {}
 ok, reason = Invite.TryHostInvite("DpsWhisper", "dps")
 check("whisper last seat blocks dps", ok == false and reason == "prefer support seat", tostring(reason))
 check("whisper last seat did not invite", #invited == 0)
+check("whisper last seat still gets an auto-reply (regression)", #whispersSent == 1, tostring(#whispersSent))
 
 -- ... but if no support role is actually open, dps still gets invited
 _G.IsRaidLeader = function() return true end

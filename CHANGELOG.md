@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.4.25
+
+- **Fix: "prefer support seat" (v0.4.19) applicants got zero feedback.**
+  Reported live: several dps whispers in a near-full raid showed as
+  "blocked" in the Queue tab but never got an auto-reply, while other
+  applicants did. Root cause: `Reject.REJECTABLE` never included
+  `"prefer support seat"` (added in v0.4.19) — a real, understood block
+  reason (dps recognized, but deliberately held back to save the last
+  1-2 seats for tank/heal/aura), unlike an actual failure. Added it to
+  `REJECTABLE` with its own template: "Saving the last couple seats for
+  tank/heal/aura — try again if one opens up!".
+- Confirmed `"global cooldown"`/`"per-name cooldown"` (Invite.lua's own
+  invite-attempt throttle, separate from Reject's cooldown) are correctly
+  and intentionally excluded from auto-reply — an existing test already
+  asserts this. If several applicants whisper within the same ~3s window
+  (`db.inviteCooldown`), only one gets processed that tick; the others
+  need to be reached on a later pass rather than getting a reply that
+  would misleadingly look like a real rejection.
+
 ## 0.4.24
 
 - **Fix real UI overlap in Post tab:** the "Interval (sec, min 30)" label +
