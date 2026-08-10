@@ -112,56 +112,7 @@ local function IsListing(parsed)
     return parsed and (parsed.isManastormLFM or parsed.isManastormLFG or parsed.isManastormListing)
 end
 
-local function PlayMatchSound(db)
-    if not db or not db.soundOnMatch then
-        return
-    end
-    if type(PlaySound) == "function" then
-        pcall(PlaySound, "RaidWarning")
-    end
-end
-
---- Pick whisper text: rotating variants with {role}, else whisperMessage.
-local function NextWhisperMessage(db, preferredRole)
-    preferredRole = tostring(preferredRole or "tank")
-    if db.useWhisperVariants ~= false and type(db.whisperVariants) == "table" and #db.whisperVariants > 0 then
-        local idx = tonumber(db.whisperVariantIndex) or 1
-        if idx < 1 then idx = 1 end
-        if idx > #db.whisperVariants then idx = 1 end
-        local tmpl = tostring(db.whisperVariants[idx] or "")
-        db.whisperVariantIndex = (idx % #db.whisperVariants) + 1
-        if tmpl ~= "" then
-            return (tmpl:gsub("{role}", preferredRole)):sub(1, 120)
-        end
-    end
-    local msg = tostring(db.whisperMessage or "inv ms"):sub(1, 120)
-    if msg:find("{role}", 1, true) then
-        msg = msg:gsub("{role}", preferredRole)
-    end
-    return msg
-end
-
-local function PreferredSeekRole(parsed, roles)
-    if AscensionLFM.Parser and AscensionLFM.Parser.NeededRoles then
-        local needed = AscensionLFM.Parser.NeededRoles(parsed)
-        if type(needed) == "table" then
-            for _, role in ipairs({ "tank", "healer", "aura", "dps" }) do
-                if needed[role] and roles and roles[role] then
-                    return role
-                end
-            end
-        end
-    end
-    for _, role in ipairs({ "tank", "healer", "aura", "dps" }) do
-        if roles and roles[role] then
-            return role
-        end
-    end
-    return "tank"
-end
-
 local function NotifyMatch(leader, parsed, source)
-    local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
     local kind = parsed.isManastormLFG and "LFG" or "LFM"
     local line = string.format("%s — %s (%s)", tostring(leader), parsed.summary or ("MS " .. kind), source)
     if AscensionLFM.Print then
@@ -177,10 +128,6 @@ local function NotifyMatch(leader, parsed, source)
             t = time and time() or 0,
         })
     end
-    if AscensionLFM.Activity and AscensionLFM.Activity.Push then
-        AscensionLFM.Activity.Push("match", line, { name = leader })
-    end
-    PlayMatchSound(db)
     if AscensionLFM.MainWindow and AscensionLFM.MainWindow.RefreshMatches then
         AscensionLFM.MainWindow.RefreshMatches()
     end
@@ -190,6 +137,7 @@ local function MaybeAutoWhisper(leader, parsed, db)
     if not db.autoWhisper then
         return
     end
+    -- Auto-whisper leaders of LFM listings; LFG seekers are not hosts
     if parsed.isManastormLFG and not parsed.isManastormLFM then
         return
     end
@@ -197,10 +145,6 @@ local function MaybeAutoWhisper(leader, parsed, db)
         return
     end
     if IsIgnoredName(leader) then
-        return
-    end
-    if AscensionLFM.Database and AscensionLFM.Database.IsLeaderBlacklisted
-        and AscensionLFM.Database.IsLeaderBlacklisted(leader) then
         return
     end
     local me = PlayerName()
@@ -216,31 +160,18 @@ local function MaybeAutoWhisper(leader, parsed, db)
     if last and (Now() - last) < cd then
         return
     end
-    local role = PreferredSeekRole(parsed, db.roles)
-    local msg = NextWhisperMessage(db, role)
+    local msg = tostring(db.whisperMessage or "inv ms"):sub(1, 120)
     if msg == "" then
         return
     end
     pcall(SendChatMessage, msg, "WHISPER", nil, leader)
     whisperSent[key] = Now()
-    if AscensionLFM.Activity and AscensionLFM.Activity.Push then
-        AscensionLFM.Activity.Push("match", "whispered " .. tostring(leader) .. ": " .. msg, {
-            name = leader,
-            role = role,
-        })
-    end
     if AscensionLFM.Print then
         AscensionLFM.Print("whispered " .. tostring(leader) .. ": " .. msg)
     end
 end
 
-local function ShouldNotify(db, parsed, leader)
-    if leader and AscensionLFM.Database and AscensionLFM.Database.IsLeaderBlacklisted
-        and AscensionLFM.Database.IsLeaderBlacklisted(leader) then
-        if db.mode == "seeking" then
-            return false
-        end
-    end
+local function ShouldNotify(db, parsed)
     if parsed.isManastormLFG and db.scanLfg == false then
         return false
     end
@@ -248,6 +179,7 @@ local function ShouldNotify(db, parsed, leader)
         return true
     end
     if db.mode == "seeking" then
+        -- LFG: notify seekers of other seekers only if scanLfg; role filter soft
         if parsed.isManastormLFG and not parsed.isManastormLFM then
             return db.scanLfg ~= false
         end
@@ -274,7 +206,7 @@ local function HandlePublicListing(leader, message, event)
     end
     Remember(leader, parsed)
 
-    if ShouldNotify(db, parsed, leader) then
+    if ShouldNotify(db, parsed) then
         NotifyMatch(leader, parsed, SourceLabel(event))
     end
 
@@ -298,7 +230,7 @@ local function HandleWhisper(sender, message)
             local window = tonumber(db.dedupeSeconds) or 45
             if not IsDupe(sender, parsed, window) then
                 Remember(sender, parsed)
-                if ShouldNotify(db, parsed, sender) then
+                if ShouldNotify(db, parsed) then
                     NotifyMatch(sender, parsed, "whisper")
                 end
                 if db.mode == "seeking" and parsed.isManastormLFM then
@@ -309,7 +241,7 @@ local function HandleWhisper(sender, message)
         end
     end
 
-    if db.mode == "hosting" then
+    if db.mode == "hosting" and db.autoInvite then
         if AscensionLFM.Invite and AscensionLFM.Invite.TryHostInvite then
             AscensionLFM.Invite.TryHostInvite(sender, message)
         end
@@ -318,7 +250,7 @@ end
 
 local function HandleRoster()
     local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
-    local hostingOrPosting = db and (db.mode == "hosting" or db.autoRepost or db.fullAutoHosting)
+    local hostingOrPosting = db and (db.mode == "hosting" or db.autoRepost)
     if hostingOrPosting and AscensionLFM.Slots and AscensionLFM.Slots.ScanRaid then
         AscensionLFM.Slots.ScanRaid()
     elseif AscensionLFM.Slots and AscensionLFM.Slots.SyncFromRoster then
@@ -382,5 +314,3 @@ Scanner._HandlePublicLFM = HandlePublicListing
 Scanner._HandlePublicListing = HandlePublicListing
 Scanner._HandleWhisper = HandleWhisper
 Scanner._Fingerprint = Fingerprint
-Scanner._NextWhisperMessage = NextWhisperMessage
-Scanner._PreferredSeekRole = PreferredSeekRole
