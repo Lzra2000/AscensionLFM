@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.0
+
+- **LFG auto-invite (Hosting):** when someone posts `LFG MS …` with a role you accept
+  and that slot is open → `InviteUnit`. Toggle **Auto-invite LFG seekers** (default ON
+  while Hosting; Full Auto enables it). No-role LFG lines are denied unless
+  `lfgInviteWithoutRole` is on.
+- **Full Auto Hosting** master (default OFF): whisper invite + LFG invite + roster scan +
+  auto-repost + reject-rewhisper.
+- Reject re-whisper on slot/group full / no role; Applicant **Queue**; presets; activity log;
+  seeking whisper variants + leader blacklist; opt-in sounds.
+- TOC backslash paths (from 0.3.1) kept so `/alfm` loads on Ascension.
+
 ## 0.3.1
 
 - **Fix `/alfm` not working on Ascension:** TOC file paths use Windows backslashes

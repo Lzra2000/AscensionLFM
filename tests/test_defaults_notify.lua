@@ -33,6 +33,8 @@ check("defaultsRev is 2", tonumber(db.defaultsRev) == 2)
 check("autoKick still off", db.autoKickLevel59 == false)
 check("autoWhisper still off", db.autoWhisper == false)
 check("autoRepost still off", db.autoRepost == false)
+check("fullAutoHosting still off", db.fullAutoHosting == false)
+check("rejectRewhisper still off", db.rejectRewhisper == false)
 check("repostInterval default 60", tonumber(db.repostInterval) == 60)
 check("postChannel default YELL", db.postChannel == "YELL")
 

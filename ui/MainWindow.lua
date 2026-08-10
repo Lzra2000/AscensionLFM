@@ -1,6 +1,6 @@
 -- AscensionLFM: ui/MainWindow.lua
 -- Native DialogFrame settings with Categories sidebar (General / Seeking /
--- Hosting / Post / Kick / Log). Matches docs/sketch/ascension-lfm-mockup.html.
+-- Hosting / Post / Queue / Kick / Log). Matches docs/sketch/ascension-lfm-mockup.html.
 
 local AscensionLFM = _G.AscensionLFM
 if type(AscensionLFM) ~= "table" then
@@ -13,35 +13,39 @@ AscensionLFM.MainWindow = MainWindow
 
 local FRAME_NAME = "AscensionLFMFrame"
 local FRAME_WIDTH = 720
-local FRAME_HEIGHT = 540
+local FRAME_HEIGHT = 680
 local SIDEBAR_WIDTH = 148
 
 local CAT_GENERAL = "general"
 local CAT_SEEKING = "seeking"
 local CAT_HOSTING = "hosting"
 local CAT_POST = "post"
+local CAT_QUEUE = "queue"
 local CAT_KICK = "kick"
 local CAT_LOG = "log"
 
 local CATEGORIES = {
     { id = CAT_GENERAL, label = "General",
       title = "General",
-      sub = "Mode and status. Default Notify = Listening ON (Log fills; no auto-invite)." },
+      sub = "Mode and status. Default Notify = Listening ON. Full Auto Hosting is opt-in OFF." },
     { id = CAT_SEEKING, label = "Seeking",
       title = "Seeking",
-      sub = "Roles you play and optional auto-whisper when an LFM still needs you." },
+      sub = "Roles, rotating whisper variants, leader blacklist, optional match sound." },
     { id = CAT_HOSTING, label = "Hosting",
       title = "Hosting",
-      sub = "Accept roles, invite rules, and Manastorm slot caps (default 2/3/3/7)." },
+      sub = "Full Auto master, reject re-whisper, presets, slots, and invite rules." },
     { id = CAT_POST, label = "Post",
       title = "Post",
-      sub = "Compose LFM from slots, scan raid fills, post once, or opt-in auto-repost." },
+      sub = "LFM compose, scan fills, auto-repost, smart stop + optional FULL announce." },
+    { id = CAT_QUEUE, label = "Queue",
+      title = "Queue",
+      sub = "Recent applicant whispers — Invite or Reject+rewhisper." },
     { id = CAT_KICK, label = "Kick",
       title = "Kick",
       sub = "Opt-in level-59 auto-kick with raid warning. Dangerous — default OFF." },
     { id = CAT_LOG, label = "Log",
       title = "Log",
-      sub = "Recent Manastorm LFM/LFG matches from public chat and whispers." },
+      sub = "Match history + activity (posts, invites, rejects, matches)." },
 }
 
 local TOOLTIP_BACKDROP = {
@@ -81,6 +85,8 @@ local statusFS
 local slotsFS
 local matchFS = {}
 local kickFS = {}
+local activityFS = {}
+local queueRows = {}
 local widgets = {
     modeButtons = {},
     roleButtons = {},
@@ -91,6 +97,7 @@ local widgets = {
 local postStatusFS
 local postPreviewEdit
 local _syncingPost = false
+local presetLabelFS
 
 local function ApplyBackdrop(f, template, r, g, b, a, br, bg, bb, ba)
     if type(f) ~= "table" or type(f.SetBackdrop) ~= "function" then
@@ -181,19 +188,23 @@ local function RefreshStatus()
         last = string.format("\nLast: %s — %s", tostring(m.leader), tostring(m.summary or m.text or ""))
     end
     local kickBit = db.autoKickLevel59 and " · |cffff6060Kick59 ON|r" or ""
-    statusFS:SetText(string.format("Status: %s  ·  Mode: |cffc8a03c%s|r%s%s",
-        listening, ModeLabel(db.mode), kickBit, last))
+    local fullBit = db.fullAutoHosting and " · |cff2a7a3aFull Auto ON|r" or ""
+    statusFS:SetText(string.format("Status: %s  ·  Mode: |cffc8a03c%s|r%s%s%s",
+        listening, ModeLabel(db.mode), fullBit, kickBit, last))
 
     if footerStatus then
         local kick = db.autoKickLevel59 and "Kick59 ON" or "Kick59 off"
         if activeCategory == CAT_KICK then
             footerStatus:SetText("Kick log · Clear removes kick history")
         elseif activeCategory == CAT_LOG then
-            footerStatus:SetText("Match log · Clear removes match history")
+            footerStatus:SetText("Match + activity · Clear removes both")
+        elseif activeCategory == CAT_QUEUE then
+            footerStatus:SetText("Applicant queue · Clear empties queue")
         else
-            footerStatus:SetText(string.format("%s · Mode %s · %s",
+            local fa = db.fullAutoHosting and "FullAuto ON" or "FullAuto off"
+            footerStatus:SetText(string.format("%s · Mode %s · %s · %s",
                 listeningOn and "Listening ON" or "Listening OFF",
-                ModeLabel(db.mode), kick))
+                ModeLabel(db.mode), fa, kick))
         end
         SetInk(footerStatus, MUTED)
     end
@@ -285,7 +296,7 @@ end
 function MainWindow.RefreshMatches()
     local db = AscensionLFM.Database.Get()
     local history = db.matchHistory or {}
-    for i = 1, 6 do
+    for i = 1, 5 do
         local fs = matchFS[i]
         if fs then
             local m = history[i]
@@ -335,6 +346,56 @@ function MainWindow.RefreshKicks()
     end
 end
 
+function MainWindow.RefreshActivity()
+    local db = AscensionLFM.Database.Get()
+    local history = db.activityLog or {}
+    for i = 1, 6 do
+        local fs = activityFS[i]
+        if fs then
+            local a = history[i]
+            if a then
+                fs:SetText(string.format("|cff6a4a10[%s]|r %s",
+                    tostring(a.kind or "?"), tostring(a.text or "")))
+                fs:Show()
+            else
+                fs:SetText("")
+                if i == 1 then
+                    fs:SetText("|cff5a4a30No activity yet.|r")
+                    fs:Show()
+                else
+                    fs:Hide()
+                end
+            end
+        end
+    end
+end
+
+function MainWindow.RefreshQueue()
+    local list = AscensionLFM.Queue and AscensionLFM.Queue.Recent and AscensionLFM.Queue.Recent(5) or {}
+    for i = 1, 5 do
+        local row = queueRows[i]
+        if row then
+            local q = list[i]
+            if q then
+                local role = q.role and tostring(q.role) or "?"
+                local st = tostring(q.status or "pending")
+                row.label:SetText(string.format("|cff4a3010%s|r  |cff5a4a30[%s]|r  %s\n%s",
+                    tostring(q.name or "?"), role, st, tostring(q.message or ""):sub(1, 60)))
+                row.name = q.name
+                row:Show()
+                if row.inviteBtn then row.inviteBtn:Show() end
+                if row.rejectBtn then row.rejectBtn:Show() end
+            else
+                row.name = nil
+                row.label:SetText(i == 1 and "|cff5a4a30No applicants yet.|r" or "")
+                if i == 1 then row:Show() else row:Hide() end
+                if row.inviteBtn then row.inviteBtn:Hide() end
+                if row.rejectBtn then row.rejectBtn:Hide() end
+            end
+        end
+    end
+end
+
 local function SyncSlotEdits()
     local db = AscensionLFM.Database.Get()
     for _, role in ipairs({ "tank", "healer", "aura", "dps" }) do
@@ -372,6 +433,9 @@ local function SyncWidgetsFromDB()
     if widgets.autoInvite and widgets.autoInvite.SetChecked then
         widgets.autoInvite:SetChecked(db.autoInvite and true or false)
     end
+    if widgets.autoInviteLfg and widgets.autoInviteLfg.SetChecked then
+        widgets.autoInviteLfg:SetChecked(db.autoInviteLfg ~= false)
+    end
     if widgets.requireRole and widgets.requireRole.SetChecked then
         widgets.requireRole:SetChecked(db.requireRoleWhisper ~= false)
     end
@@ -396,12 +460,49 @@ local function SyncWidgetsFromDB()
         end
         widgets.repostInterval:SetText(tostring(n))
     end
+    if widgets.fullAuto and widgets.fullAuto.SetChecked then
+        widgets.fullAuto:SetChecked(db.fullAutoHosting and true or false)
+    end
+    if widgets.rejectRewhisper and widgets.rejectRewhisper.SetChecked then
+        widgets.rejectRewhisper:SetChecked(db.rejectRewhisper and true or false)
+    end
+    if widgets.announceFull and widgets.announceFull.SetChecked then
+        widgets.announceFull:SetChecked(db.announceFull and true or false)
+    end
+    if widgets.useVariants and widgets.useVariants.SetChecked then
+        widgets.useVariants:SetChecked(db.useWhisperVariants ~= false)
+    end
+    if widgets.soundMatch and widgets.soundMatch.SetChecked then
+        widgets.soundMatch:SetChecked(db.soundOnMatch and true or false)
+    end
+    if widgets.soundApplicant and widgets.soundApplicant.SetChecked then
+        widgets.soundApplicant:SetChecked(db.soundOnApplicant and true or false)
+    end
+    if widgets.rejectTemplate and widgets.rejectTemplate.SetText then
+        widgets.rejectTemplate:SetText(tostring(db.rejectTemplate or ""))
+    end
+    if widgets.variant1 and widgets.variant1.SetText then
+        local v = db.whisperVariants or {}
+        widgets.variant1:SetText(tostring(v[1] or ""))
+        if widgets.variant2 then widgets.variant2:SetText(tostring(v[2] or "")) end
+        if widgets.variant3 then widgets.variant3:SetText(tostring(v[3] or "")) end
+    end
+    if presetLabelFS then
+        local names = AscensionLFM.Presets and AscensionLFM.Presets.List and AscensionLFM.Presets.List() or {}
+        presetLabelFS:SetText("Presets: " .. table.concat(names, ", "))
+    end
     SyncSlotEdits()
     RefreshStatus()
     MainWindow.RefreshSlots()
     MainWindow.RefreshPost()
     MainWindow.RefreshMatches()
     MainWindow.RefreshKicks()
+    MainWindow.RefreshActivity()
+    MainWindow.RefreshQueue()
+end
+
+function MainWindow.SyncFromDB()
+    SyncWidgetsFromDB()
 end
 
 local function SetRole(role, on)
@@ -549,7 +650,7 @@ function MainWindow.SelectCategory(id)
     end
 
     if clearBtn then
-        if id == CAT_LOG or id == CAT_KICK then
+        if id == CAT_LOG or id == CAT_KICK or id == CAT_QUEUE then
             clearBtn:Show()
         else
             clearBtn:Hide()
@@ -608,7 +709,7 @@ function MainWindow.Init()
 
     local sub = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     sub:SetPoint("TOP", title, "BOTTOM", 0, -2)
-    sub:SetText("Manastorm Level Run LFM/LFG · v" .. tostring(AscensionLFM.VERSION or "0.3.1"))
+    sub:SetText("Manastorm Level Run LFM/LFG · v" .. tostring(AscensionLFM.VERSION or "0.4.0"))
     SetInk(sub, MUTED)
 
     local shell = CreateFrame("Frame", FRAME_NAME .. "Shell", frame)
@@ -643,7 +744,7 @@ function MainWindow.Init()
             MainWindow.SelectCategory(cat.id)
         end)
         categoryButtons[cat.id] = btn
-        y = y - 32
+        y = y - 28
     end
 
     local main = CreateFrame("Frame", FRAME_NAME .. "Main", shell)
@@ -693,6 +794,18 @@ function MainWindow.Init()
         if activeCategory == CAT_KICK then
             AscensionLFM.Database.ClearKicks()
             MainWindow.RefreshKicks()
+        elseif activeCategory == CAT_QUEUE then
+            if AscensionLFM.Queue and AscensionLFM.Queue.Clear then
+                AscensionLFM.Queue.Clear()
+            end
+            MainWindow.RefreshQueue()
+        elseif activeCategory == CAT_LOG then
+            AscensionLFM.Database.ClearMatches()
+            if AscensionLFM.Activity and AscensionLFM.Activity.Clear then
+                AscensionLFM.Activity.Clear()
+            end
+            MainWindow.RefreshMatches()
+            MainWindow.RefreshActivity()
         else
             AscensionLFM.Database.ClearMatches()
             MainWindow.RefreshMatches()
@@ -752,7 +865,8 @@ function MainWindow.Init()
     modeHint:SetText("|cff5a4010Off|r — Listening OFF (no chat scan).\n"
         .. "|cff5a4010Notify|r — Listening ON: print MS LFM/LFG to chat + Log (default).\n"
         .. "|cff5a4010Seeking|r — match open roles; optional auto-whisper LFM leaders.\n"
-        .. "|cff5a4010Hosting|r — role whispers → invite only if accepted role + open slot.")
+        .. "|cff5a4010Hosting|r — role whispers → invite only if accepted role + open slot.\n"
+        .. "|cff5a4010Full Auto|r — Hosting category master (default OFF): invite + scan + repost + reject.")
     SetInk(modeHint, MUTED)
 
     --------------------------------------------------------------------
@@ -805,42 +919,221 @@ function MainWindow.Init()
     end)
     widgets.whisperEdit = edit
 
+    widgets.useVariants = CreateToggleRow(seeking, -214,
+        "Rotate whisper variants ({role})",
+        "Cycles 2–3 templates below. {role} becomes tank/healer/aura/dps. Default ON.",
+        false,
+        function(on)
+            AscensionLFM.Database.Get().useWhisperVariants = on and true or false
+        end)
+
+    local v1l = seeking:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    v1l:SetPoint("TOPLEFT", 4, -268)
+    v1l:SetText("V1")
+    SetInk(v1l, INK)
+    local v1 = CreateFrame("EditBox", "AscensionLFMVariant1", seeking, "InputBoxTemplate")
+    v1:SetSize(200, 18)
+    v1:SetPoint("LEFT", v1l, "RIGHT", 6, 0)
+    v1:SetAutoFocus(false)
+    v1:SetMaxLetters(80)
+    local function saveVariant(idx, box)
+        local db = AscensionLFM.Database.Get()
+        if type(db.whisperVariants) ~= "table" then db.whisperVariants = {} end
+        db.whisperVariants[idx] = box:GetText() or ""
+    end
+    v1:SetScript("OnEnterPressed", function(self) saveVariant(1, self); self:ClearFocus() end)
+    v1:SetScript("OnEditFocusLost", function(self) saveVariant(1, self) end)
+    widgets.variant1 = v1
+
+    local v2l = seeking:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    v2l:SetPoint("TOPLEFT", 4, -292)
+    v2l:SetText("V2")
+    SetInk(v2l, INK)
+    local v2 = CreateFrame("EditBox", "AscensionLFMVariant2", seeking, "InputBoxTemplate")
+    v2:SetSize(200, 18)
+    v2:SetPoint("LEFT", v2l, "RIGHT", 6, 0)
+    v2:SetAutoFocus(false)
+    v2:SetMaxLetters(80)
+    v2:SetScript("OnEnterPressed", function(self) saveVariant(2, self); self:ClearFocus() end)
+    v2:SetScript("OnEditFocusLost", function(self) saveVariant(2, self) end)
+    widgets.variant2 = v2
+
+    local v3l = seeking:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    v3l:SetPoint("TOPLEFT", 4, -316)
+    v3l:SetText("V3")
+    SetInk(v3l, INK)
+    local v3 = CreateFrame("EditBox", "AscensionLFMVariant3", seeking, "InputBoxTemplate")
+    v3:SetSize(200, 18)
+    v3:SetPoint("LEFT", v3l, "RIGHT", 6, 0)
+    v3:SetAutoFocus(false)
+    v3:SetMaxLetters(80)
+    v3:SetScript("OnEnterPressed", function(self) saveVariant(3, self); self:ClearFocus() end)
+    v3:SetScript("OnEditFocusLost", function(self) saveVariant(3, self) end)
+    widgets.variant3 = v3
+
+    widgets.soundMatch = CreateToggleRow(seeking, -340,
+        "Sound on new match",
+        "Play a sound when a Manastorm listing is logged. Opt-in OFF.",
+        false,
+        function(on)
+            AscensionLFM.Database.Get().soundOnMatch = on and true or false
+        end)
+
+    local blLbl = seeking:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    blLbl:SetPoint("TOPLEFT", 4, -394)
+    blLbl:SetText("Blacklist leader")
+    SetInk(blLbl, INK)
+    local blEdit = CreateFrame("EditBox", "AscensionLFMBlacklistEdit", seeking, "InputBoxTemplate")
+    blEdit:SetSize(120, 18)
+    blEdit:SetPoint("LEFT", blLbl, "RIGHT", 6, 0)
+    blEdit:SetAutoFocus(false)
+    blEdit:SetMaxLetters(24)
+    widgets.blacklistEdit = blEdit
+    local blAdd = CreateFrame("Button", nil, seeking, "UIPanelButtonTemplate")
+    blAdd:SetSize(50, 20)
+    blAdd:SetPoint("LEFT", blEdit, "RIGHT", 4, 0)
+    blAdd:SetText("Add")
+    blAdd:SetScript("OnClick", function()
+        local name = blEdit:GetText() or ""
+        if AscensionLFM.Database.AddLeaderBlacklist(name) then
+            blEdit:SetText("")
+            if AscensionLFM.Print then AscensionLFM.Print("blacklisted " .. name) end
+        end
+    end)
+    local blRem = CreateFrame("Button", nil, seeking, "UIPanelButtonTemplate")
+    blRem:SetSize(64, 20)
+    blRem:SetPoint("LEFT", blAdd, "RIGHT", 4, 0)
+    blRem:SetText("Remove")
+    blRem:SetScript("OnClick", function()
+        local name = blEdit:GetText() or ""
+        AscensionLFM.Database.RemoveLeaderBlacklist(name)
+        blEdit:SetText("")
+    end)
+
     --------------------------------------------------------------------
     -- Hosting
     --------------------------------------------------------------------
     local hosting = BuildCategoryPage(pageHost, CAT_HOSTING)
-    CreateSectionLabel(hosting, "Accept roles", -4)
+    CreateSectionLabel(hosting, "Full Auto", -4)
+    widgets.fullAuto = CreateToggleRow(hosting, -20,
+        "Full Auto Hosting (master)",
+        "ON: Hosting + whisper invite + LFG invite + scan + repost + reject-rewhisper. Default OFF.",
+        false,
+        function(on)
+            AscensionLFM.Database.SetFullAutoHosting(on)
+        end)
 
+    CreateSectionLabel(hosting, "Accept roles", -72)
     local hostRoles = CreateFrame("Frame", nil, hosting)
-    hostRoles:SetPoint("TOPLEFT", 0, -22)
-    hostRoles:SetPoint("TOPRIGHT", 0, -22)
-    hostRoles:SetHeight(28)
+    hostRoles:SetPoint("TOPLEFT", 0, -88)
+    hostRoles:SetPoint("TOPRIGHT", 0, -88)
+    hostRoles:SetHeight(24)
     MakeRoleCheck(hostRoles, "tank", "Tank", 0, 0, widgets.roleButtonsHost)
     MakeRoleCheck(hostRoles, "healer", "Healer", 90, 0, widgets.roleButtonsHost)
     MakeRoleCheck(hostRoles, "aura", "Aura", 190, 0, widgets.roleButtonsHost)
     MakeRoleCheck(hostRoles, "dps", "DPS", 280, 0, widgets.roleButtonsHost)
 
-    CreateSectionLabel(hosting, "Invite", -58)
-    widgets.autoInvite = CreateToggleRow(hosting, -76,
+    CreateSectionLabel(hosting, "Invite + reject", -118)
+    widgets.autoInvite = CreateToggleRow(hosting, -134,
         "Auto-invite matching role whispers",
-        "InviteUnit only when the whisper role is accepted and that slot is open.",
+        "InviteUnit when role accepted + slot open. Full Auto turns this on.",
         false,
         function(on)
             AscensionLFM.Database.Get().autoInvite = on and true or false
         end)
-    widgets.requireRole = CreateToggleRow(hosting, -128,
-        "Require role in whisper",
-        "Default-deny whispers with no tank/heal/aura/dps cue. No blind invites.",
+    widgets.autoInviteLfg = CreateToggleRow(hosting, -184,
+        "Auto-invite LFG seekers (chat)",
+        "When someone posts LFG MS with a role you need + open slot → InviteUnit. Default ON while Hosting.",
+        false,
+        function(on)
+            AscensionLFM.Database.Get().autoInviteLfg = on and true or false
+        end)
+    widgets.requireRole = CreateToggleRow(hosting, -234,
+        "Require role in whisper / LFG",
+        "Default-deny whispers/LFG lines with no tank/heal/aura/dps cue.",
         false,
         function(on)
             AscensionLFM.Database.Get().requireRoleWhisper = on and true or false
         end)
+    widgets.rejectRewhisper = CreateToggleRow(hosting, -284,
+        "Reject re-whisper (slot/group full / no role)",
+        "Whisper templates with {role} {filled} {max}. Rate-limited; ignore list. Default OFF.",
+        false,
+        function(on)
+            AscensionLFM.Database.Get().rejectRewhisper = on and true or false
+        end)
 
-    CreateSectionLabel(hosting, "Slots", -180)
+    local rtLbl = hosting:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    rtLbl:SetPoint("TOPLEFT", 4, -336)
+    rtLbl:SetText("Reject tmpl")
+    SetInk(rtLbl, INK)
+    local rtEdit = CreateFrame("EditBox", "AscensionLFMRejectTmpl", hosting, "InputBoxTemplate")
+    rtEdit:SetSize(320, 18)
+    rtEdit:SetPoint("LEFT", rtLbl, "RIGHT", 6, 0)
+    rtEdit:SetAutoFocus(false)
+    rtEdit:SetMaxLetters(120)
+    rtEdit:SetScript("OnEnterPressed", function(self)
+        AscensionLFM.Database.Get().rejectTemplate = self:GetText() or ""
+        self:ClearFocus()
+    end)
+    rtEdit:SetScript("OnEditFocusLost", function(self)
+        AscensionLFM.Database.Get().rejectTemplate = self:GetText() or ""
+    end)
+    widgets.rejectTemplate = rtEdit
 
+    widgets.soundApplicant = CreateToggleRow(hosting, -360,
+        "Sound on applicant whisper",
+        "Play TellMessage when a hosting whisper arrives. Opt-in OFF.",
+        false,
+        function(on)
+            AscensionLFM.Database.Get().soundOnApplicant = on and true or false
+        end)
+
+    CreateSectionLabel(hosting, "Presets", -412)
+    local presetRow = CreateFrame("Frame", nil, hosting)
+    presetRow:SetPoint("TOPLEFT", 0, -428)
+    presetRow:SetPoint("TOPRIGHT", 0, -378)
+    presetRow:SetHeight(24)
+    local load2337 = CreateFrame("Button", nil, presetRow, "UIPanelButtonTemplate")
+    load2337:SetSize(100, 20)
+    load2337:SetPoint("LEFT", 0, 0)
+    load2337:SetText("MS 2/3/3/7")
+    load2337:SetScript("OnClick", function()
+        if AscensionLFM.Presets then AscensionLFM.Presets.Load("MS 2/3/3/7") end
+        SyncWidgetsFromDB()
+    end)
+    local load2255 = CreateFrame("Button", nil, presetRow, "UIPanelButtonTemplate")
+    load2255:SetSize(100, 20)
+    load2255:SetPoint("LEFT", load2337, "RIGHT", 4, 0)
+    load2255:SetText("MS 2/2/2/5")
+    load2255:SetScript("OnClick", function()
+        if AscensionLFM.Presets then AscensionLFM.Presets.Load("MS 2/2/2/5") end
+        SyncWidgetsFromDB()
+    end)
+    local pName = CreateFrame("EditBox", "AscensionLFMPresetName", presetRow, "InputBoxTemplate")
+    pName:SetSize(80, 18)
+    pName:SetPoint("LEFT", load2255, "RIGHT", 8, 0)
+    pName:SetAutoFocus(false)
+    pName:SetMaxLetters(24)
+    pName:SetText("My MS")
+    local pSave = CreateFrame("Button", nil, presetRow, "UIPanelButtonTemplate")
+    pSave:SetSize(50, 20)
+    pSave:SetPoint("LEFT", pName, "RIGHT", 4, 0)
+    pSave:SetText("Save")
+    pSave:SetScript("OnClick", function()
+        if AscensionLFM.Presets then AscensionLFM.Presets.Save(pName:GetText()) end
+        SyncWidgetsFromDB()
+    end)
+    presetLabelFS = hosting:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    presetLabelFS:SetPoint("TOPLEFT", 4, -404)
+    presetLabelFS:SetPoint("RIGHT", -4, 0)
+    presetLabelFS:SetJustifyH("LEFT")
+    SetInk(presetLabelFS, MUTED)
+
+    CreateSectionLabel(hosting, "Slots", -424)
     local slotRow = CreateFrame("Frame", nil, hosting)
-    slotRow:SetPoint("TOPLEFT", 0, -200)
-    slotRow:SetPoint("TOPRIGHT", 0, -200)
+    slotRow:SetPoint("TOPLEFT", 0, -440)
+    slotRow:SetPoint("TOPRIGHT", 0, -440)
     slotRow:SetHeight(24)
 
     local maxLabel = slotRow:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -886,17 +1179,10 @@ function MainWindow.Init()
     end
 
     slotsFS = hosting:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    slotsFS:SetPoint("TOPLEFT", 4, -232)
+    slotsFS:SetPoint("TOPLEFT", 4, -466)
     slotsFS:SetPoint("RIGHT", -4, 0)
     slotsFS:SetJustifyH("LEFT")
     SetInk(slotsFS, MUTED)
-
-    local hostHint = hosting:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    hostHint:SetPoint("TOPLEFT", 4, -252)
-    hostHint:SetPoint("RIGHT", -4, 0)
-    hostHint:SetJustifyH("LEFT")
-    hostHint:SetText("Whisper roles: tank/OT/MT · heal/HPS · Aura of Exp / exp aura · dps/DD.")
-    SetInk(hostHint, MUTED)
 
     --------------------------------------------------------------------
     -- Post (LFM compose / scan / repost)
@@ -1043,9 +1329,16 @@ function MainWindow.Init()
             end
             MainWindow.RefreshPost()
         end)
+    widgets.announceFull = CreateToggleRow(post, -268,
+        "Announce FULL when stopping",
+        "Optional one public FULL line (fullAnnounceMessage) when auto-repost stops. Default OFF.",
+        false,
+        function(on)
+            AscensionLFM.Database.Get().announceFull = on and true or false
+        end)
 
     local intLbl = post:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    intLbl:SetPoint("TOPLEFT", 4, -272)
+    intLbl:SetPoint("TOPLEFT", 4, -322)
     intLbl:SetText("Interval (sec, min 30)")
     SetInk(intLbl, INK)
 
@@ -1081,17 +1374,69 @@ function MainWindow.Init()
     widgets.repostInterval = intEdit
 
     postStatusFS = post:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    postStatusFS:SetPoint("TOPLEFT", 4, -300)
+    postStatusFS:SetPoint("TOPLEFT", 4, -350)
     postStatusFS:SetPoint("RIGHT", -4, 0)
     postStatusFS:SetJustifyH("LEFT")
     SetInk(postStatusFS, MUTED)
 
     local postHint = post:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    postHint:SetPoint("TOPLEFT", 4, -320)
+    postHint:SetPoint("TOPLEFT", 4, -372)
     postHint:SetPoint("RIGHT", -4, 0)
     postHint:SetJustifyH("LEFT")
     postHint:SetText("Example: LFM MS 0/2 Tanks 0/3 Healers 0/3 Aura 0/7 DPS — filled from Hosting slots + Scan.")
     SetInk(postHint, MUTED)
+
+    --------------------------------------------------------------------
+    -- Queue (applicants)
+    --------------------------------------------------------------------
+    local queue = BuildCategoryPage(pageHost, CAT_QUEUE)
+    CreateSectionLabel(queue, "Recent applicant whispers", -4)
+    local qHint = queue:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    qHint:SetPoint("TOPLEFT", 4, -20)
+    qHint:SetPoint("RIGHT", -4, 0)
+    qHint:SetJustifyH("LEFT")
+    qHint:SetText("Hosting whispers land here. Invite uses InviteUnit; Reject sends re-whisper once.")
+    SetInk(qHint, MUTED)
+
+    local qy = -44
+    for i = 1, 5 do
+        local row = CreateFrame("Frame", nil, queue)
+        row:SetPoint("TOPLEFT", 0, qy)
+        row:SetPoint("TOPRIGHT", 0, qy)
+        row:SetHeight(48)
+        ApplyInset(row)
+        local lbl = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        lbl:SetPoint("TOPLEFT", 8, -6)
+        lbl:SetPoint("RIGHT", row, "RIGHT", -150, 0)
+        lbl:SetJustifyH("LEFT")
+        SetInk(lbl, INK)
+        row.label = lbl
+        local inv = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+        inv:SetSize(64, 20)
+        inv:SetPoint("TOPRIGHT", -8, -6)
+        inv:SetText("Invite")
+        inv:SetScript("OnClick", function()
+            if row.name and AscensionLFM.Queue then
+                AscensionLFM.Queue.Invite(row.name)
+                MainWindow.RefreshQueue()
+            end
+        end)
+        row.inviteBtn = inv
+        local rej = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+        rej:SetSize(110, 20)
+        rej:SetPoint("TOPRIGHT", -8, -28)
+        rej:SetText("Reject+whisp")
+        rej:SetScript("OnClick", function()
+            if row.name and AscensionLFM.Queue then
+                AscensionLFM.Queue.Reject(row.name)
+                MainWindow.RefreshQueue()
+            end
+        end)
+        row.rejectBtn = rej
+        row:Hide()
+        queueRows[i] = row
+        qy = qy - 54
+    end
 
     --------------------------------------------------------------------
     -- Kick
@@ -1127,13 +1472,14 @@ function MainWindow.Init()
     -- Log
     --------------------------------------------------------------------
     local log = BuildCategoryPage(pageHost, CAT_LOG)
-    CreateSectionLabel(log, "Recent Manastorm LFM/LFG matches", -4)
+    CreateSectionLabel(log, "Recent matches", -4)
     local matchBox = CreateFrame("Frame", nil, log)
-    matchBox:SetPoint("TOPLEFT", 0, -22)
-    matchBox:SetPoint("BOTTOMRIGHT", 0, 0)
+    matchBox:SetPoint("TOPLEFT", 0, -20)
+    matchBox:SetPoint("TOPRIGHT", 0, -20)
+    matchBox:SetHeight(200)
     ApplyInset(matchBox)
-    local my = -10
-    for i = 1, 6 do
+    local my = -8
+    for i = 1, 5 do
         local fs = matchBox:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         fs:SetPoint("TOPLEFT", matchBox, "TOPLEFT", 8, my)
         fs:SetPoint("TOPRIGHT", matchBox, "TOPRIGHT", -8, my)
@@ -1141,6 +1487,22 @@ function MainWindow.Init()
         SetInk(fs, INK)
         matchFS[i] = fs
         my = my - 36
+    end
+
+    CreateSectionLabel(log, "Activity (posts / invites / rejects / matches)", -230)
+    local actBox = CreateFrame("Frame", nil, log)
+    actBox:SetPoint("TOPLEFT", 0, -248)
+    actBox:SetPoint("BOTTOMRIGHT", 0, 0)
+    ApplyInset(actBox)
+    local ay = -8
+    for i = 1, 6 do
+        local fs = actBox:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        fs:SetPoint("TOPLEFT", actBox, "TOPLEFT", 8, ay)
+        fs:SetPoint("TOPRIGHT", actBox, "TOPRIGHT", -8, ay)
+        fs:SetJustifyH("LEFT")
+        SetInk(fs, INK)
+        activityFS[i] = fs
+        ay = ay - 18
     end
 
     frame:SetScript("OnShow", function()
