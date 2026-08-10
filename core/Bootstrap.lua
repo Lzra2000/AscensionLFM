@@ -8,7 +8,7 @@ if type(AscensionLFM) ~= "table" then
     _G.AscensionLFM = AscensionLFM
 end
 
-AscensionLFM.VERSION = "0.4.0"
+AscensionLFM.VERSION = "0.4.1"
 AscensionLFM.ADDON_NAME = "AscensionLFM"
 
 local function Print(msg)
@@ -46,6 +46,14 @@ local function PrintStatus()
     Print(string.format("autoWhisper=%s · variants=%s · Kick59=%s · announceFull=%s",
         OnOff(db.autoWhisper), OnOff(db.useWhisperVariants ~= false),
         OnOff(db.autoKickLevel59), OnOff(db.announceFull)))
+    local rc = AscensionLFM.RoleCheck and AscensionLFM.RoleCheck.GetStatus and AscensionLFM.RoleCheck.GetStatus()
+    if rc then
+        Print(string.format("roleCheck: %s · window=%ss · autoResync=%s · autoMoveAura=%s",
+            tostring(rc.status or "idle"),
+            tostring(db.roleCheckWindow or db.roleCheckDuration or 60),
+            OnOff(db.roleCheckAutoResync ~= false),
+            OnOff(db.autoMoveAura ~= false)))
+    end
     Print(string.format("sounds: match=%s applicant=%s · channel=%s interval=%ss",
         OnOff(db.soundOnMatch), OnOff(db.soundOnApplicant),
         tostring(db.postChannel or "YELL"),
@@ -164,6 +172,7 @@ bootFrame:SetScript("OnEvent", function(self, event, arg1)
         RegisterSlash()
         SafeStart("Scanner.Start", AscensionLFM.Scanner and AscensionLFM.Scanner.Start)
         SafeStart("Poster.Start", AscensionLFM.Poster and AscensionLFM.Poster.Start)
+        SafeStart("RoleCheck.EnsureTicker", AscensionLFM.RoleCheck and AscensionLFM.RoleCheck.EnsureTicker)
         SafeStart("MainWindow.Init", AscensionLFM.MainWindow and AscensionLFM.MainWindow.Init)
         local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
         local mode = (db and db.mode) or "notify"

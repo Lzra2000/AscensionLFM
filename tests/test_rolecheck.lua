@@ -1,0 +1,156 @@
+-- AscensionLFM RoleCheck pure-function + whisper/resync tests.
+package.path = "./?.lua;./core/?.lua;" .. (package.path or "")
+
+dofile("core/Database.lua")
+dofile("core/Parser.lua")
+dofile("core/Slots.lua")
+dofile("core/RoleCheck.lua")
+
+local AscensionLFM = _G.AscensionLFM
+AscensionLFM.Database.Init()
+local RoleCheck = assert(_G.AscensionLFM.RoleCheck)
+local Slots = AscensionLFM.Slots
+
+local failed = 0
+local passed = 0
+
+local function check(name, cond, detail)
+    if cond then
+        passed = passed + 1
+    else
+        failed = failed + 1
+        io.stderr:write("FAIL: " .. name .. (detail and (" — " .. detail) or "") .. "\n")
+    end
+end
+
+-- Message build
+local def = RoleCheck.BuildMessage(nil)
+check("default message non-empty", type(def) == "string" and #def > 10)
+check("default mentions ROLE CHECK", def:find("ROLE CHECK", 1, true) ~= nil)
+check("custom message kept", RoleCheck.BuildMessage("hello") == "hello")
+check("empty custom → default", RoleCheck.BuildMessage("") == RoleCheck.DEFAULT_MESSAGE)
+check("message truncated to 255", #RoleCheck.BuildMessage(string.rep("x", 300)) == 255)
+
+-- Window / interval clamps
+check("window default 60", RoleCheck.ClampWindow(nil) == 60)
+check("ClampDuration alias", RoleCheck.ClampDuration(5) == 15)
+check("window floor 15", RoleCheck.ClampWindow(5) == 15)
+check("window ceil 300", RoleCheck.ClampWindow(999) == 300)
+check("min interval floor 30", RoleCheck.ClampMinInterval(10) == 30)
+
+-- Rate limit / who can RW (pure)
+check("allow first RW", RoleCheck.ShouldAllowRW(100, 0, 30) == true)
+check("rate limit blocks", RoleCheck.ShouldAllowRW(120, 100, 30) == false)
+check("after interval allows", RoleCheck.ShouldAllowRW(130, 100, 30) == true)
+
+local present = { alice = true, bob = true }
+check("member alice", RoleCheck.IsGroupMemberName("Alice", present) == true)
+check("non-member carl", RoleCheck.IsGroupMemberName("Carl", present) == false)
+
+-- Whisper → role
+check("whisper tank", RoleCheck.ParseWhisperRole("tank") == "tank")
+check("whisper heal", RoleCheck.ParseWhisperRole("heal") == "healer")
+check("whisper aura", RoleCheck.ParseWhisperRole("aura") == "aura")
+check("whisper dps", RoleCheck.ParseWhisperRole("dps please") == "dps")
+check("whisper inv ms tank", RoleCheck.ParseWhisperRole("inv ms tank") == "tank")
+check("whisper garbage nil", RoleCheck.ParseWhisperRole("hello world xyz") == nil)
+
+-- Resync prune + re-apply
+local assigned = { alice = "tank", bob = "healer", gone = "dps" }
+local responses = { alice = "dps", carl = "aura" }
+local newMap, removed, applied = RoleCheck.ResyncAssigned(assigned, responses, present)
+check("prune removed gone", removed == 1)
+check("alice role updated", newMap.alice == "dps")
+check("bob kept", newMap.bob == "healer")
+check("gone pruned", newMap.gone == nil)
+check("carl ignored", newMap.carl == nil)
+check("applied 1", applied == 1)
+
+check("active status format",
+    RoleCheck.BuildStatusText(true, 42, 3) == "Role check active — 42s left · 3 responses")
+
+-- Live StartCheck needs hosting + privilege
+RoleCheck._ResetForTests()
+local db = AscensionLFM.Database.Get()
+db.mode = "notify"
+local ok, reason = RoleCheck.StartCheck()
+check("refuse when not hosting", ok == false and reason == "not hosting")
+
+db.mode = "hosting"
+ok, reason = RoleCheck.StartCheck()
+check("refuse without privilege", ok == false and reason == "no privilege")
+
+_G.GetNumRaidMembers = function() return 3 end
+_G.IsRaidLeader = function() return true end
+_G.IsRaidOfficer = function() return false end
+_G.GetRaidRosterInfo = function(i)
+    return ({ "Host", "Alice", "Bob" })[i]
+end
+_G.SendChatMessage = function(msg, ch)
+    _G._lastRW = { msg = msg, ch = ch }
+end
+_G.UnitName = function(u)
+    if u == "player" then return "Host" end
+    return nil
+end
+_G.GetTime = function() return _G._now or 2000 end
+_G.CreateFrame = function()
+    return { SetScript = function() end }
+end
+
+RoleCheck._ResetForTests()
+_G._now = 2000
+ok, reason = RoleCheck.StartCheck()
+check("start check ok", ok == true, tostring(reason))
+check("sent RAID_WARNING", _G._lastRW and _G._lastRW.ch == "RAID_WARNING")
+check("active after start", RoleCheck.IsActive() == true)
+
+ok, reason = RoleCheck.StartCheck()
+check("second RW rate limited", ok == false and reason == "rate limited")
+
+-- Whisper from group member during window
+local handled = RoleCheck.HandleWhisper("Alice", "tank")
+check("whisper handled", handled == true)
+check("alice assigned tank", Slots.GetAssigned("Alice") == "tank")
+check("response count 1", RoleCheck.ResponseCount() == 1)
+
+handled = RoleCheck.HandleWhisper("Stranger", "dps")
+check("stranger ignored", handled == false)
+
+handled = RoleCheck.HandleWhisper("Alice", "heal")
+check("alice role update", handled == true)
+check("alice now healer", Slots.GetAssigned("Alice") == "healer")
+check("response count still 1", RoleCheck.ResponseCount() == 1)
+
+Slots.Assign("Ghost", "dps")
+local rem = RoleCheck.Resync()
+check("resync returns", rem ~= nil)
+check("alice still healer after resync", Slots.GetAssigned("Alice") == "healer")
+check("ghost cleared", Slots.GetAssigned("Ghost") == nil)
+
+-- Auto-resync on window end
+RoleCheck._ResetForTests()
+db.roleCheckAutoResync = true
+_G._now = 3000
+ok = RoleCheck.StartCheck()
+check("restart ok", ok == true)
+RoleCheck.HandleWhisper("Bob", "aura")
+check("bob aura", Slots.GetAssigned("Bob") == "aura")
+_G._now = 3000 + 61
+local tick = RoleCheck.Tick(_G._now)
+check("tick ended", tick == "ended")
+check("inactive after end", RoleCheck.IsActive() == false)
+
+-- Full Auto counts as hosting
+RoleCheck._ResetForTests()
+db.mode = "seeking"
+db.fullAutoHosting = true
+_G._now = 4000
+ok, reason = RoleCheck.StartCheck()
+check("full auto allows check", ok == true, tostring(reason))
+
+if failed > 0 then
+    io.stderr:write(string.format("test_rolecheck: %d failed, %d passed\n", failed, passed))
+    os.exit(1)
+end
+print(string.format("test_rolecheck: %d passed", passed))

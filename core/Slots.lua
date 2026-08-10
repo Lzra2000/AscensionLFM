@@ -139,6 +139,9 @@ function Slots.Assign(name, role)
     if db then
         db.assignedRoles[key] = role
     end
+    if role == "aura" and AscensionLFM.AuraBalance and AscensionLFM.AuraBalance.Balance then
+        AscensionLFM.AuraBalance.Balance()
+    end
     return true
 end
 
@@ -274,6 +277,9 @@ end
 -- @return snapshot, removedCount
 function Slots.ScanRaid()
     local removed = Slots.SyncFromRoster() or 0
+    if AscensionLFM.AuraBalance and AscensionLFM.AuraBalance.Balance then
+        AscensionLFM.AuraBalance.Balance()
+    end
     local snap = Slots.Snapshot()
     if AscensionLFM.Poster and AscensionLFM.Poster.RefreshMessage then
         AscensionLFM.Poster.RefreshMessage()

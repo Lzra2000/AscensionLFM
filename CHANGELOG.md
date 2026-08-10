@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.1
+
+- **RW Role Check:** Hosting / Post buttons send a raid warning (lead/assist; party/yell
+  fallback like Kick59) asking members to whisper `tank` / `heal` / `aura` / `dps`.
+- **Listening window** (default 60s, configurable): group whispers update `Slots.Assign`
+  / `assignedRoles` live; status shows `Role check active — Xs left · N responses`.
+- **Resync roles now:** prune leavers, re-apply role-check responses, `Slots.ScanRaid`,
+  refresh LFM preview + filled counts — works without a prior RW.
+- Optional **auto-resync** when the window ends (default ON). RW rate-limited (min 30s).
+  Hosting / Full Auto only.
+- **Aura 1 per raid group + auto-move:** at most one Aura-assigned player per raid
+  subgroup (1–8); extras are moved with `SetRaidSubgroup`. Toggle default **ON**.
+  Runs after assign / ScanRaid / roster sync / role resync.
+
 ## 0.4.0
 
 - **LFG auto-invite (Hosting):** when someone posts `LFG MS …` with a role you accept

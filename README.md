@@ -1,6 +1,6 @@
 # AscensionLFM
 
-WotLK **3.3.5a** addon for Ascension that scans chat and whispers for **Manastorm Level Run** **LFM** and **LFG** messages, notifies you of matches, and optionally auto-whispers leaders or auto-invites applicants when you host — with per-role slot caps, Full Auto Hosting, reject re-whisper, applicant queue, LFM post/repost, and an opt-in level-59 auto-kick.
+WotLK **3.3.5a** addon for Ascension that scans chat and whispers for **Manastorm Level Run** **LFM** and **LFG** messages, notifies you of matches, and optionally auto-whispers leaders or auto-invites applicants when you host — with per-role slot caps, Full Auto Hosting, **RW Role Check**, reject re-whisper, applicant queue, LFM post/repost, and an opt-in level-59 auto-kick.
 
 ## Install (EN)
 
@@ -55,6 +55,18 @@ Open **Post** in `/alfm` (separate from Hosting to avoid crowding).
 4. **Scan raid/party** recounts filled from the current roster + assigned roles; while Mode is **Hosting** (or auto-repost is on), roster events auto-refresh fills and the preview.
 5. **Auto-repost** (default **OFF**): interval seconds (default **60**, minimum **30**). Only while Mode=**Hosting**. Rebuilds the message each tick; **stops** when all role caps are filled or the group hits Max size. Optional **Announce FULL** posts one public FULL line when stopping.
 
+## RW Role Check (resync T/H/A/D places)
+
+While **Mode = Hosting** (or Full Auto) and you are raid lead/assist (party lead → party/yell fallback):
+
+1. `/alfm` → **Hosting** (or **Post**) → **RW Role Check**
+2. Sends a configurable raid warning (default: `ROLE CHECK — whisper me tank / heal / aura / dps to sync MS slots`)
+3. Opens a **listening window** (default **60s**): party/raid members who whisper a role update slot assignments live
+4. Status shows `Role check active — Xs left · N responses`
+5. When the window ends (if **Auto-resync** is on) — or anytime via **Resync roles now** — leavers are pruned, whisper roles re-applied, `ScanRaid` refreshes filled counts + LFM preview
+
+RW is rate-limited (minimum **30s** between warnings). **Resync roles now** works without a prior RW (roster prune + recount only).
+
 ## Full Auto Hosting (default OFF)
 
 `/alfm` → **Hosting** → enable **Full Auto Hosting (master)**. This:
@@ -99,8 +111,8 @@ Native DialogFrame with a left **Categories** sidebar:
 |----------|----------|
 | **General** | Status (Listening ON/OFF, Full Auto) + mode Off / Notify / Seeking / Hosting |
 | **Seeking** | My roles, Scan LFG MS, auto-whisper + rotating variants, leader blacklist, match sound |
-| **Hosting** | Full Auto master, accept roles, whisper + LFG auto-invite, reject-rewhisper, presets, slots |
-| **Post** | LFM preview, channel, Post once, Scan raid/party, auto-repost, announce FULL |
+| **Hosting** | Full Auto master, accept roles, invites, reject-rewhisper, presets, slots, **RW Role Check** |
+| **Post** | LFM preview, channel, Post once, Scan, **RW Role Check / Resync**, auto-repost, announce FULL |
 | **Queue** | Applicant whispers — Invite / Reject+rewhisper |
 | **Kick** | Opt-in level-59 kick + recent kick log |
 | **Log** | Match history + activity (posts / invites / rejects) |
@@ -120,14 +132,15 @@ Native DialogFrame with a left **Categories** sidebar:
 3. Set **Max T/H/A/D** slot caps (defaults 2/3/3/7) and **Max size** (15).
 4. Leave **Auto-invite matching role whispers**, **Auto-invite LFG seekers**, and **Require role in whisper** on.
 5. **Post** → **Scan raid/party** (optional) → pick channel → **Post once**, or enable **Auto-repost** (interval ≥ 30s).
-6. Optionally **Kick** → enable **Kick at level 59 + raid warning** (dangerous; default off).
+6. Optionally **Hosting** → **RW Role Check** to resync T/H/A/D places from member whispers; or **Resync roles now**.
+7. Optionally **Kick** → enable **Kick at level 59 + raid warning** (dangerous; default off).
 
 ## Safety
 
 - Default mode is **Notify** (Log only). **Full Auto Hosting**, auto-invite, auto-whisper, auto-repost, reject-rewhisper, and level-59 kick remain **opt-in**; Full Auto, kick, and auto-repost default off.
 - Never invites when the group is at **Max size** or the role **slot is full**.
 - Auto-repost stops when slots are full or Max size is reached (optional FULL announce).
-- Skips ignored players; rate-limits whispers/invites/rejects; kick RW cadence 10s; repost min interval 30s.
+- Skips ignored players; rate-limits whispers/invites/rejects; kick RW cadence 10s; repost min interval 30s; Role Check RW min 30s.
 - Classic chat/party APIs only (`InviteUnit`, `UninviteUnit`, `SendChatMessage`, roster APIs). No `C_*`, Draft/HoF, or Rapid Rolling hooks.
 
 ## Development
@@ -136,7 +149,7 @@ Native DialogFrame with a left **Categories** sidebar:
 sh scripts/check.sh
 ```
 
-Runs `luac5.1 -p` on all Lua files and pure Lua unit tests (parser / invite / slots / kick / poster / defaults).
+Runs `luac5.1 -p` on all Lua files and pure Lua unit tests (parser / invite / slots / kick / poster / rolecheck / defaults).
 
 ## License
 
