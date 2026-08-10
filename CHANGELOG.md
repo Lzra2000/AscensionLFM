@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.3
+
+- **Fix Full Auto whisper invites:** turning **Full Auto Hosting** ON now enables Accept
+  roles Tank/Healer/Aura/DPS. Previously defaults often left Healer/Aura off, so those
+  whispers failed as `role filtered` and felt like Full Auto whisper was broken.
+- Role Check still consumes only **group-member** whispers during the window; outside
+  applicants still go through auto-invite / Queue.
+
 ## 0.4.2
 
 - **Copy polish:** clearer Hosting Role Check / Aura helper text (no raw API jargon).

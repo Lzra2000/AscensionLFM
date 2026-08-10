@@ -74,9 +74,10 @@ RW is rate-limited (minimum **30s** between warnings). **Resync roles now** work
 `/alfm` → **Hosting** → enable **Full Auto Hosting (master)**. This:
 
 1. Sets Mode to **Hosting**
-2. Turns on whisper auto-invite + LFG auto-invite + roster scan + auto-repost + reject-rewhisper
+2. Enables Accept roles **Tank / Healer / Aura / DPS** (so heal/aura whispers invite)
+3. Turns on whisper auto-invite + LFG auto-invite + roster scan + auto-repost + reject-rewhisper
 
-Turn it off anytime to clear that bundle (spam safety). Kick59 is never included — stays opt-in OFF on its own page.
+Turn it off anytime to clear that automation bundle (spam safety). Accept-role checkboxes stay as last set. Kick59 is never included — stays opt-in OFF on its own page.
 
 ## Queue + reject re-whisper
 
@@ -122,7 +123,7 @@ Native DialogFrame with a left **Categories** sidebar:
 ## How to enable Full Auto Hosting
 
 1. `/alfm` → **Hosting** → enable **Full Auto Hosting (master)** (default OFF).
-2. Confirm Accept roles / slot caps (or load preset **MS 2/3/3/7**).
+2. Confirm Accept roles are all on (Full Auto enables T/H/A/D) and slot caps (or load preset **MS 2/3/3/7**).
 3. **Post** → pick channel; auto-repost is already on via Full Auto (interval ≥ 30s).
 4. Watch **Queue** for applicants; reject-rewhisper is on via Full Auto.
 5. `/alfm status` for a live dump. Kick59 stays off unless you enable it under **Kick**.

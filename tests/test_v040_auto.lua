@@ -169,6 +169,25 @@ check("full auto invite on", db.autoInvite == true)
 check("full auto repost on", db.autoRepost == true)
 check("full auto reject on", db.rejectRewhisper == true)
 check("full auto flag on", db.fullAutoHosting == true)
+check("full auto accepts tank", db.roles.tank == true)
+check("full auto accepts healer", db.roles.healer == true)
+check("full auto accepts aura", db.roles.aura == true)
+check("full auto accepts dps", db.roles.dps == true)
+
+-- Whisper invites must work for heal/aura under Full Auto (not role-filtered)
+db.roles.healer = false
+db.roles.aura = false
+AscensionLFM.Database.SetFullAutoHosting(true)
+Invite._ResetCooldowns()
+Slots.ClearAll()
+invited = {}
+local okHeal = Invite.TryHostInvite("HealBob", "heal")
+check("full auto heal whisper invites", okHeal == true, tostring(okHeal))
+Invite._ResetCooldowns()
+_G.GetTime = function() return 2000 end
+local okAura = Invite.TryHostInvite("AuraBob", "aura")
+check("full auto aura whisper invites", okAura == true, tostring(okAura))
+_G.GetTime = function() return 1000 end
 
 AscensionLFM.Database.SetFullAutoHosting(false)
 check("full auto off flag", db.fullAutoHosting == false)
