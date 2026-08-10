@@ -71,6 +71,11 @@ check("full reason maxPartySize", reason == "maxPartySize")
 full = Poster.IsFull(midSnap, 14, 15)
 check("not full under maxPartySize", full == false)
 
+full, reason = Poster.IsFull(midSnap, 14, 15, 3)
+check("unassigned near full", full == true and reason == "unassigned")
+full = Poster.IsFull(midSnap, 10, 15, 3)
+check("unassigned mid group still open", full == false)
+
 -- zero-max roles ignored for "all filled"
 full, reason = Poster.IsFull({
     tank = { filled = 1, max = 1 },

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.16
+
+- **Bugfix batch:** parse glued `MS15` (Heal lfg MS15 works); hosting LFG
+  notify only when that role still has an open slot; auto-repost pauses at
+  14/15 when people are unassigned (need RW); host self-assigns a role on
+  Hosting/Full Auto/Scan; last 1–2 seats prefer tank/heal/aura over DPS;
+  LFG GuessRole fallback; Mini HUD clicks are pcall-wrapped (no silent Lua errors).
+
 ## 0.4.15
 
 - **Status diagnosis:** `/alfm status` always reports RoleCheck (or MODULE MISSING),

@@ -21,6 +21,7 @@ dofile("core/Invite.lua")
 local AscensionLFM = _G.AscensionLFM
 AscensionLFM.Database.Init()
 local db = AscensionLFM.Database.Get()
+local Slots = AscensionLFM.Slots
 db.mode = "hosting"
 db.autoInvite = true
 db.autoInviteLfg = true
@@ -65,6 +66,27 @@ AscensionLFM.Invite._ResetCooldowns()
 _G._lastInvite = nil
 ok, reason = AscensionLFM.Invite.TryLfgInvite("SeekerFour", "LFG MS", AscensionLFM.Parser.Parse("LFG MS"))
 check("lfg without role denied", ok == false)
+
+-- Glued MS15 heal LFG
+AscensionLFM.Invite._ResetCooldowns()
+_G._lastInvite = nil
+Slots.ClearAll()
+local pHeal = AscensionLFM.Parser.Parse("Heal lfg MS15")
+check("parse Heal lfg MS15", pHeal and pHeal.isManastormLFG)
+ok, reason = AscensionLFM.Invite.TryLfgInvite("HealerFive", "Heal lfg MS15", pHeal)
+check("invite Heal lfg MS15", ok == true)
+check("healer invited", _G._lastInvite == "HealerFive")
+
+-- Last seats: prefer support over DPS when tank/aura open
+AscensionLFM.Invite._ResetCooldowns()
+_G._lastInvite = nil
+Slots.ClearAll()
+db.roles = { tank = true, healer = true, aura = true, dps = true }
+db.maxPartySize = 15
+GetNumRaidMembers = function() return 14 end
+ok, reason = AscensionLFM.Invite.TryLfgInvite("DpsSix", "LFG MS DPS", AscensionLFM.Parser.Parse("LFG MS DPS"))
+check("last seat blocks dps", ok == false and reason == "prefer support seat")
+GetNumRaidMembers = function() return 0 end
 
 -- Full Auto enables autoInviteLfg
 db.autoInviteLfg = false

@@ -200,6 +200,9 @@ function Database.SetMode(mode)
         if mode ~= "hosting" and db.fullAutoHosting then
             Database.SetFullAutoHosting(false)
         end
+        if mode == "hosting" and AscensionLFM.Slots and AscensionLFM.Slots.EnsureHostAssigned then
+            AscensionLFM.Slots.EnsureHostAssigned()
+        end
     end
 end
 
@@ -226,6 +229,9 @@ function Database.SetFullAutoHosting(on)
         db.roles.aura = true
         db.roles.dps = true
         -- Roster scan already runs while hosting / autoRepost (Scanner.HandleRoster)
+        if AscensionLFM.Slots and AscensionLFM.Slots.EnsureHostAssigned then
+            AscensionLFM.Slots.EnsureHostAssigned()
+        end
         if AscensionLFM.Poster and AscensionLFM.Poster.RefreshMessage then
             AscensionLFM.Poster.RefreshMessage()
         end

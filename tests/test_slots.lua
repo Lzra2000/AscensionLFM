@@ -51,6 +51,15 @@ check("list unassigned name", names[1] == "c")
 names, n = Slots.ListUnassigned({ a = true }, { a = "tank" })
 check("list none unassigned", n == 0)
 
+_G.UnitName = function() return "HostPlayer" end
+Slots.ClearAll()
+db.mode = "hosting"
+db.roles = { tank = true, healer = true, aura = true, dps = true }
+local hostRole = Slots.EnsureHostAssigned()
+check("host assigned", hostRole == "tank", tostring(hostRole))
+check("host remembered", Slots.GetAssigned("HostPlayer") == "tank")
+check("host assign idempotent", Slots.EnsureHostAssigned() == nil)
+
 io.write(string.format("slots tests: %d passed, %d failed\n", passed, failed))
 if failed > 0 then
     os.exit(1)

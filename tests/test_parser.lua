@@ -143,6 +143,14 @@ local totals = Parser.SlotTotals(p)
 check("slot totals tank", totals and totals.tank == 2)
 check("slot totals aura", totals and totals.aura == 3)
 
+-- Glued MS15 / Heal lfg MS15
+p = Parser.Parse("Heal lfg MS15")
+check("heal lfg MS15 parses", p ~= nil, tostring(p))
+check("heal lfg MS15 is LFG", p and p.isManastormLFG == true)
+check("heal lfg MS15 healer", p and p.roles and p.roles.healer and p.roles.healer.open == true)
+p = Parser.Parse("LFG MS15 DPS")
+check("LFG MS15 DPS", p and p.isManastormLFG and p.roles.dps)
+
 io.write(string.format("parser tests: %d passed, %d failed\n", passed, failed))
 if failed > 0 then
     os.exit(1)

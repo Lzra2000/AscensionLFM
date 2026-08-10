@@ -267,11 +267,15 @@ end
 
 function MiniHUD.ActionOpenSettings()
     if AscensionLFM.MainWindow and AscensionLFM.MainWindow.Toggle then
-        pcall(AscensionLFM.MainWindow.Toggle)
+        local ok, err = pcall(AscensionLFM.MainWindow.Toggle)
+        if not ok then
+            Print("settings UI error: " .. tostring(err))
+            return false, tostring(err)
+        end
         return true
     end
     Print("settings UI missing — /alfm")
-    return false
+    return false, "no ui"
 end
 
 function MiniHUD.ActionPostLfm()
@@ -741,11 +745,17 @@ local function MakeBtn(parent, label, width, onClick, danger)
     btn:SetSize(width or 40, 20)
     btn:SetText(label)
     btn:SetScript("OnClick", function()
-        local ok, err = onClick()
-        -- Actions Print their own success/fail; only surface bare silent failures here
-        if ok ~= true and err and AscensionLFM.Print then
-            -- Prefer Action-owned messages; skip duplicates for common reasons
-            local e = tostring(err)
+        local okCall, ok, err = pcall(onClick)
+        if not okCall then
+            if AscensionLFM.Print then
+                AscensionLFM.Print("MiniHUD " .. tostring(label) .. " error: " .. tostring(ok))
+            end
+            MiniHUD.Refresh()
+            return
+        end
+        -- Actions Print their own success/fail; surface remaining silent failures
+        if ok ~= true and AscensionLFM.Print then
+            local e = err and tostring(err) or "failed"
             if e ~= "rate limited" and e ~= "no privilege" and e ~= "not hosting" then
                 AscensionLFM.Print("MiniHUD " .. tostring(label) .. ": " .. e)
             end

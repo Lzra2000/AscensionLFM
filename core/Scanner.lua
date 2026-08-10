@@ -242,7 +242,27 @@ local function ShouldNotify(db, parsed, leader)
     if parsed.isManastormLFG and db.scanLfg == false then
         return false
     end
-    if db.mode == "notify" or db.mode == "hosting" then
+    if db.mode == "hosting" then
+        -- Hosting: LFG noise only when we still need that role
+        if parsed.isManastormLFG and not parsed.isManastormLFM then
+            local role = AscensionLFM.Parser and AscensionLFM.Parser.RequestedRole
+                and AscensionLFM.Parser.RequestedRole(parsed)
+            if role and AscensionLFM.Slots and AscensionLFM.Slots.HasOpenSlot then
+                return AscensionLFM.Slots.HasOpenSlot(role) and true or false
+            end
+            -- Generic / ambiguous LFG: notify only if any accepted role has room
+            if AscensionLFM.Slots and AscensionLFM.Slots.HasOpenSlot and db.roles then
+                for _, r in ipairs({ "tank", "healer", "aura", "dps" }) do
+                    if db.roles[r] and AscensionLFM.Slots.HasOpenSlot(r) then
+                        return true
+                    end
+                end
+                return false
+            end
+        end
+        return true
+    end
+    if db.mode == "notify" then
         return true
     end
     if db.mode == "seeking" then

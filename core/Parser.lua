@@ -78,6 +78,10 @@ local function HasManastorm(text)
     if text:find("%f[%w]ms%f[%W]") or text:find("%f[%w]ms$") or text:find("^ms%f[%W]") then
         return true
     end
+    -- Glued level tags: MS15 / ms60 (common Ascension LFG shorthand)
+    if text:find("%f[%w]ms%d") then
+        return true
+    end
     return false
 end
 
