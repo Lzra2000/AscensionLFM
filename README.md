@@ -67,7 +67,7 @@ While **Mode = Hosting** (or Full Auto) and you are raid lead/assist (party lead
 
 RW is rate-limited (minimum **30s** between warnings). **Resync roles now** works without a prior RW (roster cleanup + recount only).
 
-**Aura auto-move** (default ON, Hosting): at most one Aura player per raid group (1–8). Extra Auras are moved into empty groups after assign / scan / resync.
+**Aura auto-move** (default ON, Hosting): at most one Aura player per raid group (1–8). Extra Auras move (or swap into full groups) one at a time after assign / scan / resync; skipped in combat.
 
 ## Full Auto Hosting (default OFF)
 

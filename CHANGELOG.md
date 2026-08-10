@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.6
+
+- **Fix Aura auto-group:** respect 5-player raid subgroup cap (swap when full), apply
+  one move at a time and wait for roster settle (raid indices reshuffle after each
+  `SetRaidSubgroup` / `SwapRaidSubgroup`), skip moves while in combat.
+
 ## 0.4.5
 
 - **UI overlap fix:** category pages are scrollable; toggle rows taller (58px) with 10px gaps.
