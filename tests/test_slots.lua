@@ -45,6 +45,12 @@ local snap = Slots.Snapshot()
 check("snapshot filled", snap.tank.filled == 2)
 check("snapshot max", snap.dps.max == 7)
 
+local names, n = Slots.ListUnassigned({ a = true, b = true, c = true }, { a = "tank", b = "tank" })
+check("list unassigned count", n == 1, tostring(n))
+check("list unassigned name", names[1] == "c")
+names, n = Slots.ListUnassigned({ a = true }, { a = "tank" })
+check("list none unassigned", n == 0)
+
 io.write(string.format("slots tests: %d passed, %d failed\n", passed, failed))
 if failed > 0 then
     os.exit(1)

@@ -354,11 +354,21 @@ end
 
 function MiniHUD.ActionResync()
     if AscensionLFM.RoleCheck and AscensionLFM.RoleCheck.ResyncNow then
-        return AscensionLFM.RoleCheck.ResyncNow()
+        local ok = AscensionLFM.RoleCheck.ResyncNow()
+        if AscensionLFM.Slots and AscensionLFM.Slots.UnassignedMembers then
+            local names, n = AscensionLFM.Slots.UnassignedMembers()
+            if n and n > 0 then
+                Print(string.format("Sync: %d without role — click RW (e.g. %s)", n, tostring(names[1])))
+            end
+        end
+        return ok
     end
     if AscensionLFM.Slots and AscensionLFM.Slots.ScanRaid then
-        AscensionLFM.Slots.ScanRaid()
+        local _, _, unassigned = AscensionLFM.Slots.ScanRaid()
         Print("Sync: scanned raid/party roster")
+        if unassigned and unassigned > 0 then
+            Print(string.format("Sync: %d without role — click RW so they reply T/H/A/D", unassigned))
+        end
         return true
     end
     Print("Sync failed: no resync module")
