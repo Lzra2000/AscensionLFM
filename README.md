@@ -43,7 +43,7 @@ Floating bar (default **ON**) — mid-run clicks without typing `/alfm`:
 | **Regrp** | Raid warning `REGROUP — accept invite` + re-invite missing watch-list players |
 | **T H A D** | Short need Tank/Healer/Aura/DPS on Post channel |
 
-Drag the title to move. **×** collapses to an `ALFM` chip (click to expand). Title click opens full settings. Toggle under **General → Show floating quick bar**.
+Drag the title to move. **×** collapses to an `ALFM` chip (click to expand). Title click opens full settings. Toggle under **General → Show floating quick bar**. Every click prints success/fail in chat (no silent buttons). `/alfm status` includes a **miniHUD** debug line (`canWarn`, `group`, `canInvite`, watch list size).
 
 ## Modes (default: **Notify** — Listening ON)
 
