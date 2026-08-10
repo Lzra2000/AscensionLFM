@@ -11,8 +11,10 @@ local Database = {}
 AscensionLFM.Database = Database
 
 -- Modes: "off" | "notify" | "seeking" | "hosting"
+-- Default "notify": Log fills from public LFM/LFG MS lines; kick/auto-invite stay off.
 local DEFAULTS = {
-    mode = "off",
+    mode = "notify",
+    defaultsRev = 2, -- bumped when shipping default-mode changes
     roles = {
         tank = true,
         healer = false,
@@ -74,6 +76,14 @@ function Database.Init()
         _G.AscensionLFMDB = DeepCopy(DEFAULTS)
     else
         MergeDefaults(_G.AscensionLFMDB, DEFAULTS)
+        -- v0.2.2: leftover installs still on silent Off → listen (notify) once.
+        local rev = tonumber(_G.AscensionLFMDB.defaultsRev) or 0
+        if rev < 2 then
+            if _G.AscensionLFMDB.mode == "off" then
+                _G.AscensionLFMDB.mode = "notify"
+            end
+            _G.AscensionLFMDB.defaultsRev = 2
+        end
     end
 end
 

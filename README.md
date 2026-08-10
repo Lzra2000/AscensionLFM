@@ -2,11 +2,21 @@
 
 WotLK **3.3.5a** addon for Ascension that scans chat and whispers for **Manastorm Level Run** **LFM** and **LFG** messages, notifies you of matches, and optionally auto-whispers leaders or auto-invites applicants when you host — with per-role slot caps and an opt-in level-59 auto-kick.
 
-## Install
+## Install (EN)
 
-1. Download `AscensionLFM.zip` from [Releases](https://github.com/Lzra2000/AscensionLFM/releases).
-2. Extract so you have `Interface/AddOns/AscensionLFM/AscensionLFM.toc`.
-3. Restart the client (or `/reload`).
+1. Download **`AscensionLFM.zip`** from [Releases](https://github.com/Lzra2000/AscensionLFM/releases) — **not** GitHub “Source code” / Code → Download ZIP (that becomes `AscensionLFM-main` and **will not** appear in the AddOns list).
+2. Extract so you have exactly `Interface/AddOns/AscensionLFM/AscensionLFM.toc` (folder name must match the `.toc` basename).
+3. Enable the addon on the character select AddOns list, then login or `/reload`.
+4. `/alfm` opens settings. Default mode is **Notify** (Listening ON). Use `/alfm test` to inject a fake Log entry.
+
+See `INSTALL.txt` inside the zip for a short checklist.
+
+## Installation (DE)
+
+1. **`AscensionLFM.zip`** von [Releases](https://github.com/Lzra2000/AscensionLFM/releases) laden — **nicht** „Source code“ / Code → Download ZIP (`AscensionLFM-main` erscheint **nicht** in der AddOns-Liste).
+2. Entpacken zu `Interface/AddOns/AscensionLFM/AscensionLFM.toc` (Ordnername = TOC-Basename).
+3. Addon in der Charakter-AddOns-Liste aktivieren, einloggen oder `/reload`.
+4. `/alfm` öffnet die Einstellungen. Standard: **Notify** (Listening ON). `/alfm test` legt einen Test-Eintrag ins Log.
 
 ## Slash commands
 
@@ -15,11 +25,12 @@ WotLK **3.3.5a** addon for Ascension that scans chat and whispers for **Manastor
 | `/alfm` | Open settings |
 | `/mslfm` | Same |
 | `/alfm status` | Print current mode |
+| `/alfm test` | Inject a fake match into the Log |
 
-## Modes (default: **Off**)
+## Modes (default: **Notify** — Listening ON)
 
-1. **Off** — no scanning side effects (addon still loads).
-2. **Notify only** — print matching Manastorm LFM/LFG lines to chat and list them in the UI.
+1. **Off** — Listening OFF (no chat scan).
+2. **Notify only** (default) — print matching Manastorm LFM/LFG lines to chat and list them in the Log. No auto-whisper / auto-invite.
 3. **Seeking** — notify when a listing still needs one of **your** roles; optional **auto-whisper** the LFM leader (rate-limited, respect ignore list). LFG lines are notified when **Scan LFG MS** is on (no auto-whisper to seekers).
 4. **Hosting** — scan incoming whispers for tank/heal/aura/dps (incl. Aura of Exp / OT / MT / HPS) and **InviteUnit** only when that role is accepted **and** a host slot remains.
 
@@ -46,12 +57,13 @@ Requires group leader (party) or raid leader/assist. No-ops safely otherwise.
 Recognized (case-insensitive), among others:
 
 - `LFM MS 0/2 Tanks 0/3 Healers 0/3 Aura 0/7 DPS`
-- `LFG MS tank` / `lfg manastorm need heals`
+- `LFG MS tank` / `lfg manastorm need heals` / `lfg ms`
 - `lfm ms need tank and heals`
 - `LFM Manastorm 1/2 Tank 2/3 H 0/7 DPS`
+- `LFM mana storm …` / `LFM Mana-Storm …`
 - Hosting whispers: `inv ms tank`, `heal`, `OT`, `HPS`, `Aura of Exp`, `exp aura`, `dps please`
 
-Public listings need an LFM **or** LFG cue plus Manastorm (`MS` / `Manastorm`). Duplicate spam from the same leader with the same slot fingerprint is suppressed for ~45s.
+Public listings need an LFM **or** LFG cue plus Manastorm (`MS` / `Manastorm` / `mana storm`). Duplicate spam from the same leader with the same slot fingerprint is suppressed for ~45s.
 
 ## Settings UI (`/alfm`)
 
@@ -59,7 +71,7 @@ Native DialogFrame with a left **Categories** sidebar:
 
 | Category | Contents |
 |----------|----------|
-| **General** | Status + mode Off / Notify / Seeking / Hosting |
+| **General** | Status (Listening ON/OFF) + mode Off / Notify / Seeking / Hosting |
 | **Seeking** | My roles, Scan LFG MS, auto-whisper + message |
 | **Hosting** | Accept roles, auto-invite, require-role, max size, slot caps T/H/A/D + filled |
 | **Kick** | Opt-in level-59 kick + recent kick log |
@@ -75,7 +87,7 @@ Native DialogFrame with a left **Categories** sidebar:
 
 ## Safety
 
-- Auto-invite, auto-whisper, and level-59 kick are **opt-in**; default mode is Off; kick defaults off.
+- Default mode is **Notify** (Log only). Auto-invite, auto-whisper, and level-59 kick remain **opt-in**; kick defaults off.
 - Never invites when the group is at **Max size** or the role **slot is full**.
 - Skips ignored players; rate-limits whispers/invites; kick RW cadence 10s.
 - Classic chat/party APIs only (`InviteUnit`, `UninviteUnit`, `SendChatMessage`, roster APIs). No `C_*`, Draft/HoF, or Rapid Rolling hooks.
@@ -86,7 +98,7 @@ Native DialogFrame with a left **Categories** sidebar:
 sh scripts/check.sh
 ```
 
-Runs `luac5.1 -p` on all Lua files and pure Lua unit tests (parser / invite / slots / kick).
+Runs `luac5.1 -p` on all Lua files and pure Lua unit tests (parser / invite / slots / kick / defaults).
 
 ## License
 

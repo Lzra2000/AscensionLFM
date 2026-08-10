@@ -1,5 +1,6 @@
 -- AscensionLFM: core/Bootstrap.lua
 -- Namespace + slash commands + ADDON_LOADED / PLAYER_LOGIN wiring.
+-- Loaded LAST in AscensionLFM.toc so Database/Parser/Scanner/UI exist.
 
 local AscensionLFM = _G.AscensionLFM
 if type(AscensionLFM) ~= "table" then
@@ -7,7 +8,7 @@ if type(AscensionLFM) ~= "table" then
     _G.AscensionLFM = AscensionLFM
 end
 
-AscensionLFM.VERSION = "0.2.1"
+AscensionLFM.VERSION = "0.2.2"
 AscensionLFM.ADDON_NAME = "AscensionLFM"
 
 local function Print(msg)
@@ -16,6 +17,39 @@ local function Print(msg)
     end
 end
 AscensionLFM.Print = Print
+
+local function ModeLabel(mode)
+    if mode == "notify" then
+        return "Notify (Listening ON)"
+    elseif mode == "seeking" then
+        return "Seeking (Listening ON)"
+    elseif mode == "hosting" then
+        return "Hosting (Listening ON)"
+    end
+    return "Off (Listening OFF)"
+end
+
+local function InjectTestMatch()
+    local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
+    if not db then
+        Print("Database not ready.")
+        return
+    end
+    local sample = "LFM MS 0/2 Tanks 0/3 Healers 0/3 Aura 0/7 DPS"
+    local parsed = AscensionLFM.Parser and AscensionLFM.Parser.Parse and AscensionLFM.Parser.Parse(sample)
+    AscensionLFM.Database.PushMatch({
+        leader = "TestLeader",
+        text = sample,
+        summary = (parsed and parsed.summary) or "MS test",
+        source = "test",
+        kind = "lfm",
+        t = time and time() or 0,
+    })
+    if AscensionLFM.MainWindow and AscensionLFM.MainWindow.RefreshMatches then
+        AscensionLFM.MainWindow.RefreshMatches()
+    end
+    Print("injected test match into Log — /alfm → Log")
+end
 
 local bootFrame = CreateFrame("Frame")
 bootFrame:RegisterEvent("ADDON_LOADED")
@@ -33,7 +67,11 @@ bootFrame:SetScript("OnEvent", function(self, event, arg1)
         if AscensionLFM.MainWindow and AscensionLFM.MainWindow.Init then
             AscensionLFM.MainWindow.Init()
         end
-        Print("loaded v" .. AscensionLFM.VERSION .. " — /alfm")
+        local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
+        local mode = (db and db.mode) or "notify"
+        Print("v" .. AscensionLFM.VERSION .. " — mode=" .. ModeLabel(mode))
+        Print("/alfm to open settings · /alfm test for a fake Log entry")
+        Print("set Mode → Hosting for auto-invite (kick stays opt-in OFF)")
         self:UnregisterEvent("PLAYER_LOGIN")
     end
 end)
@@ -45,8 +83,12 @@ SlashCmdList["ASCENSIONLFM"] = function(msg)
     msg = tostring(msg or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
     if msg == "status" then
         local db = AscensionLFM.Database and AscensionLFM.Database.Get()
-        local mode = (db and db.mode) or "off"
-        Print("mode=" .. tostring(mode) .. " version=" .. AscensionLFM.VERSION)
+        local mode = (db and db.mode) or "notify"
+        Print("mode=" .. ModeLabel(mode) .. " version=" .. AscensionLFM.VERSION)
+        return
+    end
+    if msg == "test" then
+        InjectTestMatch()
         return
     end
     if AscensionLFM.MainWindow and AscensionLFM.MainWindow.Toggle then

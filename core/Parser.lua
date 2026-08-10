@@ -62,6 +62,10 @@ local function HasManastorm(text)
     if text:find("manastorm", 1, true) then
         return true
     end
+    -- "mana storm" / "mana-storm" / "Mana  Storm"
+    if text:find("mana[%s%-_]*storm", 1) then
+        return true
+    end
     -- Word-boundary-ish MS (avoid matching "dms", "msg", etc.)
     if text:find("%f[%w]ms%f[%W]") or text:find("%f[%w]ms$") or text:find("^ms%f[%W]") then
         return true

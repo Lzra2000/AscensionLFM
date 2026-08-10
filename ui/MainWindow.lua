@@ -25,7 +25,7 @@ local CAT_LOG = "log"
 local CATEGORIES = {
     { id = CAT_GENERAL, label = "General",
       title = "General",
-      sub = "Mode, status, and safety overview. Scanner stays idle until you leave Off." },
+      sub = "Mode and status. Default Notify = Listening ON (Log fills; no auto-invite)." },
     { id = CAT_SEEKING, label = "Seeking",
       title = "Seeking",
       sub = "Roles you play and optional auto-whisper when an LFM still needs you." },
@@ -165,14 +165,15 @@ local function RefreshStatus()
         return
     end
     local db = AscensionLFM.Database.Get()
-    local listening = db.mode ~= "off" and "Listening" or "Idle"
+    local listeningOn = db.mode ~= "off"
+    local listening = listeningOn and "|cff2a7a3aListening ON|r" or "|cff802020Listening OFF|r"
     local last = ""
     if db.matchHistory and db.matchHistory[1] then
         local m = db.matchHistory[1]
         last = string.format("\nLast: %s — %s", tostring(m.leader), tostring(m.summary or m.text or ""))
     end
     local kickBit = db.autoKickLevel59 and " · |cffff6060Kick59 ON|r" or ""
-    statusFS:SetText(string.format("Status: |cff2a7a3a%s|r  ·  Mode: |cffc8a03c%s|r%s%s",
+    statusFS:SetText(string.format("Status: %s  ·  Mode: |cffc8a03c%s|r%s%s",
         listening, ModeLabel(db.mode), kickBit, last))
 
     if footerStatus then
@@ -182,7 +183,9 @@ local function RefreshStatus()
         elseif activeCategory == CAT_LOG then
             footerStatus:SetText("Match log · Clear removes match history")
         else
-            footerStatus:SetText(string.format("Mode %s · %s", ModeLabel(db.mode), kick))
+            footerStatus:SetText(string.format("%s · Mode %s · %s",
+                listeningOn and "Listening ON" or "Listening OFF",
+                ModeLabel(db.mode), kick))
         end
         SetInk(footerStatus, MUTED)
     end
@@ -499,7 +502,7 @@ function MainWindow.Init()
 
     local sub = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     sub:SetPoint("TOP", title, "BOTTOM", 0, -2)
-    sub:SetText("Manastorm Level Run LFM/LFG · v" .. tostring(AscensionLFM.VERSION or "0.2.1"))
+    sub:SetText("Manastorm Level Run LFM/LFG · v" .. tostring(AscensionLFM.VERSION or "0.2.2"))
     SetInk(sub, MUTED)
 
     local shell = CreateFrame("Frame", FRAME_NAME .. "Shell", frame)
@@ -640,8 +643,8 @@ function MainWindow.Init()
     modeHint:SetPoint("TOPLEFT", 4, -116)
     modeHint:SetPoint("RIGHT", -4, 0)
     modeHint:SetJustifyH("LEFT")
-    modeHint:SetText("|cff5a4010Off|r — no scanning side effects.\n"
-        .. "|cff5a4010Notify|r — print MS LFM/LFG matches to chat + Log.\n"
+    modeHint:SetText("|cff5a4010Off|r — Listening OFF (no chat scan).\n"
+        .. "|cff5a4010Notify|r — Listening ON: print MS LFM/LFG to chat + Log (default).\n"
         .. "|cff5a4010Seeking|r — match open roles; optional auto-whisper LFM leaders.\n"
         .. "|cff5a4010Hosting|r — role whispers → invite only if accepted role + open slot.")
     SetInk(modeHint, MUTED)
