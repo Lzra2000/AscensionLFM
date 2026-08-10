@@ -60,6 +60,20 @@ check("host assigned", hostRole == "tank", tostring(hostRole))
 check("host remembered", Slots.GetAssigned("HostPlayer") == "tank")
 check("host assign idempotent", Slots.EnsureHostAssigned() == nil)
 
+-- Regression: host must NOT be force-assigned to a disabled/full role.
+-- Only tank+healer accepted, both already full, dps explicitly off (but has
+-- room) — EnsureHostAssigned used to hard-fall-back to "dps" regardless.
+Slots.ClearAll()
+db.mode = "hosting"
+db.roles = { tank = true, healer = true, aura = false, dps = false }
+db.slotMax = { tank = 1, healer = 1, aura = 3, dps = 7 }
+Slots.Assign("SomeTank", "tank")
+Slots.Assign("SomeHealer", "healer")
+local noRole = Slots.EnsureHostAssigned()
+check("no forced dps fallback when full/disabled", noRole == nil, tostring(noRole))
+check("host stays unassigned", Slots.GetAssigned("HostPlayer") == nil, tostring(Slots.GetAssigned("HostPlayer")))
+check("dps not silently filled", Slots.CountFilled("dps") == 0, tostring(Slots.CountFilled("dps")))
+
 io.write(string.format("slots tests: %d passed, %d failed\n", passed, failed))
 if failed > 0 then
     os.exit(1)

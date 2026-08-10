@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.17
+
+- **Bugfix batch (code review):** `Parser.lua` bare-role whisper match used a
+  Lua pattern with `|` as separator — Lua patterns have no alternation
+  operator, so that branch could never match and was dead code; replaced with
+  a table lookup. `Invite.lua` hosting-invite "ms-related" gate always
+  evaluated true (dead reject branch) since `role` is already non-nil by that
+  point — removed instead of enforced, since enforcing it would reject plain
+  role whispers ("tank") that don't mention ms/manastorm/inv. `Slots.lua`
+  `EnsureHostAssigned` no longer hard-falls-back to `"dps"` when no accepted
+  role has room — that silently force-counted the host into a disabled/full
+  role and skewed slot counts + the posted LFM message; host now stays
+  unassigned in that case instead. Regression tests added to `test_slots.lua`.
+
 ## 0.4.16
 
 - **Bugfix batch:** parse glued `MS15` (Heal lfg MS15 works); hosting LFG

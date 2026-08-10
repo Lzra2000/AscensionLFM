@@ -156,6 +156,28 @@ local function CollectRoles(text)
     return roles, parts
 end
 
+-- Exact single-word role phrases for the "bare role" whisper check below.
+-- NOTE: this used to be one Lua pattern with "|" as separator, but Lua patterns
+-- have no alternation operator — "|" only matches a literal pipe character, so
+-- that pattern could never match anything and the whole bareRole branch was
+-- dead code. Table lookup + a couple of explicit multi-word patterns instead.
+local BARE_ROLE_WORDS = {
+    tank = true, tanks = true, ot = true, mt = true,
+    healer = true, healers = true, heal = true, heals = true, heiler = true, hps = true,
+    aura = true, auras = true,
+    dd = true, damage = true, dmg = true, dps = true,
+}
+
+local function IsBareRolePhrase(s)
+    if BARE_ROLE_WORDS[s] then
+        return true
+    end
+    if s:match("^aura%s+of%s+exp[%w]*$") or s:match("^exp%s+aura$") or s:match("^aoe%s+aura$") then
+        return true
+    end
+    return false
+end
+
 local function SoftRoleRequest(text, raw, ms)
     local invish = text:find("inv", 1, true) or text:find("invite", 1, true)
     local hasRoleWord = text:find("tank") or text:find("heal") or text:find("dps")
@@ -166,9 +188,7 @@ local function SoftRoleRequest(text, raw, ms)
         or text:find("exp%s*aura") or text:find("aoe%s*aura")
     -- Strip trailing punctuation for bare / letter matches ("healers!", "H?")
     local stripped = text:gsub("[!%?%.%,%;%:]+$", ""):gsub("^%s+", ""):gsub("%s+$", "")
-    local bareRole = stripped:match(
-        "^(tanks?|ot|mt|healers?|heals?|heal|heiler|hps|dps|auras?|aura|dd|damage|dmg|aura%s+of%s+exp[%w]*|exp%s+aura|aoe%s+aura)$"
-    )
+    local bareRole = IsBareRolePhrase(stripped) and stripped or nil
     local letterRole = stripped:match("^([thad])$")
     local allow = bareRole or letterRole or (hasRoleWord and (ms or invish or #text <= 48))
     if not allow then

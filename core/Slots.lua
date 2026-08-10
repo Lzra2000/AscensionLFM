@@ -267,7 +267,12 @@ function Slots.UnassignedMembers()
 end
 
 --- Assign the local player a host role if still unassigned (Hosting / Full Auto).
--- Prefers db.hostRole, else first open accepted role, else dps.
+-- Prefers db.hostRole, else first accepted role with an open slot.
+-- Never invents a role: if nothing accepted has room, the host stays
+-- unassigned rather than being force-counted into an unrelated/disabled
+-- role's slot (previously hard-fell back to "dps" even when dps was not
+-- accepted or already full, which silently skewed slot counts and the
+-- posted LFM message).
 -- @return assignedRole or nil
 function Slots.EnsureHostAssigned()
     local me
@@ -293,7 +298,9 @@ function Slots.EnsureHostAssigned()
             end
         end
     end
-    role = role or "dps"
+    if not role then
+        return nil
+    end
     if Slots.Assign(me, role) then
         return role
     end

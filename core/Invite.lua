@@ -188,17 +188,16 @@ function Invite.TryHostInvite(sender, message)
             return false, "slot full"
         end
     end
-    -- Soft Manastorm hint: accept pure role whispers while hosting MS runs.
-    -- GuessRole / isRoleRequest / letter roles always count as related.
-    local text = tostring(message or ""):lower()
-    local msHint = text:find("ms", 1, true) or text:find("manastorm", 1, true)
-        or text:find("inv", 1, true) or (parsed and parsed.isRoleRequest)
-        or (parsed and parsed.isManastormLFM) or (parsed and parsed.isManastormLFG)
-        or role ~= nil
-    if not msHint then
-        AfterHostResult(sender, message, role, false, "not ms-related")
-        return false, "not ms-related"
-    end
+    -- NOTE: this used to compute a "msHint" (ms/manastorm/inv keywords, or
+    -- isRoleRequest, or a resolved role) and reject when none of that held.
+    -- But `role` is already guaranteed non-nil at this point (we returned
+    -- above whenever role == nil), so "or role ~= nil" made the check always
+    -- true and the "not ms-related" branch was unreachable dead code.
+    -- Actually enforcing that filter would reject plain role whispers like
+    -- "tank" that don't mention ms/manastorm/inv, which is the accepted,
+    -- tested hosting flow (a private reply to your LFM) — so the correct fix
+    -- is to drop the dead gate rather than start enforcing it. Any recognized
+    -- role is accepted here, matching the behavior this always actually had.
     local ok, reason = Invite.InvitePlayer(sender, role)
     AfterHostResult(sender, message, role, ok, reason)
     return ok, reason
