@@ -145,10 +145,11 @@ Native DialogFrame with a left **Categories** sidebar:
 Im Modus **Hosting** (oder Full Auto), als Raid-Lead/Assist:
 
 1. `/alfm` → **Hosting** (oder **Post**) → **RW Role Check**
-2. Raid Warning (Standard: `ROLE CHECK — whisper tank / heal / aura / dps`)
-3. Mitglieder flüstern ihre Rolle; die Slot-Zuordnung aktualisiert sich live (~60s Fenster)
-4. **Resync roles now** (oder Auto-Resync am Ende): Abgänger raus, geflüsterte Rollen anwenden, Filled-Zähler + LFM-Vorschau neu
+2. Raid Warning (Standard erwähnt Whisper **oder Party**: tank/heal/aura/dps)
+3. Mitglieder antworten per Whisper **oder Party/Raid-Chat**; Slot-Zuordnung live (~60s Fenster)
+4. **Resync roles now** (oder Auto-Resync am Ende): Abgänger raus, Rollen anwenden, Filled-Zähler + LFM-Vorschau neu
 5. **Auto-move Auras (1 per raid group)** (Standard AN): höchstens **eine Aura pro Raid-Gruppe (1–8)**; weitere Auras werden automatisch in freie Gruppen verschoben (Lead/Assist)
+6. Wenn der Button nichts tut: `/alfm status` → `roleCheck: canWarn=… · lastStart=…`
 
 ## Safety
 
