@@ -800,7 +800,7 @@ function MainWindow.Init()
 
     local sub = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     sub:SetPoint("TOP", title, "BOTTOM", 0, -2)
-    sub:SetText("Manastorm Level Run LFM/LFG · v" .. tostring(AscensionLFM.VERSION or "0.4.5"))
+    sub:SetText("Manastorm Level Run LFM/LFG · v" .. tostring(AscensionLFM.VERSION or "0.4.6"))
     SetInk(sub, MUTED)
 
     local shell = CreateFrame("Frame", FRAME_NAME .. "Shell", frame)
