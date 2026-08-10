@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.19
+
+- **Fix inconsistent "last seats prefer support" policy:** the v0.4.16
+  "don't burn the last 1-2 raid seats on DPS while tank/heal/aura are still
+  open" rule only applied to the LFG-chat-scan auto-invite path
+  (`TryLfgInvite`) — a private whisper applicant asking for dps in the exact
+  same situation got auto-invited immediately, defeating the policy for the
+  more common whisper-hosting flow. Extracted the shared check
+  (`ShouldPreferSupportOverDps`) and applied it to `TryHostInvite` too, so
+  both paths behave the same.
+
 ## 0.4.18
 
 - **Fix Kick59 infinite re-warn spam:** if `UninviteUnit` kept failing for a

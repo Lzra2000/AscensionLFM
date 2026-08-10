@@ -147,6 +147,51 @@ local function AfterHostResult(sender, message, role, ok, reason)
     end
 end
 
+-- Moved above TryHostInvite (Lua locals aren't visible before their
+-- declaration) so both TryHostInvite and TryLfgInvite can share the same
+-- "save the last seats for support roles" policy — this used to only exist
+-- in TryLfgInvite, so a whisper applicant asking for dps in the last 1-2
+-- raid seats got auto-invited immediately while an LFG-chat dps applicant
+-- in the exact same situation got held back. Same policy, same code path now.
+local function FirstOpenHostRole(db, preferSupport)
+    local order = { "tank", "healer", "aura", "dps" }
+    if preferSupport then
+        order = { "tank", "healer", "aura" }
+    end
+    for _, role in ipairs(order) do
+        if db.roles and db.roles[role] then
+            if AscensionLFM.Slots and AscensionLFM.Slots.HasOpenSlot then
+                if AscensionLFM.Slots.HasOpenSlot(role) then
+                    return role
+                end
+            else
+                return role
+            end
+        end
+    end
+    return nil
+end
+
+local function SeatsLeft(db)
+    local maxSize = tonumber(db and db.maxPartySize) or 15
+    local size = Invite.GetGroupSize()
+    return maxSize - size, maxSize, size
+end
+
+--- True when the applicant asked for DPS, only 1-2 raid seats remain, and an
+-- accepted support role (tank/heal/aura) still has room — in that case the
+-- seat should be held for support rather than burned on another DPS.
+local function ShouldPreferSupportOverDps(db, role)
+    if role ~= "dps" then
+        return false
+    end
+    local left = SeatsLeft(db)
+    if left > 2 then
+        return false
+    end
+    return FirstOpenHostRole(db, true) ~= nil
+end
+
 --- Hosting path: parse whisper for a role we accept + open slot, then invite.
 function Invite.TryHostInvite(sender, message)
     local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
@@ -177,6 +222,12 @@ function Invite.TryHostInvite(sender, message)
         end
         AfterHostResult(sender, message, nil, false, why)
         return false, why
+    end
+    -- Last 1–2 seats: do not burn them on DPS while tank/heal/aura still
+    -- open — same policy TryLfgInvite already applies to LFG-chat applicants.
+    if ShouldPreferSupportOverDps(db, role) then
+        AfterHostResult(sender, message, role, false, "prefer support seat")
+        return false, "prefer support seat"
     end
     if not (db.roles and db.roles[role]) then
         AfterHostResult(sender, message, role, false, "role filtered")
@@ -221,31 +272,6 @@ local function FirstOpenAcceptedRole(db, parsed)
         end
     end
     return nil
-end
-
-local function FirstOpenHostRole(db, preferSupport)
-    local order = { "tank", "healer", "aura", "dps" }
-    if preferSupport then
-        order = { "tank", "healer", "aura" }
-    end
-    for _, role in ipairs(order) do
-        if db.roles and db.roles[role] then
-            if AscensionLFM.Slots and AscensionLFM.Slots.HasOpenSlot then
-                if AscensionLFM.Slots.HasOpenSlot(role) then
-                    return role
-                end
-            else
-                return role
-            end
-        end
-    end
-    return nil
-end
-
-local function SeatsLeft(db)
-    local maxSize = tonumber(db and db.maxPartySize) or 15
-    local size = Invite.GetGroupSize()
-    return maxSize - size, maxSize, size
 end
 
 --- Hosting: public LFG MS poster → InviteUnit if role matches an open accepted slot.
@@ -317,13 +343,10 @@ function Invite.TryLfgInvite(leader, message, parsed)
     end
 
     -- Last 1–2 seats: do not burn them on DPS while tank/heal/aura still open
-    local left = SeatsLeft(db)
-    if left <= 2 and role == "dps" then
-        local support = FirstOpenHostRole(db, true)
-        if support then
-            AfterHostResult(leader, message, role, false, "prefer support seat")
-            return false, "prefer support seat"
-        end
+    -- (shared with TryHostInvite via ShouldPreferSupportOverDps)
+    if ShouldPreferSupportOverDps(db, role) then
+        AfterHostResult(leader, message, role, false, "prefer support seat")
+        return false, "prefer support seat"
     end
 
     if not (db.roles and db.roles[role]) then

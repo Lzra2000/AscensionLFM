@@ -145,6 +145,30 @@ check("reconcile keeps bob", newMap.bob == "tank")
 check("reconcile drops gone", newMap.gone == nil)
 check("reconcile removed 1", removed == 1)
 
+-- Last 1-2 seats prefer support over DPS — same policy as TryLfgInvite
+-- (regression: this used to only apply to the LFG-chat path, not whispers)
+_G.GetNumPartyMembers = function() return 0 end
+_G.GetNumRaidMembers = function() return 14 end
+db.roles = { tank = true, healer = true, aura = true, dps = true }
+db.maxPartySize = 15
+Slots.ClearAll()
+Invite._ResetCooldowns()
+invited = {}
+ok, reason = Invite.TryHostInvite("DpsWhisper", "dps")
+check("whisper last seat blocks dps", ok == false and reason == "prefer support seat", tostring(reason))
+check("whisper last seat did not invite", #invited == 0)
+
+-- ... but if no support role is actually open, dps still gets invited
+_G.IsRaidLeader = function() return true end
+db.slotMax = { tank = 0, healer = 0, aura = 0, dps = 7 }
+Slots.ClearAll()
+Invite._ResetCooldowns()
+invited = {}
+ok, reason = Invite.TryHostInvite("DpsWhisperOk", "dps")
+check("whisper last seat allows dps when no support open", ok == true, tostring(reason))
+_G.IsRaidLeader = function() return false end
+_G.GetNumRaidMembers = function() return 0 end
+
 io.write(string.format("invite tests: %d passed, %d failed\n", passed, failed))
 if failed > 0 then
     os.exit(1)
