@@ -148,7 +148,7 @@ SlashCmdList = SlashCmdList or {}
 
 -- Load Database + MainWindow (no Scanner/Invite needed for UI smoke).
 dofile("core/Database.lua")
-AscensionLFM.VERSION = "0.4.0"
+AscensionLFM.VERSION = "0.4.1"
 AscensionLFM.Slots = {
     Snapshot = function()
         return {
@@ -215,7 +215,7 @@ local f = MW.GetFrame()
 check("frame created", type(f) == "table")
 check("frame named", f._name == "AscensionLFMFrame")
 check("frame size width", f._width == 720)
-check("frame size height", f._height == 680)
+check("frame size height", f._height == 900)
 check("default category general", MW.GetActiveCategory() == "general")
 check("UISpecialFrames registered", UISpecialFrames[1] == "AscensionLFMFrame")
 

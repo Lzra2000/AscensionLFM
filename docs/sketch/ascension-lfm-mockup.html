@@ -371,6 +371,23 @@
               </div>
               <div class="filled">Filled: T 1/2  ·  H 0/3  ·  A 1/3  ·  D 2/7</div>
               <p class="hint">Whisper roles: tank/OT/MT · heal/HPS · Aura of Exp / exp aura · dps/DD.</p>
+              <div class="sec">Role Check</div>
+              <div class="toggle">
+                <div class="tbox on"></div>
+                <div>
+                  <div class="t">Auto-resync after listening window</div>
+                  <div class="d">Prune leavers, re-apply whisper roles, ScanRaid. Default ON.</div>
+                </div>
+              </div>
+              <div class="row">
+                <label>RW message <input type="text" value="ROLE CHECK — whisper me tank / heal / aura / dps to sync MS slots" style="width:280px;" /></label>
+              </div>
+              <div class="row">
+                <label>Window (sec) <input class="tiny" type="text" value="60" /></label>
+                <div class="btn">RW Role Check</div>
+                <div class="btn">Resync roles now</div>
+              </div>
+              <div class="filled">Role check idle</div>
             </div>
 
             <!-- POST -->
@@ -391,6 +408,11 @@
                 <div class="btn">Rebuild</div>
                 <div class="btn">Scan raid/party</div>
                 <div class="btn">Post once</div>
+              </div>
+              <div class="row" style="margin-top:8px;">
+                <div class="btn">RW Role Check</div>
+                <div class="btn">Resync roles now</div>
+                <span class="filled" style="margin-left:8px;">Role check idle</span>
               </div>
               <div class="sec">Auto-repost</div>
               <div class="toggle">
@@ -459,8 +481,8 @@
       <ul>
         <li><b>General</b> — status + mode Off/Notify/Seeking/Hosting</li>
         <li><b>Seeking</b> — my roles, scan LFG, auto-whisper + message</li>
-        <li><b>Hosting</b> — accept roles, invite toggles, slot maxes + filled</li>
-        <li><b>Post</b> — LFM preview, channel, Post once, Scan, auto-repost</li>
+        <li><b>Hosting</b> — accept roles, invite toggles, slot maxes + filled, RW Role Check</li>
+        <li><b>Post</b> — LFM compose, scan, RW Role Check / Resync, auto-repost</li>
         <li><b>Kick</b> — opt-in level-59 kick + recent kick log</li>
         <li><b>Log</b> — recent LFM/LFG matches (Clear)</li>
       </ul>
@@ -475,8 +497,8 @@
   var titles = {
     general: ["General", "Mode and status. Default Notify = Listening ON (Log fills; no auto-invite)."],
     seeking: ["Seeking", "Roles you play and optional auto-whisper when an LFM still needs you."],
-    hosting: ["Hosting", "Accept roles, invite rules, and Manastorm slot caps (default 2/3/3/7)."],
-    post: ["Post", "Compose LFM from slots, scan raid fills, post once, or opt-in auto-repost."],
+    hosting: ["Hosting", "Accept roles, invite rules, slot caps, and RW Role Check to resync T/H/A/D."],
+    post: ["Post", "LFM compose, scan fills, RW Role Check, auto-repost."],
     kick: ["Kick", "Opt-in level-59 auto-kick with raid warning. Dangerous — default OFF."],
     log: ["Log", "Recent Manastorm LFM/LFG matches from public chat and whispers."]
   };

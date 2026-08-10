@@ -80,6 +80,14 @@ local DEFAULTS = {
     -- Sounds (opt-in)
     soundOnMatch = false,
     soundOnApplicant = false,
+    -- RW Role Check + Aura 1-per-subgroup auto-move
+    roleCheckMessage = "ROLE CHECK — whisper me tank / heal / aura / dps to sync MS slots",
+    roleCheckDuration = 60,
+    roleCheckWindow = 60,
+    roleCheckMinInterval = 30,
+    roleCheckAutoResync = true,
+    lastRoleCheckAt = 0,
+    autoMoveAura = true, -- at most one aura player per raid subgroup; auto SetRaidSubgroup
     -- Presets / queue / activity
     presets = {},
     applicantQueue = {},

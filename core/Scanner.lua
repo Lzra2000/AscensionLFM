@@ -314,6 +314,11 @@ local function HandleWhisper(sender, message)
     end
 
     if db.mode == "hosting" then
+        if AscensionLFM.RoleCheck and AscensionLFM.RoleCheck.IsActive and AscensionLFM.RoleCheck.IsActive() then
+            if AscensionLFM.RoleCheck.OnWhisper and AscensionLFM.RoleCheck.OnWhisper(sender, message) then
+                return
+            end
+        end
         if AscensionLFM.Invite and AscensionLFM.Invite.TryHostInvite then
             AscensionLFM.Invite.TryHostInvite(sender, message)
         end
@@ -327,6 +332,9 @@ local function HandleRoster()
         AscensionLFM.Slots.ScanRaid()
     elseif AscensionLFM.Slots and AscensionLFM.Slots.SyncFromRoster then
         AscensionLFM.Slots.SyncFromRoster()
+        if AscensionLFM.AuraBalance and AscensionLFM.AuraBalance.Balance then
+            AscensionLFM.AuraBalance.Balance()
+        end
         if AscensionLFM.MainWindow and AscensionLFM.MainWindow.RefreshSlots then
             AscensionLFM.MainWindow.RefreshSlots()
         end

@@ -13,7 +13,7 @@ AscensionLFM.MainWindow = MainWindow
 
 local FRAME_NAME = "AscensionLFMFrame"
 local FRAME_WIDTH = 720
-local FRAME_HEIGHT = 680
+local FRAME_HEIGHT = 900
 local SIDEBAR_WIDTH = 148
 
 local CAT_GENERAL = "general"
@@ -33,10 +33,10 @@ local CATEGORIES = {
       sub = "Roles, rotating whisper variants, leader blacklist, optional match sound." },
     { id = CAT_HOSTING, label = "Hosting",
       title = "Hosting",
-      sub = "Full Auto master, reject re-whisper, presets, slots, and invite rules." },
+      sub = "Full Auto, slots, RW Role Check, reject re-whisper, presets, invite rules." },
     { id = CAT_POST, label = "Post",
       title = "Post",
-      sub = "LFM compose, scan fills, auto-repost, smart stop + optional FULL announce." },
+      sub = "LFM compose, scan fills, RW Role Check, auto-repost + optional FULL announce." },
     { id = CAT_QUEUE, label = "Queue",
       title = "Queue",
       sub = "Recent applicant whispers — Invite or Reject+rewhisper." },
@@ -83,6 +83,8 @@ local footerStatus
 local clearBtn
 local statusFS
 local slotsFS
+local roleCheckStatusFS
+local postRoleCheckStatusFS
 local matchFS = {}
 local kickFS = {}
 local activityFS = {}
@@ -229,6 +231,26 @@ function MainWindow.RefreshSlots()
     end
     slotsFS:SetText("Filled: " .. table.concat(bits, "  ·  "))
     RefreshStatus()
+    MainWindow.RefreshRoleCheck()
+end
+
+function MainWindow.RefreshRoleCheck()
+    local text = "Role check idle"
+    if AscensionLFM.RoleCheck and AscensionLFM.RoleCheck.GetStatus then
+        local st = AscensionLFM.RoleCheck.GetStatus()
+        if st and st.status then
+            text = st.status
+        end
+    end
+    if widgets.roleCheckStatus and widgets.roleCheckStatus.SetText then
+        widgets.roleCheckStatus:SetText(text)
+    end
+    if roleCheckStatusFS and roleCheckStatusFS.SetText then
+        roleCheckStatusFS:SetText(text)
+    end
+    if postRoleCheckStatusFS and postRoleCheckStatusFS.SetText then
+        postRoleCheckStatusFS:SetText(text)
+    end
 end
 
 local function FormatLastPostWall()
@@ -460,6 +482,9 @@ local function SyncWidgetsFromDB()
         end
         widgets.repostInterval:SetText(tostring(n))
     end
+    if widgets.autoMoveAura and widgets.autoMoveAura.SetChecked then
+        widgets.autoMoveAura:SetChecked(db.autoMoveAura ~= false)
+    end
     if widgets.fullAuto and widgets.fullAuto.SetChecked then
         widgets.fullAuto:SetChecked(db.fullAutoHosting and true or false)
     end
@@ -481,6 +506,22 @@ local function SyncWidgetsFromDB()
     if widgets.rejectTemplate and widgets.rejectTemplate.SetText then
         widgets.rejectTemplate:SetText(tostring(db.rejectTemplate or ""))
     end
+    if widgets.roleCheckMsg and widgets.roleCheckMsg.SetText then
+        widgets.roleCheckMsg:SetText(tostring(db.roleCheckMessage or ""))
+    end
+    if widgets.roleCheckWindow and widgets.roleCheckWindow.SetText then
+        local w = 60
+        local raw = db.roleCheckWindow or db.roleCheckDuration
+        if AscensionLFM.RoleCheck and AscensionLFM.RoleCheck.ClampWindow then
+            w = AscensionLFM.RoleCheck.ClampWindow(raw)
+        else
+            w = tonumber(raw) or 60
+        end
+        widgets.roleCheckWindow:SetText(tostring(w))
+    end
+    if widgets.roleCheckAutoResync and widgets.roleCheckAutoResync.SetChecked then
+        widgets.roleCheckAutoResync:SetChecked(db.roleCheckAutoResync ~= false)
+    end
     if widgets.variant1 and widgets.variant1.SetText then
         local v = db.whisperVariants or {}
         widgets.variant1:SetText(tostring(v[1] or ""))
@@ -499,6 +540,7 @@ local function SyncWidgetsFromDB()
     MainWindow.RefreshKicks()
     MainWindow.RefreshActivity()
     MainWindow.RefreshQueue()
+    MainWindow.RefreshRoleCheck()
 end
 
 function MainWindow.SyncFromDB()
@@ -709,7 +751,7 @@ function MainWindow.Init()
 
     local sub = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     sub:SetPoint("TOP", title, "BOTTOM", 0, -2)
-    sub:SetText("Manastorm Level Run LFM/LFG · v" .. tostring(AscensionLFM.VERSION or "0.4.0"))
+    sub:SetText("Manastorm Level Run LFM/LFG · v" .. tostring(AscensionLFM.VERSION or "0.4.1"))
     SetInk(sub, MUTED)
 
     local shell = CreateFrame("Frame", FRAME_NAME .. "Shell", frame)
@@ -1092,7 +1134,7 @@ function MainWindow.Init()
     CreateSectionLabel(hosting, "Presets", -412)
     local presetRow = CreateFrame("Frame", nil, hosting)
     presetRow:SetPoint("TOPLEFT", 0, -428)
-    presetRow:SetPoint("TOPRIGHT", 0, -378)
+    presetRow:SetPoint("TOPRIGHT", 0, -428)
     presetRow:SetHeight(24)
     local load2337 = CreateFrame("Button", nil, presetRow, "UIPanelButtonTemplate")
     load2337:SetSize(100, 20)
@@ -1125,15 +1167,15 @@ function MainWindow.Init()
         SyncWidgetsFromDB()
     end)
     presetLabelFS = hosting:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    presetLabelFS:SetPoint("TOPLEFT", 4, -404)
+    presetLabelFS:SetPoint("TOPLEFT", 4, -454)
     presetLabelFS:SetPoint("RIGHT", -4, 0)
     presetLabelFS:SetJustifyH("LEFT")
     SetInk(presetLabelFS, MUTED)
 
-    CreateSectionLabel(hosting, "Slots", -424)
+    CreateSectionLabel(hosting, "Slots", -476)
     local slotRow = CreateFrame("Frame", nil, hosting)
-    slotRow:SetPoint("TOPLEFT", 0, -440)
-    slotRow:SetPoint("TOPRIGHT", 0, -440)
+    slotRow:SetPoint("TOPLEFT", 0, -492)
+    slotRow:SetPoint("TOPRIGHT", 0, -492)
     slotRow:SetHeight(24)
 
     local maxLabel = slotRow:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -1179,10 +1221,116 @@ function MainWindow.Init()
     end
 
     slotsFS = hosting:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    slotsFS:SetPoint("TOPLEFT", 4, -466)
+    slotsFS:SetPoint("TOPLEFT", 4, -518)
     slotsFS:SetPoint("RIGHT", -4, 0)
     slotsFS:SetJustifyH("LEFT")
     SetInk(slotsFS, MUTED)
+
+    CreateSectionLabel(hosting, "Role Check", -542)
+    widgets.autoMoveAura = CreateToggleRow(hosting, -558,
+        "Auto-move Auras (1 per raid group)",
+        "At most one Aura-assigned player per raid subgroup 1–8; extras SetRaidSubgroup. Default ON.",
+        false,
+        function(on)
+            AscensionLFM.Database.Get().autoMoveAura = on and true or false
+            if on and AscensionLFM.AuraBalance and AscensionLFM.AuraBalance.Balance then
+                AscensionLFM.AuraBalance.Balance()
+            end
+        end)
+    widgets.roleCheckAutoResync = CreateToggleRow(hosting, -608,
+        "Auto-resync after listening window",
+        "When the RW window ends: prune leavers, re-apply whisper roles, ScanRaid. Default ON.",
+        false,
+        function(on)
+            AscensionLFM.Database.Get().roleCheckAutoResync = on and true or false
+        end)
+
+    local rcMsgLbl = hosting:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    rcMsgLbl:SetPoint("TOPLEFT", 4, -658)
+    rcMsgLbl:SetText("RW message")
+    SetInk(rcMsgLbl, INK)
+    local rcMsg = CreateFrame("EditBox", "AscensionLFMRoleCheckMsg", hosting, "InputBoxTemplate")
+    rcMsg:SetSize(340, 18)
+    rcMsg:SetPoint("LEFT", rcMsgLbl, "RIGHT", 6, 0)
+    rcMsg:SetAutoFocus(false)
+    rcMsg:SetMaxLetters(200)
+    rcMsg:SetScript("OnEnterPressed", function(self)
+        AscensionLFM.Database.Get().roleCheckMessage = self:GetText() or ""
+        self:ClearFocus()
+    end)
+    rcMsg:SetScript("OnEditFocusLost", function(self)
+        AscensionLFM.Database.Get().roleCheckMessage = self:GetText() or ""
+    end)
+    widgets.roleCheckMsg = rcMsg
+
+    local rcWinLbl = hosting:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    rcWinLbl:SetPoint("TOPLEFT", 4, -682)
+    rcWinLbl:SetText("Window (sec)")
+    SetInk(rcWinLbl, INK)
+    local rcWin = CreateFrame("EditBox", "AscensionLFMRoleCheckWindow", hosting, "InputBoxTemplate")
+    rcWin:SetSize(40, 18)
+    rcWin:SetPoint("LEFT", rcWinLbl, "RIGHT", 6, 0)
+    rcWin:SetAutoFocus(false)
+    rcWin:SetMaxLetters(3)
+    rcWin:SetNumeric(true)
+    local function commitWindow(self)
+        local n = tonumber(self:GetText()) or 60
+        if AscensionLFM.RoleCheck and AscensionLFM.RoleCheck.ClampWindow then
+            n = AscensionLFM.RoleCheck.ClampWindow(n)
+        end
+        local db = AscensionLFM.Database.Get()
+        db.roleCheckWindow = n
+        db.roleCheckDuration = n
+        self:SetText(tostring(n))
+    end
+    rcWin:SetScript("OnEnterPressed", function(self)
+        commitWindow(self)
+        self:ClearFocus()
+    end)
+    rcWin:SetScript("OnEditFocusLost", commitWindow)
+    widgets.roleCheckWindow = rcWin
+
+    local rcBtnRow = CreateFrame("Frame", nil, hosting)
+    rcBtnRow:SetPoint("TOPLEFT", 0, -706)
+    rcBtnRow:SetPoint("TOPRIGHT", 0, -706)
+    rcBtnRow:SetHeight(24)
+
+    local rwBtn = CreateFrame("Button", nil, rcBtnRow, "UIPanelButtonTemplate")
+    rwBtn:SetSize(120, 22)
+    rwBtn:SetPoint("LEFT", 0, 0)
+    rwBtn:SetText("RW Role Check")
+    rwBtn:SetScript("OnClick", function()
+        if AscensionLFM.RoleCheck and AscensionLFM.RoleCheck.StartCheck then
+            local ok, reason = AscensionLFM.RoleCheck.StartCheck()
+            if not ok and AscensionLFM.Print then
+                AscensionLFM.Print("Role Check: " .. tostring(reason))
+            end
+        end
+        MainWindow.RefreshRoleCheck()
+    end)
+
+    local resyncBtn = CreateFrame("Button", nil, rcBtnRow, "UIPanelButtonTemplate")
+    resyncBtn:SetSize(130, 22)
+    resyncBtn:SetPoint("LEFT", rwBtn, "RIGHT", 6, 0)
+    resyncBtn:SetText("Resync roles now")
+    resyncBtn:SetScript("OnClick", function()
+        if AscensionLFM.RoleCheck and AscensionLFM.RoleCheck.ResyncNow then
+            AscensionLFM.RoleCheck.ResyncNow()
+        elseif AscensionLFM.Slots and AscensionLFM.Slots.ScanRaid then
+            AscensionLFM.Slots.ScanRaid()
+        end
+        MainWindow.RefreshRoleCheck()
+        MainWindow.RefreshSlots()
+        MainWindow.RefreshPost()
+    end)
+
+    widgets.roleCheckStatus = hosting:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    widgets.roleCheckStatus:SetPoint("TOPLEFT", 4, -734)
+    widgets.roleCheckStatus:SetPoint("RIGHT", -4, 0)
+    widgets.roleCheckStatus:SetJustifyH("LEFT")
+    SetInk(widgets.roleCheckStatus, MUTED)
+    widgets.roleCheckStatus:SetText("Role check idle")
+    roleCheckStatusFS = widgets.roleCheckStatus
 
     --------------------------------------------------------------------
     -- Post (LFM compose / scan / repost)
@@ -1316,8 +1464,48 @@ function MainWindow.Init()
         MainWindow.RefreshPost()
     end)
 
-    CreateSectionLabel(post, "Auto-repost", -200)
-    widgets.autoRepost = CreateToggleRow(post, -218,
+    local rcPostRow = CreateFrame("Frame", nil, post)
+    rcPostRow:SetPoint("TOPLEFT", 0, -196)
+    rcPostRow:SetPoint("TOPRIGHT", 0, -196)
+    rcPostRow:SetHeight(26)
+
+    local postRwBtn = CreateFrame("Button", nil, rcPostRow, "UIPanelButtonTemplate")
+    postRwBtn:SetSize(120, 22)
+    postRwBtn:SetPoint("LEFT", 0, 0)
+    postRwBtn:SetText("RW Role Check")
+    postRwBtn:SetScript("OnClick", function()
+        if AscensionLFM.RoleCheck and AscensionLFM.RoleCheck.StartCheck then
+            local ok, reason = AscensionLFM.RoleCheck.StartCheck()
+            if not ok and AscensionLFM.Print then
+                AscensionLFM.Print("Role Check: " .. tostring(reason))
+            end
+        end
+        MainWindow.RefreshRoleCheck()
+    end)
+
+    local postResyncBtn = CreateFrame("Button", nil, rcPostRow, "UIPanelButtonTemplate")
+    postResyncBtn:SetSize(130, 22)
+    postResyncBtn:SetPoint("LEFT", postRwBtn, "RIGHT", 6, 0)
+    postResyncBtn:SetText("Resync roles now")
+    postResyncBtn:SetScript("OnClick", function()
+        if AscensionLFM.RoleCheck and AscensionLFM.RoleCheck.ResyncNow then
+            AscensionLFM.RoleCheck.ResyncNow()
+        elseif AscensionLFM.Slots and AscensionLFM.Slots.ScanRaid then
+            AscensionLFM.Slots.ScanRaid()
+        end
+        MainWindow.RefreshRoleCheck()
+        MainWindow.RefreshSlots()
+        MainWindow.RefreshPost()
+    end)
+
+    postRoleCheckStatusFS = post:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    postRoleCheckStatusFS:SetPoint("LEFT", postResyncBtn, "RIGHT", 10, 0)
+    postRoleCheckStatusFS:SetJustifyH("LEFT")
+    SetInk(postRoleCheckStatusFS, MUTED)
+    postRoleCheckStatusFS:SetText("Role check idle")
+
+    CreateSectionLabel(post, "Auto-repost", -230)
+    widgets.autoRepost = CreateToggleRow(post, -248,
         "Enable auto-repost (Hosting only)",
         "Rebuild LFM from slots each tick. Stops when full or disabled. Default OFF.",
         false,
@@ -1329,7 +1517,7 @@ function MainWindow.Init()
             end
             MainWindow.RefreshPost()
         end)
-    widgets.announceFull = CreateToggleRow(post, -268,
+    widgets.announceFull = CreateToggleRow(post, -298,
         "Announce FULL when stopping",
         "Optional one public FULL line (fullAnnounceMessage) when auto-repost stops. Default OFF.",
         false,
@@ -1338,7 +1526,7 @@ function MainWindow.Init()
         end)
 
     local intLbl = post:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    intLbl:SetPoint("TOPLEFT", 4, -322)
+    intLbl:SetPoint("TOPLEFT", 4, -352)
     intLbl:SetText("Interval (sec, min 30)")
     SetInk(intLbl, INK)
 
@@ -1374,7 +1562,7 @@ function MainWindow.Init()
     widgets.repostInterval = intEdit
 
     postStatusFS = post:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    postStatusFS:SetPoint("TOPLEFT", 4, -350)
+    postStatusFS:SetPoint("TOPLEFT", 4, -380)
     postStatusFS:SetPoint("RIGHT", -4, 0)
     postStatusFS:SetJustifyH("LEFT")
     SetInk(postStatusFS, MUTED)
