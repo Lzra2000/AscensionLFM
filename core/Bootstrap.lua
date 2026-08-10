@@ -8,7 +8,7 @@ if type(AscensionLFM) ~= "table" then
     _G.AscensionLFM = AscensionLFM
 end
 
-AscensionLFM.VERSION = "0.4.7"
+AscensionLFM.VERSION = "0.4.8"
 AscensionLFM.ADDON_NAME = "AscensionLFM"
 
 local function Print(msg)
@@ -64,6 +64,12 @@ local function PrintStatus()
             tostring(db.roleCheckWindow or db.roleCheckDuration or 60),
             OnOff(db.roleCheckAutoResync ~= false),
             OnOff(db.autoMoveAura ~= false)))
+        Print(string.format("roleCheck: canWarn=%s · group=%s · hosting=%s · lastStart=%s · replies=%s",
+            OnOff(rc.canWarn),
+            tostring(rc.group or "?"),
+            OnOff(rc.hosting),
+            tostring(rc.lastStart or "?"),
+            tostring(rc.responses or 0)))
     end
     Print(string.format("sounds: match=%s applicant=%s · channel=%s interval=%ss",
         OnOff(db.soundOnMatch), OnOff(db.soundOnApplicant),

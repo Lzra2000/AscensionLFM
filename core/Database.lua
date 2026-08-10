@@ -14,7 +14,7 @@ AscensionLFM.Database = Database
 -- Default "notify": Log fills from public LFM/LFG MS lines; kick/auto-invite stay off.
 local DEFAULTS = {
     mode = "notify",
-    defaultsRev = 4, -- bumped when shipping default-mode / stock-copy changes
+    defaultsRev = 5, -- bumped when shipping default-mode / stock-copy changes
     roles = {
         tank = true,
         healer = false,
@@ -81,7 +81,7 @@ local DEFAULTS = {
     soundOnMatch = false,
     soundOnApplicant = false,
     -- RW Role Check + Aura 1-per-subgroup auto-move
-    roleCheckMessage = "ROLE CHECK — whisper tank/heal/aura/dps (or T/H/A/D)",
+    roleCheckMessage = "ROLE CHECK — whisper or party: tank/heal/aura/dps (T/H/A/D)",
     roleCheckDuration = 60,
     roleCheckWindow = 60,
     roleCheckMinInterval = 30,
@@ -155,6 +155,19 @@ function Database.Init()
                 _G.AscensionLFMDB.roles.dps = true
             end
             _G.AscensionLFMDB.defaultsRev = 4
+            rev = 4
+        end
+        -- v0.4.8: Role Check accepts party/raid replies; refresh stock RW copy.
+        if rev < 5 then
+            local oldMsgs = {
+                ["ROLE CHECK — whisper me tank / heal / aura / dps to sync MS slots"] = true,
+                ["ROLE CHECK — whisper tank / heal / aura / dps"] = true,
+                ["ROLE CHECK — whisper tank/heal/aura/dps (or T/H/A/D)"] = true,
+            }
+            if oldMsgs[tostring(_G.AscensionLFMDB.roleCheckMessage or "")] then
+                _G.AscensionLFMDB.roleCheckMessage = DEFAULTS.roleCheckMessage
+            end
+            _G.AscensionLFMDB.defaultsRev = 5
         end
     end
 end

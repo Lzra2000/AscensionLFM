@@ -204,6 +204,9 @@ local function CollectPresentNames()
             if type(GetRaidRosterInfo) == "function" then
                 name = GetRaidRosterInfo(i)
             end
+            if (type(name) ~= "string" or name == "") and type(UnitName) == "function" then
+                name = UnitName("raid" .. i)
+            end
             if type(name) == "string" and name ~= "" then
                 present[LowerName(name)] = true
             end

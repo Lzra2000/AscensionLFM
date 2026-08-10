@@ -82,6 +82,18 @@ invited = {}
 Scanner._HandleWhisper("Alice", "heal")
 check("RC active member not invited", invited[1] == nil)
 
+-- Party/raid chat role reply during Role Check (common after RW)
+_G.GetRaidRosterInfo = function(i)
+    return ({ "Host", "Alice" })[i]
+end
+RoleCheck._ResetForTests()
+RoleCheck.StartCheck(3000)
+invited = {}
+check("group chat event detect", Scanner._IsGroupChatEvent("CHAT_MSG_PARTY") == true)
+check("party role reply consumed", Scanner._TryRoleCheckReply("Alice", "tank") == true)
+check("alice tank from party chat", Slots.GetAssigned("Alice") == "tank")
+check("party reply not invited", invited[1] == nil)
+
 io.write(string.format("test_whisper_hosting: %d passed, %d failed\n", passed, failed))
 if failed > 0 then
     os.exit(1)

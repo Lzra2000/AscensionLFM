@@ -287,6 +287,28 @@ local function HandlePublicListing(leader, message, event)
     end
 end
 
+local function IsGroupChatEvent(event)
+    return event == "CHAT_MSG_PARTY"
+        or event == "CHAT_MSG_PARTY_LEADER"
+        or event == "CHAT_MSG_RAID"
+        or event == "CHAT_MSG_RAID_LEADER"
+        or event == "CHAT_MSG_RAID_WARNING"
+end
+
+local function TryRoleCheckReply(sender, message)
+    if not AscensionLFM.RoleCheck then
+        return false
+    end
+    if not AscensionLFM.RoleCheck.IsActive or not AscensionLFM.RoleCheck.IsActive() then
+        return false
+    end
+    local fn = AscensionLFM.RoleCheck.HandleRoleReply or AscensionLFM.RoleCheck.OnWhisper
+    if type(fn) ~= "function" then
+        return false
+    end
+    return fn(sender, message) and true or false
+end
+
 local function HandleWhisper(sender, message)
     local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
     if not db then
@@ -316,12 +338,7 @@ local function HandleWhisper(sender, message)
     if db.mode == "hosting" then
         -- Role Check consumes whispers only from current group members.
         -- Outside applicants must still reach auto-invite / Queue.
-        local consumed = false
-        if AscensionLFM.RoleCheck and AscensionLFM.RoleCheck.IsActive and AscensionLFM.RoleCheck.IsActive() then
-            if AscensionLFM.RoleCheck.OnWhisper then
-                consumed = AscensionLFM.RoleCheck.OnWhisper(sender, message) and true or false
-            end
-        end
+        local consumed = TryRoleCheckReply(sender, message)
         if not consumed and AscensionLFM.Invite and AscensionLFM.Invite.TryHostInvite then
             AscensionLFM.Invite.TryHostInvite(sender, message)
         end
@@ -381,6 +398,11 @@ function Scanner.Start()
         if event == "CHAT_MSG_WHISPER" then
             HandleWhisper(sender, message)
         else
+            -- During Role Check, party/raid chat role replies count too
+            -- (players often answer the RW in party instead of whispering).
+            if IsGroupChatEvent(event) and TryRoleCheckReply(sender, message) then
+                return
+            end
             HandlePublicListing(sender, message, event)
         end
     end)
@@ -396,6 +418,8 @@ end
 Scanner._HandlePublicLFM = HandlePublicListing
 Scanner._HandlePublicListing = HandlePublicListing
 Scanner._HandleWhisper = HandleWhisper
+Scanner._TryRoleCheckReply = TryRoleCheckReply
+Scanner._IsGroupChatEvent = IsGroupChatEvent
 Scanner._Fingerprint = Fingerprint
 Scanner._NextWhisperMessage = NextWhisperMessage
 Scanner._PreferredSeekRole = PreferredSeekRole
