@@ -176,6 +176,22 @@ check("ScanRaid snapshot table", type(snap) == "table")
 check("ScanRaid tank filled", snap.tank and snap.tank.filled == 1)
 check("ScanRaid removed number", type(removed) == "number")
 
+-- Regression: a disabled role (db.roles[role] == false) with leftover
+-- positive slotMax must not still get advertised in the posted LFM text —
+-- previously "0/3 Healers" would show even with healer explicitly off,
+-- contradicting the "role filtered" reject applicants for that role got.
+local db = AscensionLFM.Database.Get()
+db.roles = { tank = true, healer = false, aura = true, dps = true }
+db.slotMax = { tank = 2, healer = 3, aura = 3, dps = 7 }
+Slots.ClearAll()
+local disabledMsg = Poster.RefreshMessage()
+check("disabled role shows 0/0 not raw slotMax", disabledMsg:find("0/0 Healers", 1, true) ~= nil, disabledMsg)
+check("disabled role max not leaked", disabledMsg:find("0/3 Healers", 1, true) == nil, disabledMsg)
+
+local disabledStatus = Poster.GetStatus()
+check("GetStatus message also filtered", disabledStatus.message:find("0/0 Healers", 1, true) ~= nil,
+    disabledStatus.message)
+
 io.write(string.format("poster tests: %d passed, %d failed\n", passed, failed))
 if failed > 0 then
     os.exit(1)

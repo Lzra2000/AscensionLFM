@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.4.26
+
+- **Fix: posted LFM could advertise a role you turned off.** `db.roles[role]
+  = false` (Accept roles toggle) and `db.slotMax[role]` (the numeric cap)
+  are independent settings — turning off e.g. Healer doesn't reset its
+  leftover slotMax. The posted LFM text and `/alfm status` built straight
+  from `Slots.Snapshot()`, which only reflects slotMax, not acceptance — so
+  a disabled role with old slotMax still leftover showed as e.g.
+  "0/3 Healers" (looks actively sought), while any healer who whispered in
+  response got rejected with "Not looking for healer right now" (role
+  filtered) — a contradictory experience. Now zeroed to "0/0" in the
+  posted message and status when the role is off, without touching
+  `Slots.Snapshot()` itself (UI slot editors and invite logic still need
+  the raw configured numbers).
+
 ## 0.4.25
 
 - **Fix: "prefer support seat" (v0.4.19) applicants got zero feedback.**

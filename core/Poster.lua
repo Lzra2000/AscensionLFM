@@ -184,9 +184,36 @@ local function LiveUnassignedCount()
     return 0
 end
 
+--- Zero out a role's filled/max/open when the host has turned off accepting
+-- it (db.roles[role] == false), even if db.slotMax still has a leftover
+-- positive cap left over from before it was disabled. Without this, the
+-- posted LFM text could advertise e.g. "0/3 Healers" for a role nobody can
+-- actually get invited for (TryHostInvite/TryLfgInvite already reject via
+-- db.roles separately with "role filtered" — so the ad and the reply would
+-- contradict each other), and Poster.IsFull's "slots" full-check could
+-- never resolve since that role's cap could never be met by anyone.
+local function FilterAcceptedRoles(snapshot, db)
+    if type(snapshot) ~= "table" then
+        return snapshot
+    end
+    local roles = db and db.roles
+    if type(roles) ~= "table" then
+        return snapshot
+    end
+    local out = {}
+    for role, s in pairs(snapshot) do
+        if type(s) == "table" and roles[role] == false then
+            out[role] = { filled = 0, max = 0, open = false }
+        else
+            out[role] = s
+        end
+    end
+    return out
+end
+
 --- Build (or refresh) the current LFM text from slots.
 function Poster.RefreshMessage()
-    lastMessage = Poster.BuildMessage(LiveSnapshot())
+    lastMessage = Poster.BuildMessage(FilterAcceptedRoles(LiveSnapshot(), DB()))
     return lastMessage
 end
 
@@ -265,7 +292,7 @@ function Poster.GetStatus()
     local mode = (db and db.mode) or "off"
     local interval = Poster.ClampInterval(db and db.repostInterval)
     local now = Now()
-    local snap = LiveSnapshot()
+    local snap = FilterAcceptedRoles(LiveSnapshot(), db)
     local full, fullReason = Poster.IsFull(snap, LiveGroupSize(), db and db.maxPartySize, LiveUnassignedCount())
     local countdown = 0
     if nextPostAt > now then
@@ -296,7 +323,7 @@ function Poster.Tick(now)
         return lastStatus
     end
 
-    local snap = LiveSnapshot()
+    local snap = FilterAcceptedRoles(LiveSnapshot(), db)
     lastMessage = Poster.BuildMessage(snap)
     local full, fullReason = Poster.IsFull(snap, LiveGroupSize(), db.maxPartySize, LiveUnassignedCount())
     local ok, reason = Poster.ShouldRepost(
