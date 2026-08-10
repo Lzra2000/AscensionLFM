@@ -67,6 +67,8 @@ While **Mode = Hosting** (or Full Auto) and you are raid lead/assist (party lead
 
 RW is rate-limited (minimum **30s** between warnings). **Resync roles now** works without a prior RW (roster prune + recount only).
 
+**Aura auto-move** (default ON, Hosting): at most one Aura-assigned player per raid subgroup (1–8); extras are moved with `SetRaidSubgroup` after assign / scan / resync.
+
 ## Full Auto Hosting (default OFF)
 
 `/alfm` → **Hosting** → enable **Full Auto Hosting (master)**. This:
