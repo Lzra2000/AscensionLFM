@@ -317,6 +317,22 @@ function Invite.TryLfgInvite(leader, message, parsed)
     if not db.autoInvite or db.autoInviteLfg == false then
         return false, "lfg invite off"
     end
+    -- Public LFG-chat scan reaches out to whoever posted "LFG MS ..." even
+    -- though they never whispered/applied to YOU specifically — that's fine
+    -- while actively recruiting in the open world, but once you're already
+    -- inside your own Manastorm instance, General/Trade chat still relays
+    -- OTHER unrelated players' own "LFG MS" posts (for entirely different
+    -- groups) and this used to auto-reply to them ("Sorry, tank is full")
+    -- as if they had applied to you — confusing strangers who never
+    -- whispered you at all. Direct whispers (TryHostInvite) are unaffected
+    -- — those are always a genuine, intentional application regardless of
+    -- where you are.
+    if type(IsInInstance) == "function" then
+        local ok, inInstance = pcall(IsInInstance)
+        if ok and inInstance then
+            return false, "in instance"
+        end
+    end
     if type(leader) ~= "string" or leader == "" then
         return false, "bad name"
     end

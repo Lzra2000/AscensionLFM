@@ -95,5 +95,30 @@ check("full auto sets autoInviteLfg", db.autoInviteLfg == true)
 AscensionLFM.Database.SetFullAutoHosting(false)
 check("full auto off clears autoInviteLfg", db.autoInviteLfg == false)
 
+-- Regression: pause LFG-chat auto-invite/reply while inside an instance —
+-- General/Trade still relays OTHER unrelated players' own "LFG MS" posts
+-- while you're already in your own Manastorm, and replying to them (invite
+-- or reject) reads as a bizarre unprompted DM to someone who never actually
+-- applied to your group. Direct whispers (TryHostInvite) are unaffected.
+db.autoInvite = true
+db.autoInviteLfg = true
+AscensionLFM.Invite._ResetCooldowns()
+_G._lastInvite = nil
+Slots.ClearAll()
+_G.IsInInstance = function() return true, "party" end
+ok, reason = AscensionLFM.Invite.TryLfgInvite("StrangerOutside", "LFG MS tank",
+    AscensionLFM.Parser.Parse("LFG MS tank"))
+check("lfg invite paused while in instance", ok == false and reason == "in instance", tostring(reason))
+check("no invite sent while in instance", _G._lastInvite == nil)
+
+_G.IsInInstance = function() return false, "none" end
+AscensionLFM.Invite._ResetCooldowns()
+_G._lastInvite = nil
+Slots.ClearAll()
+ok, reason = AscensionLFM.Invite.TryLfgInvite("StrangerOutside2", "LFG MS tank",
+    AscensionLFM.Parser.Parse("LFG MS tank"))
+check("lfg invite works again outside instance", ok == true, tostring(reason))
+_G.IsInInstance = nil
+
 print(string.format("lfg invite tests: %d passed, %d failed", passed, failed))
 if failed > 0 then os.exit(1) end

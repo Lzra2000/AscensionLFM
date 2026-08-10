@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.4.27
+
+- **Fix: LFG-chat auto-invite/reply DMing strangers who never applied.**
+  Reported live (Lazynorm: "brother, I hadn't even sent my message yet").
+  `TryLfgInvite` (the public LFG-chat scan) reacts to *any* "LFG MS" line
+  in General/Trade — including posts from completely unrelated players
+  advertising their own, different search while you're already inside
+  your own Manastorm instance (General/Trade still relays their messages
+  across zones). The addon whispered them an invite/reject as if they'd
+  personally applied to your group, which they never did — confusing and
+  unsolicited from their side. Auto-invite/reply from the LFG scan now
+  pauses entirely while you're inside any instance (`IsInInstance()`).
+  Direct whispers to you (`TryHostInvite`) are unaffected — those are
+  always a genuine, intentional application regardless of where you are.
+
 ## 0.4.26
 
 - **Fix: posted LFM could advertise a role you turned off.** `db.roles[role]
