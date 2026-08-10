@@ -1,0 +1,32 @@
+AscensionLFM — Install / Installation
+=====================================
+
+ENGLISH
+-------
+1. Download AscensionLFM.zip from GitHub Releases (NOT the green "Code → Download ZIP"
+   / "Source code" archive — that unpacks as AscensionLFM-main and will NOT show in the
+   WoW AddOns list).
+2. Extract so you have exactly:
+
+     Interface/AddOns/AscensionLFM/AscensionLFM.toc
+
+   Folder name MUST match the .toc basename: AscensionLFM (classic 3.3.5a rule).
+3. Enable AscensionLFM in the character AddOns list, then login or /reload.
+4. Type /alfm to open settings. Default mode is Notify (Listening ON) — matches appear
+   in the Log. Set Hosting only if you want auto-invite.
+5. Optional: /alfm test injects a fake match so you can verify the Log UI.
+
+DEUTSCH
+-------
+1. Lade AscensionLFM.zip von GitHub Releases herunter (NICHT „Code → Download ZIP“ /
+   „Source code“ — das entpackt als AscensionLFM-main und erscheint NICHT in der
+   AddOns-Liste).
+2. Entpacken, sodass genau dieser Pfad entsteht:
+
+     Interface/AddOns/AscensionLFM/AscensionLFM.toc
+
+   Der Ordnername MUSS AscensionLFM heißen (Regel von WoW 3.3.5a).
+3. Addon in der Charakter-AddOns-Liste aktivieren, einloggen oder /reload.
+4. /alfm öffnet die Einstellungen. Standardmodus ist Notify (Listening ON) — Treffer
+   erscheinen im Log. Hosting nur setzen, wenn Auto-Invite gewünscht ist.
+5. Optional: /alfm test legt einen Test-Eintrag ins Log.

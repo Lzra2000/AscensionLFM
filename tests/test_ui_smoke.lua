@@ -148,7 +148,7 @@ SlashCmdList = SlashCmdList or {}
 
 -- Load Database + MainWindow (no Scanner/Invite needed for UI smoke).
 dofile("core/Database.lua")
-AscensionLFM.VERSION = "0.2.1"
+AscensionLFM.VERSION = "0.2.2"
 AscensionLFM.Slots = {
     Snapshot = function()
         return {
@@ -212,6 +212,10 @@ check("mode hosting persisted", AscensionLFM.Database.Get().mode == "hosting")
 
 -- Kick default remains off
 check("kick default off", AscensionLFM.Database.Get().autoKickLevel59 == false)
+-- Fresh Init default mode is notify (Listening ON)
+_G.AscensionLFMDB = nil
+AscensionLFM.Database.Init()
+check("default mode notify", AscensionLFM.Database.Get().mode == "notify")
 
 if failed > 0 then
     io.stderr:write(string.format("test_ui_smoke: %d failed, %d passed\n", failed, passed))

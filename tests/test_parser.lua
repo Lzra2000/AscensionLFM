@@ -58,6 +58,19 @@ check("lfg manastorm", p and p.isManastormLFG and p.roles.healer and p.roles.hea
 p = Parser.Parse("LFG MS 0/2 Tanks 0/3 Healers")
 check("LFG with slots", p and p.isManastormLFG and p.roles.tank.total == 2)
 
+-- Softened Manastorm spelling / spacing variants
+p = Parser.Parse("LFM mana storm 0/2 Tanks 0/7 DPS")
+check("mana storm spaced", p and p.isManastormLFM and p.roles.tank and p.roles.tank.total == 2)
+
+p = Parser.Parse("LFM Mana-Storm need tank")
+check("mana-storm hyphen", p and p.isManastormLFM and p.roles.tank and p.roles.tank.open)
+
+p = Parser.Parse("lfg ms")
+check("bare lfg ms", p and p.isManastormLFG == true)
+
+p = Parser.Parse("LFM Manastorm")
+check("bare LFM Manastorm", p and p.isManastormLFM == true)
+
 -- Non-match
 check("trade spam nil", Parser.Parse("WTS epic mount cheap") == nil)
 check("lfm without ms nil", Parser.Parse("LFM ICC 25 need tank") == nil)
