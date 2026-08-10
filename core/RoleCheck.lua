@@ -11,7 +11,7 @@ end
 local RoleCheck = {}
 AscensionLFM.RoleCheck = RoleCheck
 
-local DEFAULT_MSG = "ROLE CHECK — whisper me tank / heal / aura / dps to sync MS slots"
+local DEFAULT_MSG = "ROLE CHECK — whisper tank / heal / aura / dps"
 local DEFAULT_DURATION = 60
 local MIN_RW_GAP = 30
 local MIN_DURATION = 15
@@ -403,7 +403,7 @@ function RoleCheck.StartCheck(msgOrNow)
     end
     if not IsHosting(db) then
         if AscensionLFM.Print then
-            AscensionLFM.Print("Role Check needs Mode=Hosting")
+            AscensionLFM.Print("Role Check needs Hosting mode (or Full Auto)")
         end
         return false, "not hosting"
     end
@@ -411,14 +411,14 @@ function RoleCheck.StartCheck(msgOrNow)
     local minGap = RoleCheck.ClampMinInterval(db and db.roleCheckMinInterval)
     if not RoleCheck.ShouldAllowRW(now, lastRwAt, minGap) then
         if AscensionLFM.Print then
-            AscensionLFM.Print("Role Check RW on cooldown")
+            AscensionLFM.Print("Role Check: wait before the next raid warning")
         end
         return false, "rate limited"
     end
     local can, groupKind = RoleCheck.CanRaidWarn()
     if not can then
         if AscensionLFM.Print then
-            AscensionLFM.Print("Role Check: need raid lead/assist or party lead")
+            AscensionLFM.Print("Role Check: need raid lead/assist (or party lead)")
         end
         return false, "no privilege"
     end
@@ -438,7 +438,7 @@ function RoleCheck.StartCheck(msgOrNow)
         AscensionLFM.Activity.Push("rolecheck", "RW role check started (" .. dur .. "s)")
     end
     if AscensionLFM.Print then
-        AscensionLFM.Print("Role Check ON — whisper roles for " .. dur .. "s")
+        AscensionLFM.Print("Role Check open — whisper tank / heal / aura / dps (" .. dur .. "s)")
     end
     RoleCheck.EnsureTicker()
     RefreshUI()
@@ -514,7 +514,7 @@ function RoleCheck.Tick(now)
     if auto then
         RoleCheck.Resync()
         if AscensionLFM.Print then
-            AscensionLFM.Print("Role Check ended — slots resynced")
+            AscensionLFM.Print("Role Check ended — roles resynced")
         end
     end
     activeUntil = 0

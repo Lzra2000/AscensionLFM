@@ -2,7 +2,7 @@
 ## Title: AscensionLFM
 ## Notes: Manastorm LFM/LFG — Full Auto, LFG invite, RW Role Check, Aura 1/group auto-move, post/repost, Kick59.
 ## Author: Lzra2000
-## Version: 0.4.1
+## Version: 0.4.2
 ## SavedVariables: AscensionLFMDB
 ## DefaultState: enabled
 

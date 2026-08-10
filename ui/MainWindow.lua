@@ -751,7 +751,7 @@ function MainWindow.Init()
 
     local sub = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     sub:SetPoint("TOP", title, "BOTTOM", 0, -2)
-    sub:SetText("Manastorm Level Run LFM/LFG · v" .. tostring(AscensionLFM.VERSION or "0.4.1"))
+    sub:SetText("Manastorm Level Run LFM/LFG · v" .. tostring(AscensionLFM.VERSION or "0.4.2"))
     SetInk(sub, MUTED)
 
     local shell = CreateFrame("Frame", FRAME_NAME .. "Shell", frame)
@@ -1229,7 +1229,7 @@ function MainWindow.Init()
     CreateSectionLabel(hosting, "Role Check", -542)
     widgets.autoMoveAura = CreateToggleRow(hosting, -558,
         "Auto-move Auras (1 per raid group)",
-        "At most one Aura-assigned player per raid subgroup 1–8; extras SetRaidSubgroup. Default ON.",
+        "Keep at most one Aura player in each raid group (1–8). Extra Auras are moved to empty groups. Default ON.",
         false,
         function(on)
             AscensionLFM.Database.Get().autoMoveAura = on and true or false
@@ -1239,7 +1239,7 @@ function MainWindow.Init()
         end)
     widgets.roleCheckAutoResync = CreateToggleRow(hosting, -608,
         "Auto-resync after listening window",
-        "When the RW window ends: prune leavers, re-apply whisper roles, ScanRaid. Default ON.",
+        "When the window ends: remove leavers, apply whispered roles, refresh filled counts. Default ON.",
         false,
         function(on)
             AscensionLFM.Database.Get().roleCheckAutoResync = on and true or false

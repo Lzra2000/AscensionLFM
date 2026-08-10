@@ -29,7 +29,7 @@ Database.Init()
 local db = Database.Get()
 
 check("default mode is notify", db.mode == "notify")
-check("defaultsRev is 2", tonumber(db.defaultsRev) == 2)
+check("defaultsRev is 3", tonumber(db.defaultsRev) == 3)
 check("autoKick still off", db.autoKickLevel59 == false)
 check("autoWhisper still off", db.autoWhisper == false)
 check("autoRepost still off", db.autoRepost == false)
@@ -37,6 +37,8 @@ check("fullAutoHosting still off", db.fullAutoHosting == false)
 check("rejectRewhisper still off", db.rejectRewhisper == false)
 check("repostInterval default 60", tonumber(db.repostInterval) == 60)
 check("postChannel default YELL", db.postChannel == "YELL")
+check("roleCheckMessage short default",
+    db.roleCheckMessage == "ROLE CHECK — whisper tank / heal / aura / dps")
 
 -- Fresh defaults table
 local defs = Database.Defaults()
@@ -50,12 +52,30 @@ _G.AscensionLFMDB = {
 }
 Database.Init()
 check("migrate off→notify", Database.Get().mode == "notify")
-check("migrate sets defaultsRev 2", tonumber(Database.Get().defaultsRev) == 2)
+check("migrate sets defaultsRev 3", tonumber(Database.Get().defaultsRev) == 3)
 
 -- Do not re-flip after user sets Off post-migration
 Database.SetMode("off")
 Database.Init()
 check("user Off stays after rev>=2", Database.Get().mode == "off")
+
+-- v0.4.2: stock old RW message → shorter default; custom text kept
+_G.AscensionLFMDB = {
+    mode = "notify",
+    defaultsRev = 2,
+    roleCheckMessage = "ROLE CHECK — whisper me tank / heal / aura / dps to sync MS slots",
+}
+Database.Init()
+check("migrate shortens stock RW msg",
+    Database.Get().roleCheckMessage == "ROLE CHECK — whisper tank / heal / aura / dps")
+_G.AscensionLFMDB = {
+    mode = "notify",
+    defaultsRev = 2,
+    roleCheckMessage = "Custom ROLE CHECK please whisper me",
+}
+Database.Init()
+check("custom RW msg kept",
+    Database.Get().roleCheckMessage == "Custom ROLE CHECK please whisper me")
 
 -- Restore notify for scanner path tests
 Database.SetMode("notify")

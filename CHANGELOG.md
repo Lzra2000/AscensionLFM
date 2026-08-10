@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.2
+
+- **Copy polish:** clearer Hosting Role Check / Aura helper text (no raw API jargon).
+- Shorter default raid-warning: `ROLE CHECK — whisper tank / heal / aura / dps`.
+- Friendlier chat status lines for Role Check start/end/errors and Aura moves.
+- README EN + new DE how-to for RW Role Check and Aura auto-move.
+
 ## 0.4.1
 
 - **RW Role Check:** Hosting / Post buttons send a raid warning (lead/assist; party/yell

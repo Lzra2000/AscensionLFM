@@ -154,14 +154,14 @@ function AuraBalance.ApplyMoves(moves)
                 if AscensionLFM.Activity and AscensionLFM.Activity.Push then
                     AscensionLFM.Activity.Push(
                         "aura",
-                        string.format("moved %s aura g%d → g%d", tostring(mv.name), tonumber(mv.from) or 0, to),
+                        string.format("moved %s to raid group %d (was %d)", tostring(mv.name), to, tonumber(mv.from) or 0),
                         { name = mv.name }
                     )
                 end
                 if AscensionLFM.Print then
                     AscensionLFM.Print(string.format(
-                        "Aura balance: %s  group %d → %d",
-                        tostring(mv.name), tonumber(mv.from) or 0, to
+                        "Aura: moved %s to raid group %d (was %d)",
+                        tostring(mv.name), to, tonumber(mv.from) or 0
                     ))
                 end
             end

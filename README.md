@@ -55,19 +55,19 @@ Open **Post** in `/alfm` (separate from Hosting to avoid crowding).
 4. **Scan raid/party** recounts filled from the current roster + assigned roles; while Mode is **Hosting** (or auto-repost is on), roster events auto-refresh fills and the preview.
 5. **Auto-repost** (default **OFF**): interval seconds (default **60**, minimum **30**). Only while Mode=**Hosting**. Rebuilds the message each tick; **stops** when all role caps are filled or the group hits Max size. Optional **Announce FULL** posts one public FULL line when stopping.
 
-## RW Role Check (resync T/H/A/D places)
+## RW Role Check (resync tank / heal / aura / dps)
 
 While **Mode = Hosting** (or Full Auto) and you are raid lead/assist (party lead → party/yell fallback):
 
 1. `/alfm` → **Hosting** (or **Post**) → **RW Role Check**
-2. Sends a configurable raid warning (default: `ROLE CHECK — whisper me tank / heal / aura / dps to sync MS slots`)
+2. Sends a configurable raid warning (default: `ROLE CHECK — whisper tank / heal / aura / dps`)
 3. Opens a **listening window** (default **60s**): party/raid members who whisper a role update slot assignments live
 4. Status shows `Role check active — Xs left · N responses`
-5. When the window ends (if **Auto-resync** is on) — or anytime via **Resync roles now** — leavers are pruned, whisper roles re-applied, `ScanRaid` refreshes filled counts + LFM preview
+5. When the window ends (if **Auto-resync** is on) — or anytime via **Resync roles now** — leavers are removed, whispered roles re-applied, filled counts and the LFM preview refresh
 
-RW is rate-limited (minimum **30s** between warnings). **Resync roles now** works without a prior RW (roster prune + recount only).
+RW is rate-limited (minimum **30s** between warnings). **Resync roles now** works without a prior RW (roster cleanup + recount only).
 
-**Aura auto-move** (default ON, Hosting): at most one Aura-assigned player per raid subgroup (1–8); extras are moved with `SetRaidSubgroup` after assign / scan / resync.
+**Aura auto-move** (default ON, Hosting): at most one Aura player per raid group (1–8). Extra Auras are moved into empty groups after assign / scan / resync.
 
 ## Full Auto Hosting (default OFF)
 
@@ -134,8 +134,18 @@ Native DialogFrame with a left **Categories** sidebar:
 3. Set **Max T/H/A/D** slot caps (defaults 2/3/3/7) and **Max size** (15).
 4. Leave **Auto-invite matching role whispers**, **Auto-invite LFG seekers**, and **Require role in whisper** on.
 5. **Post** → **Scan raid/party** (optional) → pick channel → **Post once**, or enable **Auto-repost** (interval ≥ 30s).
-6. Optionally **Hosting** → **RW Role Check** to resync T/H/A/D places from member whispers; or **Resync roles now**.
+6. Optionally **Hosting** → **RW Role Check** to resync tank / heal / aura / dps from member whispers; or **Resync roles now**.
 7. Optionally **Kick** → enable **Kick at level 59 + raid warning** (dangerous; default off).
+
+## RW Role Check + Aura (DE)
+
+Im Modus **Hosting** (oder Full Auto), als Raid-Lead/Assist:
+
+1. `/alfm` → **Hosting** (oder **Post**) → **RW Role Check**
+2. Raid Warning (Standard: `ROLE CHECK — whisper tank / heal / aura / dps`)
+3. Mitglieder flüstern ihre Rolle; die Slot-Zuordnung aktualisiert sich live (~60s Fenster)
+4. **Resync roles now** (oder Auto-Resync am Ende): Abgänger raus, geflüsterte Rollen anwenden, Filled-Zähler + LFM-Vorschau neu
+5. **Auto-move Auras (1 per raid group)** (Standard AN): höchstens **eine Aura pro Raid-Gruppe (1–8)**; weitere Auras werden automatisch in freie Gruppen verschoben (Lead/Assist)
 
 ## Safety
 
