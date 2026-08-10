@@ -314,12 +314,15 @@ local function HandleWhisper(sender, message)
     end
 
     if db.mode == "hosting" then
+        -- Role Check consumes whispers only from current group members.
+        -- Outside applicants must still reach auto-invite / Queue.
+        local consumed = false
         if AscensionLFM.RoleCheck and AscensionLFM.RoleCheck.IsActive and AscensionLFM.RoleCheck.IsActive() then
-            if AscensionLFM.RoleCheck.OnWhisper and AscensionLFM.RoleCheck.OnWhisper(sender, message) then
-                return
+            if AscensionLFM.RoleCheck.OnWhisper then
+                consumed = AscensionLFM.RoleCheck.OnWhisper(sender, message) and true or false
             end
         end
-        if AscensionLFM.Invite and AscensionLFM.Invite.TryHostInvite then
+        if not consumed and AscensionLFM.Invite and AscensionLFM.Invite.TryHostInvite then
             AscensionLFM.Invite.TryHostInvite(sender, message)
         end
     end

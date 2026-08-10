@@ -751,7 +751,7 @@ function MainWindow.Init()
 
     local sub = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     sub:SetPoint("TOP", title, "BOTTOM", 0, -2)
-    sub:SetText("Manastorm Level Run LFM/LFG · v" .. tostring(AscensionLFM.VERSION or "0.4.2"))
+    sub:SetText("Manastorm Level Run LFM/LFG · v" .. tostring(AscensionLFM.VERSION or "0.4.3"))
     SetInk(sub, MUTED)
 
     local shell = CreateFrame("Frame", FRAME_NAME .. "Shell", frame)
@@ -1059,7 +1059,7 @@ function MainWindow.Init()
     CreateSectionLabel(hosting, "Full Auto", -4)
     widgets.fullAuto = CreateToggleRow(hosting, -20,
         "Full Auto Hosting (master)",
-        "ON: Hosting + whisper invite + LFG invite + scan + repost + reject-rewhisper. Default OFF.",
+        "ON: Hosting + accept T/H/A/D + whisper invite + LFG invite + scan + repost + reject-rewhisper. Default OFF.",
         false,
         function(on)
             AscensionLFM.Database.SetFullAutoHosting(on)

@@ -178,6 +178,15 @@ function Database.SetFullAutoHosting(on)
         db.autoInviteLfg = true
         db.autoRepost = true
         db.rejectRewhisper = true
+        -- MS level-run hosts need all four accept roles; defaults otherwise leave
+        -- healer/aura off so heal/aura whispers die as "role filtered".
+        if type(db.roles) ~= "table" then
+            db.roles = {}
+        end
+        db.roles.tank = true
+        db.roles.healer = true
+        db.roles.aura = true
+        db.roles.dps = true
         -- Roster scan already runs while hosting / autoRepost (Scanner.HandleRoster)
         if AscensionLFM.Poster and AscensionLFM.Poster.RefreshMessage then
             AscensionLFM.Poster.RefreshMessage()
