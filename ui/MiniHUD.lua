@@ -188,7 +188,13 @@ local function SendGroupAnnounce(msg)
         if ok then
             return true, "RAID"
         end
+    elseif groupKind == "party" and can then
+        local ok = pcall(SendChatMessage, msg, "PARTY")
+        if ok then
+            return true, "PARTY"
+        end
     elseif groupKind == "party" then
+        -- Not lead: try party anyway, then yell
         local ok = pcall(SendChatMessage, msg, "PARTY")
         if ok then
             return true, "PARTY"
@@ -253,10 +259,55 @@ function MiniHUD.ActionPostLfm()
 end
 
 function MiniHUD.ActionRoleCheck()
-    if AscensionLFM.RoleCheck and AscensionLFM.RoleCheck.StartCheck then
-        return AscensionLFM.RoleCheck.StartCheck()
+    local db = DB()
+    local msg
+    if AscensionLFM.RoleCheck and AscensionLFM.RoleCheck.BuildMessage then
+        msg = AscensionLFM.RoleCheck.BuildMessage(db and db.roleCheckMessage)
+    else
+        msg = "ROLE CHECK — whisper or party: tank/heal/aura/dps (T/H/A/D)"
     end
-    return false, "no rolecheck"
+
+    -- Full listen-window when Hosting / Full Auto
+    local hosting = db and (db.mode == "hosting" or db.fullAutoHosting)
+    if hosting and AscensionLFM.RoleCheck and AscensionLFM.RoleCheck.StartCheck then
+        local ok, reason = AscensionLFM.RoleCheck.StartCheck()
+        if ok then
+            return true, reason
+        end
+        -- Fall through: still yell/party the RW text (same as Wipe/Mobs UX)
+        if reason == "rate limited" then
+            -- Re-announce only; keep existing listen window
+            if not RateOk("rw") then
+                return false, "rate limited"
+            end
+            local sent, ch = SendGroupAnnounce(msg)
+            if sent then
+                Print("RW (re-warn) → " .. tostring(ch))
+            end
+            return sent, ch or reason
+        end
+        if reason == "no privilege" or reason == "not hosting" then
+            -- announce fallback below
+        else
+            return false, reason
+        end
+    end
+
+    -- Not hosting, or StartCheck blocked: still send the warn like Wipe does
+    if not RateOk("rw") then
+        return false, "rate limited"
+    end
+    local sent, ch = SendGroupAnnounce(msg)
+    if sent then
+        Print("RW → " .. tostring(ch) .. ": " .. msg)
+        if not hosting then
+            Print("RW listen window needs Hosting / Full Auto — warn sent anyway")
+        end
+        if AscensionLFM.Activity and AscensionLFM.Activity.Push then
+            AscensionLFM.Activity.Push("rolecheck", "RW announce (" .. tostring(ch) .. ")")
+        end
+    end
+    return sent, ch
 end
 
 function MiniHUD.ActionResync()

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.13
+
+- **Fix Mini HUD RW:** button no longer no-ops outside Hosting / without lead —
+  always sends the role-check line (party/yell fallback like Wipe). Full listen
+  window still opens when Hosting/Full Auto. Solo hosts yell the RW. Rate-limited
+  re-click re-warns without blocking.
+
 ## 0.4.12
 
 - **Fix Mini HUD / Regrp bugs:** remember group names *before* roster sync drops

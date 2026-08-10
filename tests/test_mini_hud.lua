@@ -166,6 +166,29 @@ AscensionLFM.Database.Get().regroupDisplay = {}
 check("RememberPlayer", MiniHUD.RememberPlayer("BobTheTank") == true)
 check("display casing", AscensionLFM.Database.Get().regroupDisplay.bobthetank == "BobTheTank")
 
+-- RW works without Hosting (announce fallback like Wipe)
+MiniHUD._ResetForTests()
+_G._chats = {}
+AscensionLFM.Database.Get().mode = "notify"
+AscensionLFM.Database.Get().fullAutoHosting = false
+-- Clear wipe-test CanRaidWarn stub so solo path is real
+AscensionLFM.RoleCheck = AscensionLFM.RoleCheck or {}
+AscensionLFM.RoleCheck.CanRaidWarn = function() return false, "none" end
+AscensionLFM.RoleCheck.StartCheck = nil -- must not require hosting for announce
+_G.GetNumRaidMembers = function() return 0 end
+_G.GetNumPartyMembers = function() return 0 end
+_G.UnitIsPartyLeader = function() return false end
+_G.IsRaidLeader = function() return false end
+_G.IsRaidOfficer = function() return false end
+_G.IsPartyLeader = function() return false end
+_G.SendChatMessage = function(msg, ch)
+    table.insert(_G._chats, { msg = msg, ch = ch })
+end
+ok = MiniHUD.ActionRoleCheck()
+check("rw without hosting sends", ok == true, tostring(ok))
+check("rw yell fallback", _G._chats[1] and _G._chats[1].ch == "YELL",
+    _G._chats[1] and tostring(_G._chats[1].ch) or ("n=" .. tostring(#_G._chats)))
+
 MiniHUD._ResetForTests()
 _G._chats = {}
 ok = MiniHUD.ActionNeed("tank")
