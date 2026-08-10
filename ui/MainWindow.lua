@@ -803,7 +803,7 @@ function MainWindow.Init()
 
     local sub = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     sub:SetPoint("TOP", title, "BOTTOM", 0, -2)
-    sub:SetText("Manastorm Level Run LFM/LFG · v" .. tostring(AscensionLFM.VERSION or "0.4.10"))
+    sub:SetText("Manastorm Level Run LFM/LFG · v" .. tostring(AscensionLFM.VERSION or "0.4.11"))
     SetInk(sub, MUTED)
 
     local shell = CreateFrame("Frame", FRAME_NAME .. "Shell", frame)
@@ -975,7 +975,7 @@ function MainWindow.Init()
     CreateSectionLabel(general, "Mini Quick HUD", -210)
     widgets.miniHud = CreateToggleRow(general, -228,
         "Show floating quick bar",
-        "LFM / RW / Sync / Wipe / Mobs(shield) / FULL / Need — no /alfm. Drag to move. Default ON.",
+        "LFM / RW / Sync / Wipe / Mobs / FULL / Regrp / Need — no /alfm. Drag to move. Default ON.",
         false,
         function(on)
             if AscensionLFM.MiniHUD and AscensionLFM.MiniHUD.SetShown then

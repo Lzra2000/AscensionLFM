@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.11
+
+- **Mini HUD — Regrp:** announces `REGROUP — accept invite` and re-invites missing
+  players from the regroup watch list (filled from party/raid + assigned roles as
+  people join). Cap 15 invites per click.
+
 ## 0.4.10
 
 - **Mini HUD — Mobs:** new **Mobs** button raid-warns
