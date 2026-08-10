@@ -13,8 +13,12 @@ AscensionLFM.MainWindow = MainWindow
 
 local FRAME_NAME = "AscensionLFMFrame"
 local FRAME_WIDTH = 720
-local FRAME_HEIGHT = 900
+-- Dialog height fits common 768+ screens; tall category pages scroll.
+local FRAME_HEIGHT = 560
 local SIDEBAR_WIDTH = 148
+-- Toggle rows: title + 2-line desc must fit without spilling into the next control.
+local TOGGLE_ROW_H = 58
+local TOGGLE_STEP = 68 -- row height + 10px gap
 
 local CAT_GENERAL = "general"
 local CAT_SEEKING = "seeking"
@@ -569,7 +573,7 @@ local function CreateToggleRow(parent, y, title, description, danger, onToggle)
     local row = CreateFrame("Frame", nil, parent)
     row:SetPoint("TOPLEFT", 0, y)
     row:SetPoint("TOPRIGHT", 0, y)
-    row:SetHeight(44)
+    row:SetHeight(TOGGLE_ROW_H)
     ApplyToggleRow(row)
 
     local check = CreateFrame("CheckButton", nil, row, "UICheckButtonTemplate")
@@ -592,9 +596,18 @@ local function CreateToggleRow(parent, y, title, description, danger, onToggle)
     end
 
     local descFs = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    descFs:SetPoint("TOPLEFT", titleFs, "BOTTOMLEFT", 0, -2)
+    descFs:SetPoint("TOPLEFT", titleFs, "BOTTOMLEFT", 0, -3)
     descFs:SetPoint("RIGHT", row, "RIGHT", -8, 0)
+    if descFs.SetHeight then
+        descFs:SetHeight(30)
+    end
     descFs:SetJustifyH("LEFT")
+    if descFs.SetJustifyV then
+        descFs:SetJustifyV("TOP")
+    end
+    if descFs.SetNonSpaceWrap then
+        descFs:SetNonSpaceWrap(true)
+    end
     descFs:SetText(description)
     SetInk(descFs, MUTED)
 
@@ -638,12 +651,48 @@ local function MakeSlotEdit(parent, role)
     return edit
 end
 
-local function BuildCategoryPage(parent, id)
+-- Returns the scroll child where widgets are parented. Tall pages scroll
+-- inside a UIPanelScrollFrame instead of clipping / overlapping.
+local function BuildCategoryPage(parent, id, contentHeight)
     local page = CreateFrame("Frame", FRAME_NAME .. "Cat_" .. id, parent)
     page:SetAllPoints(parent)
     page:Hide()
     categoryPages[id] = page
-    return page
+
+    local scroll = CreateFrame("ScrollFrame", FRAME_NAME .. "Scroll_" .. id, page, "UIPanelScrollFrameTemplate")
+    scroll:SetPoint("TOPLEFT", 0, 0)
+    scroll:SetPoint("BOTTOMRIGHT", -28, 0)
+    if scroll.EnableMouseWheel then
+        scroll:EnableMouseWheel(true)
+    end
+    scroll:SetScript("OnMouseWheel", function(self, delta)
+        local cur = self:GetVerticalScroll() or 0
+        local max = 0
+        if self.GetVerticalScrollRange then
+            max = self:GetVerticalScrollRange() or 0
+        end
+        local nxt = cur - ((delta or 0) * 36)
+        if nxt < 0 then nxt = 0 end
+        if nxt > max then nxt = max end
+        self:SetVerticalScroll(nxt)
+    end)
+
+    local child = CreateFrame("Frame", FRAME_NAME .. "Content_" .. id, scroll)
+    child:SetWidth(480)
+    child:SetHeight(contentHeight or 420)
+    scroll:SetScrollChild(child)
+
+    page:SetScript("OnShow", function()
+        local w = scroll:GetWidth()
+        if type(w) == "number" and w > 40 then
+            child:SetWidth(w)
+        end
+        if scroll.SetVerticalScroll then
+            scroll:SetVerticalScroll(0)
+        end
+    end)
+
+    return child
 end
 
 local function SetCategoryHighlight(id)
@@ -751,7 +800,7 @@ function MainWindow.Init()
 
     local sub = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     sub:SetPoint("TOP", title, "BOTTOM", 0, -2)
-    sub:SetText("Manastorm Level Run LFM/LFG · v" .. tostring(AscensionLFM.VERSION or "0.4.4"))
+    sub:SetText("Manastorm Level Run LFM/LFG · v" .. tostring(AscensionLFM.VERSION or "0.4.5"))
     SetInk(sub, MUTED)
 
     local shell = CreateFrame("Frame", FRAME_NAME .. "Shell", frame)
@@ -800,13 +849,22 @@ function MainWindow.Init()
     SetInk(categoryHeadTitle, TITLE_INK)
 
     categoryHeadSub = main:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    categoryHeadSub:SetPoint("TOPLEFT", categoryHeadTitle, "BOTTOMLEFT", 0, -2)
+    categoryHeadSub:SetPoint("TOPLEFT", categoryHeadTitle, "BOTTOMLEFT", 0, -3)
     categoryHeadSub:SetPoint("RIGHT", main, "RIGHT", -12, 0)
+    if categoryHeadSub.SetHeight then
+        categoryHeadSub:SetHeight(28)
+    end
     categoryHeadSub:SetJustifyH("LEFT")
+    if categoryHeadSub.SetJustifyV then
+        categoryHeadSub:SetJustifyV("TOP")
+    end
+    if categoryHeadSub.SetNonSpaceWrap then
+        categoryHeadSub:SetNonSpaceWrap(true)
+    end
     SetInk(categoryHeadSub, { 0.28, 0.22, 0.12, 1 })
 
     local pageHost = CreateFrame("Frame", FRAME_NAME .. "PageHost", main)
-    pageHost:SetPoint("TOPLEFT", 10, -48)
+    pageHost:SetPoint("TOPLEFT", 10, -54)
     pageHost:SetPoint("BOTTOMRIGHT", -10, 8)
 
     local footer = CreateFrame("Frame", FRAME_NAME .. "Footer", shell)
@@ -858,7 +916,7 @@ function MainWindow.Init()
     --------------------------------------------------------------------
     -- General
     --------------------------------------------------------------------
-    local general = BuildCategoryPage(pageHost, CAT_GENERAL)
+    local general = BuildCategoryPage(pageHost, CAT_GENERAL, 220)
 
     local statusBox = CreateFrame("Frame", nil, general)
     statusBox:SetPoint("TOPLEFT", 0, 0)
@@ -914,7 +972,7 @@ function MainWindow.Init()
     --------------------------------------------------------------------
     -- Seeking
     --------------------------------------------------------------------
-    local seeking = BuildCategoryPage(pageHost, CAT_SEEKING)
+    local seeking = BuildCategoryPage(pageHost, CAT_SEEKING, 520)
     CreateSectionLabel(seeking, "My roles", -4)
 
     local seekRoles = CreateFrame("Frame", nil, seeking)
@@ -926,15 +984,15 @@ function MainWindow.Init()
     MakeRoleCheck(seekRoles, "aura", "Aura", 190, 0, widgets.roleButtons)
     MakeRoleCheck(seekRoles, "dps", "DPS", 280, 0, widgets.roleButtons)
 
-    CreateSectionLabel(seeking, "Seeking options", -58)
-    widgets.scanLfg = CreateToggleRow(seeking, -76,
+    CreateSectionLabel(seeking, "Seeking options", -62)
+    widgets.scanLfg = CreateToggleRow(seeking, -80,
         "Scan LFG MS lines",
         "Also notify on LFG Manastorm seekers (no auto-whisper to them).",
         false,
         function(on)
             AscensionLFM.Database.Get().scanLfg = on and true or false
         end)
-    widgets.autoWhisper = CreateToggleRow(seeking, -128,
+    widgets.autoWhisper = CreateToggleRow(seeking, -80 - TOGGLE_STEP,
         "Auto-whisper LFM leader",
         "Rate-limited whisper when a listing still needs one of your roles. Off by default.",
         false,
@@ -943,7 +1001,7 @@ function MainWindow.Init()
         end)
 
     local msgLabel = seeking:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    msgLabel:SetPoint("TOPLEFT", 4, -186)
+    msgLabel:SetPoint("TOPLEFT", 4, -228)
     msgLabel:SetText("Whisper message")
     SetInk(msgLabel, INK)
 
@@ -961,7 +1019,7 @@ function MainWindow.Init()
     end)
     widgets.whisperEdit = edit
 
-    widgets.useVariants = CreateToggleRow(seeking, -214,
+    widgets.useVariants = CreateToggleRow(seeking, -256,
         "Rotate whisper variants ({role})",
         "Cycles 2–3 templates below. {role} becomes tank/healer/aura/dps. Default ON.",
         false,
@@ -970,7 +1028,7 @@ function MainWindow.Init()
         end)
 
     local v1l = seeking:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    v1l:SetPoint("TOPLEFT", 4, -268)
+    v1l:SetPoint("TOPLEFT", 4, -326)
     v1l:SetText("V1")
     SetInk(v1l, INK)
     local v1 = CreateFrame("EditBox", "AscensionLFMVariant1", seeking, "InputBoxTemplate")
@@ -988,7 +1046,7 @@ function MainWindow.Init()
     widgets.variant1 = v1
 
     local v2l = seeking:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    v2l:SetPoint("TOPLEFT", 4, -292)
+    v2l:SetPoint("TOPLEFT", 4, -352)
     v2l:SetText("V2")
     SetInk(v2l, INK)
     local v2 = CreateFrame("EditBox", "AscensionLFMVariant2", seeking, "InputBoxTemplate")
@@ -1001,7 +1059,7 @@ function MainWindow.Init()
     widgets.variant2 = v2
 
     local v3l = seeking:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    v3l:SetPoint("TOPLEFT", 4, -316)
+    v3l:SetPoint("TOPLEFT", 4, -378)
     v3l:SetText("V3")
     SetInk(v3l, INK)
     local v3 = CreateFrame("EditBox", "AscensionLFMVariant3", seeking, "InputBoxTemplate")
@@ -1013,7 +1071,7 @@ function MainWindow.Init()
     v3:SetScript("OnEditFocusLost", function(self) saveVariant(3, self) end)
     widgets.variant3 = v3
 
-    widgets.soundMatch = CreateToggleRow(seeking, -340,
+    widgets.soundMatch = CreateToggleRow(seeking, -406,
         "Sound on new match",
         "Play a sound when a Manastorm listing is logged. Opt-in OFF.",
         false,
@@ -1022,7 +1080,7 @@ function MainWindow.Init()
         end)
 
     local blLbl = seeking:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    blLbl:SetPoint("TOPLEFT", 4, -394)
+    blLbl:SetPoint("TOPLEFT", 4, -480)
     blLbl:SetText("Blacklist leader")
     SetInk(blLbl, INK)
     local blEdit = CreateFrame("EditBox", "AscensionLFMBlacklistEdit", seeking, "InputBoxTemplate")
@@ -1055,9 +1113,9 @@ function MainWindow.Init()
     --------------------------------------------------------------------
     -- Hosting
     --------------------------------------------------------------------
-    local hosting = BuildCategoryPage(pageHost, CAT_HOSTING)
+    local hosting = BuildCategoryPage(pageHost, CAT_HOSTING, 960)
     CreateSectionLabel(hosting, "Full Auto", -4)
-    widgets.fullAuto = CreateToggleRow(hosting, -20,
+    widgets.fullAuto = CreateToggleRow(hosting, -22,
         "Full Auto Hosting (master)",
         "ON: Hosting + accept T/H/A/D + whisper invite + LFG invite + scan + repost + reject-rewhisper. Default OFF.",
         false,
@@ -1065,39 +1123,43 @@ function MainWindow.Init()
             AscensionLFM.Database.SetFullAutoHosting(on)
         end)
 
-    CreateSectionLabel(hosting, "Accept roles", -72)
+    CreateSectionLabel(hosting, "Accept roles", -96)
     local hostRoles = CreateFrame("Frame", nil, hosting)
-    hostRoles:SetPoint("TOPLEFT", 0, -88)
-    hostRoles:SetPoint("TOPRIGHT", 0, -88)
+    hostRoles:SetPoint("TOPLEFT", 0, -114)
+    hostRoles:SetPoint("TOPRIGHT", 0, -114)
     hostRoles:SetHeight(24)
     MakeRoleCheck(hostRoles, "tank", "Tank", 0, 0, widgets.roleButtonsHost)
     MakeRoleCheck(hostRoles, "healer", "Healer", 90, 0, widgets.roleButtonsHost)
     MakeRoleCheck(hostRoles, "aura", "Aura", 190, 0, widgets.roleButtonsHost)
     MakeRoleCheck(hostRoles, "dps", "DPS", 280, 0, widgets.roleButtonsHost)
 
-    CreateSectionLabel(hosting, "Invite + reject", -118)
-    widgets.autoInvite = CreateToggleRow(hosting, -134,
+    CreateSectionLabel(hosting, "Invite + reject", -154)
+    local hy = -172
+    widgets.autoInvite = CreateToggleRow(hosting, hy,
         "Auto-invite matching role whispers",
         "InviteUnit when role accepted + slot open. Full Auto turns this on.",
         false,
         function(on)
             AscensionLFM.Database.Get().autoInvite = on and true or false
         end)
-    widgets.autoInviteLfg = CreateToggleRow(hosting, -184,
+    hy = hy - TOGGLE_STEP
+    widgets.autoInviteLfg = CreateToggleRow(hosting, hy,
         "Auto-invite LFG seekers (chat)",
         "When someone posts LFG MS with a role you need + open slot → InviteUnit. Default ON while Hosting.",
         false,
         function(on)
             AscensionLFM.Database.Get().autoInviteLfg = on and true or false
         end)
-    widgets.requireRole = CreateToggleRow(hosting, -234,
+    hy = hy - TOGGLE_STEP
+    widgets.requireRole = CreateToggleRow(hosting, hy,
         "Require role in whisper / LFG",
         "Default-deny whispers/LFG lines with no tank/heal/aura/dps cue.",
         false,
         function(on)
             AscensionLFM.Database.Get().requireRoleWhisper = on and true or false
         end)
-    widgets.rejectRewhisper = CreateToggleRow(hosting, -284,
+    hy = hy - TOGGLE_STEP
+    widgets.rejectRewhisper = CreateToggleRow(hosting, hy,
         "Reject re-whisper (slot/group full / no role)",
         "Whisper templates with {role} {filled} {max}. Rate-limited; ignore list. Default OFF.",
         false,
@@ -1105,8 +1167,9 @@ function MainWindow.Init()
             AscensionLFM.Database.Get().rejectRewhisper = on and true or false
         end)
 
+    local rtY = hy - TOGGLE_ROW_H - 12
     local rtLbl = hosting:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    rtLbl:SetPoint("TOPLEFT", 4, -336)
+    rtLbl:SetPoint("TOPLEFT", 4, rtY)
     rtLbl:SetText("Reject tmpl")
     SetInk(rtLbl, INK)
     local rtEdit = CreateFrame("EditBox", "AscensionLFMRejectTmpl", hosting, "InputBoxTemplate")
@@ -1123,7 +1186,8 @@ function MainWindow.Init()
     end)
     widgets.rejectTemplate = rtEdit
 
-    widgets.soundApplicant = CreateToggleRow(hosting, -360,
+    hy = rtY - 28
+    widgets.soundApplicant = CreateToggleRow(hosting, hy,
         "Sound on applicant whisper",
         "Play TellMessage when a hosting whisper arrives. Opt-in OFF.",
         false,
@@ -1131,10 +1195,11 @@ function MainWindow.Init()
             AscensionLFM.Database.Get().soundOnApplicant = on and true or false
         end)
 
-    CreateSectionLabel(hosting, "Presets", -412)
+    local presetSecY = hy - TOGGLE_ROW_H - 16
+    CreateSectionLabel(hosting, "Presets", presetSecY)
     local presetRow = CreateFrame("Frame", nil, hosting)
-    presetRow:SetPoint("TOPLEFT", 0, -428)
-    presetRow:SetPoint("TOPRIGHT", 0, -428)
+    presetRow:SetPoint("TOPLEFT", 0, presetSecY - 18)
+    presetRow:SetPoint("TOPRIGHT", 0, presetSecY - 18)
     presetRow:SetHeight(24)
     local load2337 = CreateFrame("Button", nil, presetRow, "UIPanelButtonTemplate")
     load2337:SetSize(100, 20)
@@ -1167,15 +1232,16 @@ function MainWindow.Init()
         SyncWidgetsFromDB()
     end)
     presetLabelFS = hosting:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    presetLabelFS:SetPoint("TOPLEFT", 4, -454)
+    presetLabelFS:SetPoint("TOPLEFT", 4, presetSecY - 46)
     presetLabelFS:SetPoint("RIGHT", -4, 0)
     presetLabelFS:SetJustifyH("LEFT")
     SetInk(presetLabelFS, MUTED)
 
-    CreateSectionLabel(hosting, "Slots", -476)
+    local slotsY = presetSecY - 70
+    CreateSectionLabel(hosting, "Slots", slotsY)
     local slotRow = CreateFrame("Frame", nil, hosting)
-    slotRow:SetPoint("TOPLEFT", 0, -492)
-    slotRow:SetPoint("TOPRIGHT", 0, -492)
+    slotRow:SetPoint("TOPLEFT", 0, slotsY - 18)
+    slotRow:SetPoint("TOPRIGHT", 0, slotsY - 18)
     slotRow:SetHeight(24)
 
     local maxLabel = slotRow:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -1221,13 +1287,14 @@ function MainWindow.Init()
     end
 
     slotsFS = hosting:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    slotsFS:SetPoint("TOPLEFT", 4, -518)
+    slotsFS:SetPoint("TOPLEFT", 4, slotsY - 46)
     slotsFS:SetPoint("RIGHT", -4, 0)
     slotsFS:SetJustifyH("LEFT")
     SetInk(slotsFS, MUTED)
 
-    CreateSectionLabel(hosting, "Role Check", -542)
-    widgets.autoMoveAura = CreateToggleRow(hosting, -558,
+    local rcY = slotsY - 72
+    CreateSectionLabel(hosting, "Role Check", rcY)
+    widgets.autoMoveAura = CreateToggleRow(hosting, rcY - 18,
         "Auto-move Auras (1 per raid group)",
         "Keep at most one Aura player in each raid group (1–8). Extra Auras are moved to empty groups. Default ON.",
         false,
@@ -1237,7 +1304,7 @@ function MainWindow.Init()
                 AscensionLFM.AuraBalance.Balance()
             end
         end)
-    widgets.roleCheckAutoResync = CreateToggleRow(hosting, -608,
+    widgets.roleCheckAutoResync = CreateToggleRow(hosting, rcY - 18 - TOGGLE_STEP,
         "Auto-resync after listening window",
         "When the window ends: remove leavers, apply whispered roles, refresh filled counts. Default ON.",
         false,
@@ -1245,8 +1312,9 @@ function MainWindow.Init()
             AscensionLFM.Database.Get().roleCheckAutoResync = on and true or false
         end)
 
+    local rcFieldsY = rcY - 18 - TOGGLE_STEP - TOGGLE_ROW_H - 12
     local rcMsgLbl = hosting:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    rcMsgLbl:SetPoint("TOPLEFT", 4, -658)
+    rcMsgLbl:SetPoint("TOPLEFT", 4, rcFieldsY)
     rcMsgLbl:SetText("RW message")
     SetInk(rcMsgLbl, INK)
     local rcMsg = CreateFrame("EditBox", "AscensionLFMRoleCheckMsg", hosting, "InputBoxTemplate")
@@ -1264,7 +1332,7 @@ function MainWindow.Init()
     widgets.roleCheckMsg = rcMsg
 
     local rcWinLbl = hosting:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    rcWinLbl:SetPoint("TOPLEFT", 4, -682)
+    rcWinLbl:SetPoint("TOPLEFT", 4, rcFieldsY - 26)
     rcWinLbl:SetText("Window (sec)")
     SetInk(rcWinLbl, INK)
     local rcWin = CreateFrame("EditBox", "AscensionLFMRoleCheckWindow", hosting, "InputBoxTemplate")
@@ -1291,8 +1359,8 @@ function MainWindow.Init()
     widgets.roleCheckWindow = rcWin
 
     local rcBtnRow = CreateFrame("Frame", nil, hosting)
-    rcBtnRow:SetPoint("TOPLEFT", 0, -706)
-    rcBtnRow:SetPoint("TOPRIGHT", 0, -706)
+    rcBtnRow:SetPoint("TOPLEFT", 0, rcFieldsY - 52)
+    rcBtnRow:SetPoint("TOPRIGHT", 0, rcFieldsY - 52)
     rcBtnRow:SetHeight(24)
 
     local rwBtn = CreateFrame("Button", nil, rcBtnRow, "UIPanelButtonTemplate")
@@ -1325,7 +1393,7 @@ function MainWindow.Init()
     end)
 
     widgets.roleCheckStatus = hosting:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    widgets.roleCheckStatus:SetPoint("TOPLEFT", 4, -734)
+    widgets.roleCheckStatus:SetPoint("TOPLEFT", 4, rcFieldsY - 82)
     widgets.roleCheckStatus:SetPoint("RIGHT", -4, 0)
     widgets.roleCheckStatus:SetJustifyH("LEFT")
     SetInk(widgets.roleCheckStatus, MUTED)
@@ -1335,7 +1403,7 @@ function MainWindow.Init()
     --------------------------------------------------------------------
     -- Post (LFM compose / scan / repost)
     --------------------------------------------------------------------
-    local post = BuildCategoryPage(pageHost, CAT_POST)
+    local post = BuildCategoryPage(pageHost, CAT_POST, 560)
     CreateSectionLabel(post, "LFM message", -4)
 
     local previewBox = CreateFrame("Frame", nil, post)
@@ -1499,13 +1567,14 @@ function MainWindow.Init()
     end)
 
     postRoleCheckStatusFS = post:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    postRoleCheckStatusFS:SetPoint("LEFT", postResyncBtn, "RIGHT", 10, 0)
+    postRoleCheckStatusFS:SetPoint("TOPLEFT", 4, -226)
+    postRoleCheckStatusFS:SetPoint("RIGHT", -4, 0)
     postRoleCheckStatusFS:SetJustifyH("LEFT")
     SetInk(postRoleCheckStatusFS, MUTED)
     postRoleCheckStatusFS:SetText("Role check idle")
 
-    CreateSectionLabel(post, "Auto-repost", -230)
-    widgets.autoRepost = CreateToggleRow(post, -248,
+    CreateSectionLabel(post, "Auto-repost", -250)
+    widgets.autoRepost = CreateToggleRow(post, -268,
         "Enable auto-repost (Hosting only)",
         "Rebuild LFM from slots each tick. Stops when full or disabled. Default OFF.",
         false,
@@ -1517,16 +1586,16 @@ function MainWindow.Init()
             end
             MainWindow.RefreshPost()
         end)
-    widgets.announceFull = CreateToggleRow(post, -298,
+    widgets.announceFull = CreateToggleRow(post, -268 - TOGGLE_STEP,
         "Announce FULL when stopping",
-        "Optional one public FULL line (fullAnnounceMessage) when auto-repost stops. Default OFF.",
+        "Optional one public FULL line when auto-repost stops. Default OFF.",
         false,
         function(on)
             AscensionLFM.Database.Get().announceFull = on and true or false
         end)
 
     local intLbl = post:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    intLbl:SetPoint("TOPLEFT", 4, -352)
+    intLbl:SetPoint("TOPLEFT", 4, -368)
     intLbl:SetText("Interval (sec, min 30)")
     SetInk(intLbl, INK)
 
@@ -1562,13 +1631,13 @@ function MainWindow.Init()
     widgets.repostInterval = intEdit
 
     postStatusFS = post:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    postStatusFS:SetPoint("TOPLEFT", 4, -380)
+    postStatusFS:SetPoint("TOPLEFT", 4, -396)
     postStatusFS:SetPoint("RIGHT", -4, 0)
     postStatusFS:SetJustifyH("LEFT")
     SetInk(postStatusFS, MUTED)
 
     local postHint = post:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    postHint:SetPoint("TOPLEFT", 4, -372)
+    postHint:SetPoint("TOPLEFT", 4, -418)
     postHint:SetPoint("RIGHT", -4, 0)
     postHint:SetJustifyH("LEFT")
     postHint:SetText("Example: LFM MS 0/2 Tanks 0/3 Healers 0/3 Aura 0/7 DPS — filled from Hosting slots + Scan.")
