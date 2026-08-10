@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.14
+
+- **Debug / harden Mini HUD:** every button prints on fail (no silent clicks);
+  raid non-lead uses `RAID` before yell; rate-limit stamps only after a successful
+  send; Regrp skips invites without lead/assist (solo still invites); bad Post
+  channel falls back to YELL; Settings RW uses the same announce fallback as the
+  Mini HUD; `/alfm status` shows a miniHUD debug line.
+
 ## 0.4.13
 
 - **Fix Mini HUD RW:** button no longer no-ops outside Hosting / without lead —

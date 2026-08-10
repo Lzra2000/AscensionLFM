@@ -188,6 +188,12 @@ local function SendGroupAnnounce(msg)
         if ok then
             return true, "RAID"
         end
+    elseif groupKind == "raid" then
+        -- Not lead/assist: still hit raid chat before yell so the MS group hears it
+        local ok = pcall(SendChatMessage, msg, "RAID")
+        if ok then
+            return true, "RAID"
+        end
     elseif groupKind == "party" and can then
         local ok = pcall(SendChatMessage, msg, "PARTY")
         if ok then
@@ -207,14 +213,36 @@ local function SendGroupAnnounce(msg)
     return false, "send failed"
 end
 
-local function RateOk(kind)
+-- Solo can InviteUnit (forms a party). In a group, need lead/assist.
+local function CanInviteOthers()
+    local can, groupKind = CanRaidWarn()
+    if can then
+        return true, groupKind
+    end
+    if groupKind == "none" then
+        return true, "none"
+    end
+    return false, groupKind
+end
+
+-- Peek without consuming; stamp only after a successful send.
+local function RateBlocked(kind)
     kind = tostring(kind or "default")
     local now = Now()
     local last = tonumber(lastAnnounceAt[kind]) or 0
-    if (now - last) < ANNOUNCE_GAP then
+    return (now - last) < ANNOUNCE_GAP
+end
+
+local function RateStamp(kind)
+    lastAnnounceAt[tostring(kind or "default")] = Now()
+end
+
+-- Back-compat for tests / callers that still use RateOk
+local function RateOk(kind)
+    if RateBlocked(kind) then
         return false
     end
-    lastAnnounceAt[kind] = now
+    RateStamp(kind)
     return true
 end
 
@@ -249,13 +277,18 @@ end
 function MiniHUD.ActionPostLfm()
     local db = DB()
     if not AscensionLFM.Poster or not AscensionLFM.Poster.PostOnce then
+        Print("LFM failed: poster missing")
         return false, "no poster"
     end
     if AscensionLFM.Poster.RefreshMessage then
         AscensionLFM.Poster.RefreshMessage()
     end
     local msg = AscensionLFM.Poster.GetMessage and AscensionLFM.Poster.GetMessage() or nil
-    return AscensionLFM.Poster.PostOnce(msg, db and db.postChannel, db and db.postChannelName)
+    local ok, err = AscensionLFM.Poster.PostOnce(msg, db and db.postChannel, db and db.postChannelName)
+    if not ok then
+        Print("LFM failed: " .. tostring(err or "?"))
+    end
+    return ok, err
 end
 
 function MiniHUD.ActionRoleCheck()
@@ -277,28 +310,35 @@ function MiniHUD.ActionRoleCheck()
         -- Fall through: still yell/party the RW text (same as Wipe/Mobs UX)
         if reason == "rate limited" then
             -- Re-announce only; keep existing listen window
-            if not RateOk("rw") then
+            if RateBlocked("rw") then
+                Print("RW rate limited — wait a moment")
                 return false, "rate limited"
             end
             local sent, ch = SendGroupAnnounce(msg)
             if sent then
+                RateStamp("rw")
                 Print("RW (re-warn) → " .. tostring(ch))
+            else
+                Print("RW re-warn failed: " .. tostring(ch))
             end
             return sent, ch or reason
         end
         if reason == "no privilege" or reason == "not hosting" then
             -- announce fallback below
         else
+            Print("RW blocked: " .. tostring(reason))
             return false, reason
         end
     end
 
     -- Not hosting, or StartCheck blocked: still send the warn like Wipe does
-    if not RateOk("rw") then
+    if RateBlocked("rw") then
+        Print("RW rate limited — wait a moment")
         return false, "rate limited"
     end
     local sent, ch = SendGroupAnnounce(msg)
     if sent then
+        RateStamp("rw")
         Print("RW → " .. tostring(ch) .. ": " .. msg)
         if not hosting then
             Print("RW listen window needs Hosting / Full Auto — warn sent anyway")
@@ -306,6 +346,8 @@ function MiniHUD.ActionRoleCheck()
         if AscensionLFM.Activity and AscensionLFM.Activity.Push then
             AscensionLFM.Activity.Push("rolecheck", "RW announce (" .. tostring(ch) .. ")")
         end
+    else
+        Print("RW failed: " .. tostring(ch))
     end
     return sent, ch
 end
@@ -316,39 +358,49 @@ function MiniHUD.ActionResync()
     end
     if AscensionLFM.Slots and AscensionLFM.Slots.ScanRaid then
         AscensionLFM.Slots.ScanRaid()
+        Print("Sync: scanned raid/party roster")
         return true
     end
+    Print("Sync failed: no resync module")
     return false, "no resync"
 end
 
 function MiniHUD.ActionWipe()
-    if not RateOk("wipe") then
+    if RateBlocked("wipe") then
+        Print("Wipe rate limited — wait a moment")
         return false, "rate limited"
     end
     local db = DB()
     local msg = MiniHUD.BuildWipeMessage(db and db.wipeAnnounceMessage)
     local ok, ch = SendGroupAnnounce(msg)
     if ok then
+        RateStamp("wipe")
         Print("Wipe → " .. tostring(ch) .. ": " .. msg)
         if AscensionLFM.Activity and AscensionLFM.Activity.Push then
             AscensionLFM.Activity.Push("wipe", msg)
         end
+    else
+        Print("Wipe failed: " .. tostring(ch))
     end
     return ok, ch
 end
 
 function MiniHUD.ActionShield()
-    if not RateOk("shield") then
+    if RateBlocked("shield") then
+        Print("Mobs rate limited — wait a moment")
         return false, "rate limited"
     end
     local db = DB()
     local msg = MiniHUD.BuildShieldMessage(db and db.shieldAnnounceMessage)
     local ok, ch = SendGroupAnnounce(msg)
     if ok then
-        Print("Shield → " .. tostring(ch) .. ": " .. msg)
+        RateStamp("shield")
+        Print("Mobs → " .. tostring(ch) .. ": " .. msg)
         if AscensionLFM.Activity and AscensionLFM.Activity.Push then
             AscensionLFM.Activity.Push("shield", msg)
         end
+    else
+        Print("Mobs failed: " .. tostring(ch))
     end
     return ok, ch
 end
@@ -444,7 +496,8 @@ function MiniHUD.RememberPlayer(name)
 end
 
 function MiniHUD.ActionRegroup()
-    if not RateOk("regroup") then
+    if RateBlocked("regroup") then
+        Print("Regrp rate limited — wait a moment")
         return false, "rate limited"
     end
     MiniHUD.RememberPresent()
@@ -452,6 +505,7 @@ function MiniHUD.ActionRegroup()
     local msg = MiniHUD.BuildRegroupMessage(db and db.regroupAnnounceMessage)
     local ok, ch = SendGroupAnnounce(msg)
     if ok then
+        RateStamp("regroup")
         Print("Regroup → " .. tostring(ch) .. ": " .. msg)
         if AscensionLFM.Activity and AscensionLFM.Activity.Push then
             AscensionLFM.Activity.Push("regroup", msg)
@@ -461,7 +515,17 @@ function MiniHUD.ActionRegroup()
     end
 
     if type(InviteUnit) ~= "function" then
+        Print("Regroup: InviteUnit missing")
         return false, "InviteUnit missing"
+    end
+
+    local canInvite, invKind = CanInviteOthers()
+    if not canInvite then
+        Print("Regroup: need lead/assist to re-invite (warn still sent if above OK)")
+        if ok then
+            return true, 0
+        end
+        return false, "no invite privilege"
     end
 
     local present = CollectPresentSet()
@@ -487,7 +551,7 @@ function MiniHUD.ActionRegroup()
         end
     end
     if invited > 0 then
-        Print(string.format("Regroup invites: %d", invited))
+        Print(string.format("Regroup invites: %d (privilege=%s)", invited, tostring(invKind)))
         if AscensionLFM.Activity and AscensionLFM.Activity.Push then
             AscensionLFM.Activity.Push("regroup", "invited " .. tostring(invited))
         end
@@ -509,34 +573,62 @@ function MiniHUD.ActionRegroup()
 end
 
 function MiniHUD.ActionFull()
-    if not RateOk("full") then
+    if RateBlocked("full") then
+        Print("FULL rate limited — wait a moment")
         return false, "rate limited"
     end
     local db = DB()
     local msg = tostring((db and db.fullAnnounceMessage) or "LFM MS FULL — thanks!")
     local channel = (db and db.postChannel) or "YELL"
     if AscensionLFM.Poster and AscensionLFM.Poster.PostOnce then
-        return AscensionLFM.Poster.PostOnce(msg, channel, db and db.postChannelName)
+        local sent, err = AscensionLFM.Poster.PostOnce(msg, channel, db and db.postChannelName)
+        if sent then
+            RateStamp("full")
+        else
+            Print("FULL failed: " .. tostring(err))
+        end
+        return sent, err or channel
     end
     local sent, ch = SendGroupAnnounce(msg)
+    if sent then
+        RateStamp("full")
+        Print("FULL → " .. tostring(ch) .. ": " .. msg)
+    else
+        Print("FULL failed: " .. tostring(ch))
+    end
     return sent, ch
 end
 
 function MiniHUD.ActionNeed(role)
-    if not RateOk("need:" .. tostring(role or "")) then
+    local kind = "need:" .. tostring(role or "")
+    if RateBlocked(kind) then
+        Print("Need rate limited — wait a moment")
         return false, "rate limited"
     end
     local msg = MiniHUD.BuildNeedMessage(role)
     if not msg then
+        Print("Need failed: bad role")
         return false, "bad role"
     end
     local db = DB()
     local channel = (db and db.postChannel) or "YELL"
     if AscensionLFM.Poster and AscensionLFM.Poster.PostOnce then
         local sent, err = AscensionLFM.Poster.PostOnce(msg, channel, db and db.postChannelName)
+        if sent then
+            RateStamp(kind)
+        else
+            Print("Need failed: " .. tostring(err))
+        end
         return sent, err or channel
     end
-    return SendGroupAnnounce(msg)
+    local sent, ch = SendGroupAnnounce(msg)
+    if sent then
+        RateStamp(kind)
+        Print("Need → " .. tostring(ch) .. ": " .. msg)
+    else
+        Print("Need failed: " .. tostring(ch))
+    end
+    return sent, ch
 end
 
 function MiniHUD.ActionClearRoles()
@@ -640,8 +732,13 @@ local function MakeBtn(parent, label, width, onClick, danger)
     btn:SetText(label)
     btn:SetScript("OnClick", function()
         local ok, err = onClick()
-        if ok == false and err and AscensionLFM.Print then
-            AscensionLFM.Print("MiniHUD: " .. tostring(err))
+        -- Actions Print their own success/fail; only surface bare silent failures here
+        if ok ~= true and err and AscensionLFM.Print then
+            -- Prefer Action-owned messages; skip duplicates for common reasons
+            local e = tostring(err)
+            if e ~= "rate limited" and e ~= "no privilege" and e ~= "not hosting" then
+                AscensionLFM.Print("MiniHUD " .. tostring(label) .. ": " .. e)
+            end
         end
         MiniHUD.Refresh()
     end)
@@ -860,9 +957,34 @@ function MiniHUD._ResetForTests()
     expanded = true
 end
 
+--- Live debug snapshot for /alfm status (and tests).
+function MiniHUD.GetDebugStatus()
+    local db = DB()
+    local can, groupKind = CanRaidWarn()
+    local canInv = CanInviteOthers()
+    local watch = (db and type(db.regroupRoster) == "table" and #db.regroupRoster) or 0
+    local hosting = db and (db.mode == "hosting" or db.fullAutoHosting) and true or false
+    return {
+        shown = MiniHUD.IsShown and MiniHUD.IsShown() or false,
+        expanded = expanded and true or false,
+        mode = (db and db.mode) or "?",
+        hosting = hosting,
+        canWarn = can and true or false,
+        group = groupKind or "none",
+        canInvite = canInv and true or false,
+        watch = watch,
+        postChannel = (db and db.postChannel) or "YELL",
+    }
+end
+
 MiniHUD.DEFAULT_WIPE = DEFAULT_WIPE
 MiniHUD.DEFAULT_SHIELD = DEFAULT_SHIELD
 MiniHUD.DEFAULT_REGROUP = DEFAULT_REGROUP
 MiniHUD.ANNOUNCE_GAP = ANNOUNCE_GAP
 MiniHUD.REGROUP_MAX = REGROUP_MAX
 MiniHUD.REGROUP_INVITE_CAP = REGROUP_INVITE_CAP
+-- Test hooks
+MiniHUD._RateBlocked = RateBlocked
+MiniHUD._RateStamp = RateStamp
+MiniHUD._SendGroupAnnounce = SendGroupAnnounce
+MiniHUD._CanInviteOthers = CanInviteOthers

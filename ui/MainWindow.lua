@@ -803,7 +803,7 @@ function MainWindow.Init()
 
     local sub = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     sub:SetPoint("TOP", title, "BOTTOM", 0, -2)
-    sub:SetText("Manastorm Level Run LFM/LFG · v" .. tostring(AscensionLFM.VERSION or "0.4.13"))
+    sub:SetText("Manastorm Level Run LFM/LFG · v" .. tostring(AscensionLFM.VERSION or "0.4.14"))
     SetInk(sub, MUTED)
 
     local shell = CreateFrame("Frame", FRAME_NAME .. "Shell", frame)
@@ -1384,7 +1384,10 @@ function MainWindow.Init()
     rwBtn:SetPoint("LEFT", 0, 0)
     rwBtn:SetText("RW Role Check")
     rwBtn:SetScript("OnClick", function()
-        if AscensionLFM.RoleCheck and AscensionLFM.RoleCheck.StartCheck then
+        -- Same path as Mini HUD RW (announce fallback when not hosting / no privilege)
+        if AscensionLFM.MiniHUD and AscensionLFM.MiniHUD.ActionRoleCheck then
+            AscensionLFM.MiniHUD.ActionRoleCheck()
+        elseif AscensionLFM.RoleCheck and AscensionLFM.RoleCheck.StartCheck then
             local ok, reason = AscensionLFM.RoleCheck.StartCheck()
             if not ok and AscensionLFM.Print then
                 AscensionLFM.Print("Role Check: " .. tostring(reason))
@@ -1558,7 +1561,9 @@ function MainWindow.Init()
     postRwBtn:SetPoint("LEFT", 0, 0)
     postRwBtn:SetText("RW Role Check")
     postRwBtn:SetScript("OnClick", function()
-        if AscensionLFM.RoleCheck and AscensionLFM.RoleCheck.StartCheck then
+        if AscensionLFM.MiniHUD and AscensionLFM.MiniHUD.ActionRoleCheck then
+            AscensionLFM.MiniHUD.ActionRoleCheck()
+        elseif AscensionLFM.RoleCheck and AscensionLFM.RoleCheck.StartCheck then
             local ok, reason = AscensionLFM.RoleCheck.StartCheck()
             if not ok and AscensionLFM.Print then
                 AscensionLFM.Print("Role Check: " .. tostring(reason))

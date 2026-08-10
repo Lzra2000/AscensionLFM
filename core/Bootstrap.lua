@@ -8,7 +8,7 @@ if type(AscensionLFM) ~= "table" then
     _G.AscensionLFM = AscensionLFM
 end
 
-AscensionLFM.VERSION = "0.4.13"
+AscensionLFM.VERSION = "0.4.14"
 AscensionLFM.ADDON_NAME = "AscensionLFM"
 
 local function Print(msg)
@@ -97,6 +97,17 @@ local function PrintStatus()
             Print(string.format("repost: %s · status=%s · full=%s · countdown=%ss",
                 OnOff(st.enabled), tostring(st.status or "?"),
                 tostring(st.isFull), tostring(st.countdown or 0)))
+        end
+    end
+    if AscensionLFM.MiniHUD and AscensionLFM.MiniHUD.GetDebugStatus then
+        local mh = AscensionLFM.MiniHUD.GetDebugStatus()
+        if mh then
+            Print(string.format(
+                "miniHUD: show=%s · expand=%s · mode=%s · host=%s · canWarn=%s · group=%s · canInvite=%s · watch=%d · post=%s",
+                OnOff(mh.shown), OnOff(mh.expanded), tostring(mh.mode),
+                OnOff(mh.hosting), OnOff(mh.canWarn), tostring(mh.group),
+                OnOff(mh.canInvite), tonumber(mh.watch) or 0, tostring(mh.postChannel)
+            ))
         end
     end
     Print("slash OK — /alfm UI · /alfm test")

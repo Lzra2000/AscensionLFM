@@ -189,8 +189,55 @@ check("rw without hosting sends", ok == true, tostring(ok))
 check("rw yell fallback", _G._chats[1] and _G._chats[1].ch == "YELL",
     _G._chats[1] and tostring(_G._chats[1].ch) or ("n=" .. tostring(#_G._chats)))
 
+-- Raid member (not lead): announce via RAID, not only YELL
 MiniHUD._ResetForTests()
 _G._chats = {}
+AscensionLFM.RoleCheck.CanRaidWarn = function() return false, "raid" end
+ok = MiniHUD.ActionWipe()
+check("raid non-lead wipe ok", ok == true)
+check("raid non-lead uses RAID", _G._chats[1] and _G._chats[1].ch == "RAID",
+    _G._chats[1] and tostring(_G._chats[1].ch))
+
+-- Failed send must not burn rate limit
+MiniHUD._ResetForTests()
+_G._chats = {}
+AscensionLFM.RoleCheck.CanRaidWarn = function() return false, "none" end
+local boom = true
+_G.SendChatMessage = function(msg, ch)
+    if boom then
+        boom = false
+        error("chat blocked")
+    end
+    table.insert(_G._chats, { msg = msg, ch = ch })
+end
+ok = MiniHUD.ActionWipe()
+check("wipe fail first", ok == false)
+ok = MiniHUD.ActionWipe()
+check("wipe retry after fail not rate-limited", ok == true, tostring(ok))
+check("wipe retry yelled", _G._chats[1] and _G._chats[1].ch == "YELL")
+
+-- Regrp without invite privilege still warns
+MiniHUD._ResetForTests()
+_G._chats = {}
+_G.SendChatMessage = function(msg, ch)
+    table.insert(_G._chats, { msg = msg, ch = ch })
+end
+local invitedN = 0
+_G.InviteUnit = function() invitedN = invitedN + 1 end
+AscensionLFM.RoleCheck.CanRaidWarn = function() return false, "party" end
+AscensionLFM.Database.Get().regroupRoster = { "Alice" }
+AscensionLFM.Database.Get().regroupDisplay = { alice = "Alice" }
+ok = MiniHUD.ActionRegroup()
+check("regrp warn without invite power", ok == true)
+check("regrp no invites without privilege", invitedN == 0, tostring(invitedN))
+check("regrp still announced", _G._chats[1] ~= nil)
+
+local st = MiniHUD.GetDebugStatus()
+check("debug status table", type(st) == "table" and st.group ~= nil)
+
+MiniHUD._ResetForTests()
+_G._chats = {}
+AscensionLFM.RoleCheck.CanRaidWarn = function() return false, "none" end
 ok = MiniHUD.ActionNeed("tank")
 check("need posts via Poster", ok == true)
 

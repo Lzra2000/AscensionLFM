@@ -207,9 +207,14 @@ function Poster.PostOnce(msg, channel, channelName, nowOverride)
     if channel == "CHANNEL" then
         local id = ResolveChannelIndex(channelName)
         if not id then
-            return false, "bad channel name"
+            if AscensionLFM.Print then
+                AscensionLFM.Print("bad channel name — falling back to YELL")
+            end
+            channel = "YELL"
+            ok, err = pcall(SendChatMessage, msg, "YELL")
+        else
+            ok, err = pcall(SendChatMessage, msg, "CHANNEL", nil, id)
         end
-        ok, err = pcall(SendChatMessage, msg, "CHANNEL", nil, id)
     else
         ok, err = pcall(SendChatMessage, msg, channel)
     end
