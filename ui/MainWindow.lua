@@ -498,6 +498,9 @@ local function SyncWidgetsFromDB()
     if widgets.announceFull and widgets.announceFull.SetChecked then
         widgets.announceFull:SetChecked(db.announceFull and true or false)
     end
+    if widgets.miniHud and widgets.miniHud.SetChecked then
+        widgets.miniHud:SetChecked(db.miniHudShow ~= false)
+    end
     if widgets.useVariants and widgets.useVariants.SetChecked then
         widgets.useVariants:SetChecked(db.useWhisperVariants ~= false)
     end
@@ -800,7 +803,7 @@ function MainWindow.Init()
 
     local sub = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     sub:SetPoint("TOP", title, "BOTTOM", 0, -2)
-    sub:SetText("Manastorm Level Run LFM/LFG · v" .. tostring(AscensionLFM.VERSION or "0.4.8"))
+    sub:SetText("Manastorm Level Run LFM/LFG · v" .. tostring(AscensionLFM.VERSION or "0.4.9"))
     SetInk(sub, MUTED)
 
     local shell = CreateFrame("Frame", FRAME_NAME .. "Shell", frame)
@@ -916,7 +919,7 @@ function MainWindow.Init()
     --------------------------------------------------------------------
     -- General
     --------------------------------------------------------------------
-    local general = BuildCategoryPage(pageHost, CAT_GENERAL, 220)
+    local general = BuildCategoryPage(pageHost, CAT_GENERAL, 320)
 
     local statusBox = CreateFrame("Frame", nil, general)
     statusBox:SetPoint("TOPLEFT", 0, 0)
@@ -968,6 +971,19 @@ function MainWindow.Init()
         .. "|cff5a4010Hosting|r — role whispers → invite only if accepted role + open slot.\n"
         .. "|cff5a4010Full Auto|r — Hosting category master (default OFF): invite + scan + repost + reject.")
     SetInk(modeHint, MUTED)
+
+    CreateSectionLabel(general, "Mini Quick HUD", -210)
+    widgets.miniHud = CreateToggleRow(general, -228,
+        "Show floating quick bar",
+        "LFM / RW / Sync / Wipe / FULL / Need T-H-A-D without typing /alfm. Drag to move. Default ON.",
+        false,
+        function(on)
+            if AscensionLFM.MiniHUD and AscensionLFM.MiniHUD.SetShown then
+                AscensionLFM.MiniHUD.SetShown(on)
+            else
+                AscensionLFM.Database.Get().miniHudShow = on and true or false
+            end
+        end)
 
     --------------------------------------------------------------------
     -- Seeking

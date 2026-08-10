@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.9
+
+- **Mini Quick HUD:** floating click bar (default ON) — LFM / RW / Sync / Wipe / FULL /
+  Need T·H·A·D without typing `/alfm`. Drag to move; × collapses to an `ALFM` chip;
+  chip click expands; title click opens full settings. Toggle under General.
+- Wipe uses raid warning (party/yell fallback). Need lines post on your Post channel.
+
 ## 0.4.8
 
 - **Fix RW Role Check:** accept `UnitIsPartyLeader("player")` (same Ascension privilege

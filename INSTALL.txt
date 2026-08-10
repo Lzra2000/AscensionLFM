@@ -12,12 +12,12 @@ ENGLISH
 
    Folder name MUST match the .toc basename: AscensionLFM (classic 3.3.5a rule).
 3. Enable AscensionLFM in the character AddOns list, then login or /reload.
-4. Type /alfm (or /mslfm) to open settings. If nothing happens: check the AddOns list that
+4. Type /alfm (or /mslfm) to open settings. A Mini Quick HUD also appears for LFM/RW/Wipe/Need
+   clicks without typing /alfm. If nothing happens: check the AddOns list that
    AscensionLFM is enabled (folder must be AscensionLFM), then /reload. Try /alfm status —
    if that prints, the addon loaded. Default mode is Notify (Listening ON).
 5. Full Auto Hosting: /alfm → Hosting → enable the master toggle (default OFF). Kick59 stays OFF.
-6. Role Check / Aura: Hosting → RW Role Check; keep “Auto-move Auras (1 per raid group)” on
-   so each raid group has at most one Aura.
+6. Role Check / Aura: Hosting → RW Role Check (or Mini HUD **RW**); keep “Auto-move Auras” on.
 7. Optional: /alfm test injects a fake match so you can verify the Log UI. /alfm help lists commands.
 
 DEUTSCH
