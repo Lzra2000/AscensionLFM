@@ -64,6 +64,8 @@ local DEFAULTS = {
     fullAnnounceMessage = "LFM MS FULL — thanks!",
     wipeAnnounceMessage = "WIPE",
     shieldAnnounceMessage = "KILL MOBS — boss shield still up!",
+    regroupAnnounceMessage = "REGROUP — accept invite",
+    regroupRoster = {}, -- display names remembered for regroup re-invite
     -- Mini Quick HUD (floating bar — no /alfm needed)
     miniHudShow = true,
     miniHudExpanded = true,

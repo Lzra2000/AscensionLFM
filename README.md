@@ -40,6 +40,7 @@ Floating bar (default **ON**) — mid-run clicks without typing `/alfm`:
 | **Wipe** | Raid warning `WIPE` |
 | **Mobs** | Raid warning `KILL MOBS — boss shield still up!` |
 | **FULL** | Announce FULL line |
+| **Regrp** | Raid warning `REGROUP — accept invite` + re-invite missing watch-list players |
 | **T H A D** | Short need Tank/Healer/Aura/DPS on Post channel |
 
 Drag the title to move. **×** collapses to an `ALFM` chip (click to expand). Title click opens full settings. Toggle under **General → Show floating quick bar**.

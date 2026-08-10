@@ -362,6 +362,9 @@ local function HandleRoster()
     if AscensionLFM.Poster and AscensionLFM.Poster.OnRosterChanged then
         AscensionLFM.Poster.OnRosterChanged()
     end
+    if AscensionLFM.MiniHUD and AscensionLFM.MiniHUD.RememberPresent then
+        AscensionLFM.MiniHUD.RememberPresent()
+    end
 end
 
 local frame

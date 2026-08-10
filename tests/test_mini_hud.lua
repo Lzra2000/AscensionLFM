@@ -83,9 +83,25 @@ check("shield custom", MiniHUD.BuildShieldMessage("  KILL ADDS  ") == "KILL ADDS
 check("shield has mobs", tostring(MiniHUD.DEFAULT_SHIELD):find("MOBS", 1, true) ~= nil)
 check("shield has shield", tostring(MiniHUD.DEFAULT_SHIELD):lower():find("shield", 1, true) ~= nil)
 
+check("regroup default", MiniHUD.BuildRegroupMessage(nil) == MiniHUD.DEFAULT_REGROUP)
+check("regroup custom", MiniHUD.BuildRegroupMessage("  REGROUP NOW  ") == "REGROUP NOW")
+
+local list = MiniHUD.RememberName({}, "Alice", 3)
+list = MiniHUD.RememberName(list, "Bob", 3)
+list = MiniHUD.RememberName(list, "Alice", 3) -- move to end, unique
+check("remember unique", #list == 2 and list[2] == "Alice")
+list = MiniHUD.RememberName(list, "Carl", 3)
+list = MiniHUD.RememberName(list, "Dana", 3)
+check("remember trims", #list == 3 and list[1] == "Alice")
+
+local missing = MiniHUD.SelectMissing({ "Alice", "Bob", "Host" }, { alice = true }, "Host", 10)
+check("select missing bob", #missing == 1 and missing[1] == "Bob")
+check("select skips present+self", true)
+
 check("default miniHudShow on", AscensionLFM.Database.Get().miniHudShow == true)
 check("default wipe msg", AscensionLFM.Database.Get().wipeAnnounceMessage == "WIPE")
 check("default shield msg", AscensionLFM.Database.Get().shieldAnnounceMessage == MiniHUD.DEFAULT_SHIELD)
+check("default regroup msg", AscensionLFM.Database.Get().regroupAnnounceMessage == MiniHUD.DEFAULT_REGROUP)
 
 -- Action wipe with stubs
 MiniHUD._ResetForTests()
@@ -112,6 +128,26 @@ ok, ch = MiniHUD.ActionShield()
 check("shield sends", ok == true, tostring(ok) .. "/" .. tostring(ch))
 check("shield text", _G._chats[1] and tostring(_G._chats[1].msg):find("MOBS", 1, true) ~= nil)
 check("shield mentions shield", _G._chats[1] and tostring(_G._chats[1].msg):lower():find("shield", 1, true) ~= nil)
+
+-- Regroup: announce + invite missing
+MiniHUD._ResetForTests()
+_G._chats = {}
+local invited = {}
+_G.InviteUnit = function(name) table.insert(invited, name) end
+_G.GetNumRaidMembers = function() return 1 end
+_G.GetRaidRosterInfo = function(i)
+    if i == 1 then return "Host" end
+    return nil
+end
+_G.UnitName = function(u)
+    if u == "player" or u == "raid1" then return "Host" end
+    return nil
+end
+AscensionLFM.Database.Get().regroupRoster = { "Alice", "Bob", "Host" }
+local ok2, nInv = MiniHUD.ActionRegroup()
+check("regroup ok", ok2 == true, tostring(ok2))
+check("regroup announced", _G._chats[1] and tostring(_G._chats[1].msg):find("REGROUP", 1, true) ~= nil)
+check("regroup invited missing", #invited == 2, table.concat(invited, ","))
 
 MiniHUD._ResetForTests()
 _G._chats = {}

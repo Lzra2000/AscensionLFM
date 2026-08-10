@@ -14,7 +14,10 @@ AscensionLFM.MiniHUD = MiniHUD
 local FRAME_NAME = "AscensionLFMMiniHUD"
 local DEFAULT_WIPE = "WIPE"
 local DEFAULT_SHIELD = "KILL MOBS — boss shield still up!"
+local DEFAULT_REGROUP = "REGROUP — accept invite"
 local ANNOUNCE_GAP = 2
+local REGROUP_MAX = 40
+local REGROUP_INVITE_CAP = 15
 
 local frame
 local expanded = true
@@ -37,6 +40,10 @@ local function Print(msg)
     if AscensionLFM.Print then
         AscensionLFM.Print(msg)
     end
+end
+
+local function LowerName(name)
+    return tostring(name or ""):lower():gsub("%-.*$", "")
 end
 
 --- Pure: short need-line for a role.
@@ -79,6 +86,82 @@ function MiniHUD.BuildShieldMessage(custom)
         msg = msg:sub(1, 255)
     end
     return msg
+end
+
+--- Pure: regroup invite warning text.
+function MiniHUD.BuildRegroupMessage(custom)
+    local msg = tostring(custom or ""):gsub("^%s+", ""):gsub("%s+$", "")
+    if msg == "" then
+        msg = DEFAULT_REGROUP
+    end
+    if #msg > 255 then
+        msg = msg:sub(1, 255)
+    end
+    return msg
+end
+
+--- Pure: remember a display name in the regroup watch list (unique, newest last).
+-- @return newList
+function MiniHUD.RememberName(list, name, maxN)
+    maxN = tonumber(maxN) or REGROUP_MAX
+    if maxN < 1 then
+        maxN = 1
+    end
+    local out = {}
+    if type(list) == "table" then
+        for _, n in ipairs(list) do
+            if type(n) == "string" and n ~= "" then
+                table.insert(out, n)
+            end
+        end
+    end
+    if type(name) ~= "string" or name == "" then
+        return out
+    end
+    local key = LowerName(name)
+    local filtered = {}
+    for _, n in ipairs(out) do
+        if LowerName(n) ~= key then
+            table.insert(filtered, n)
+        end
+    end
+    table.insert(filtered, name)
+    while #filtered > maxN do
+        table.remove(filtered, 1)
+    end
+    return filtered
+end
+
+--- Pure: names from watch list that are not currently present (and not self).
+-- @param roster string[] display names
+-- @param presentSet { [nameLower]=true }
+-- @param selfName string|nil
+-- @param cap number|nil
+function MiniHUD.SelectMissing(roster, presentSet, selfName, cap)
+    presentSet = presentSet or {}
+    cap = tonumber(cap) or REGROUP_INVITE_CAP
+    if cap < 1 then
+        cap = 1
+    end
+    local selfKey = selfName and LowerName(selfName) or nil
+    local out = {}
+    local seen = {}
+    if type(roster) ~= "table" then
+        return out
+    end
+    for _, name in ipairs(roster) do
+        if type(name) == "string" and name ~= "" then
+            local key = LowerName(name)
+            if key ~= "" and not seen[key] and (not selfKey or key ~= selfKey) and not presentSet[key] then
+                seen[key] = true
+                table.insert(out, name)
+                if #out >= cap then
+                    break
+                end
+            end
+        end
+    end
+    return out
 end
 
 local function CanRaidWarn()
@@ -217,6 +300,123 @@ function MiniHUD.ActionShield()
     return ok, ch
 end
 
+local function PlayerName()
+    if type(UnitName) == "function" then
+        return UnitName("player")
+    end
+    return nil
+end
+
+local function CollectPresentSet()
+    local present = {}
+    local raid = (type(GetNumRaidMembers) == "function" and GetNumRaidMembers()) or 0
+    if raid and raid > 0 then
+        for i = 1, raid do
+            local name
+            if type(GetRaidRosterInfo) == "function" then
+                name = GetRaidRosterInfo(i)
+            end
+            if (type(name) ~= "string" or name == "") and type(UnitName) == "function" then
+                name = UnitName("raid" .. i)
+            end
+            if type(name) == "string" and name ~= "" then
+                present[LowerName(name)] = name
+            end
+        end
+        return present
+    end
+    local me = PlayerName()
+    if me then
+        present[LowerName(me)] = me
+    end
+    local party = (type(GetNumPartyMembers) == "function" and GetNumPartyMembers()) or 0
+    for i = 1, party do
+        if type(UnitName) == "function" then
+            local name = UnitName("party" .. i)
+            if type(name) == "string" and name ~= "" then
+                present[LowerName(name)] = name
+            end
+        end
+    end
+    return present
+end
+
+--- Snapshot current party/raid into the regroup watch list (survives leavers).
+function MiniHUD.RememberPresent()
+    local db = DB()
+    if not db then
+        return 0
+    end
+    if type(db.regroupRoster) ~= "table" then
+        db.regroupRoster = {}
+    end
+    local list = db.regroupRoster
+    local present = CollectPresentSet()
+    local n = 0
+    for _, name in pairs(present) do
+        local me = PlayerName()
+        if not me or LowerName(name) ~= LowerName(me) then
+            list = MiniHUD.RememberName(list, name, REGROUP_MAX)
+            n = n + 1
+        end
+    end
+    -- Also remember assigned-role names (may already have left)
+    if type(db.assignedRoles) == "table" then
+        for key, _ in pairs(db.assignedRoles) do
+            if type(key) == "string" and key ~= "" then
+                -- assignedRoles keys are already lowercased; keep as-is for InviteUnit
+                list = MiniHUD.RememberName(list, key, REGROUP_MAX)
+            end
+        end
+    end
+    db.regroupRoster = list
+    return n
+end
+
+function MiniHUD.ActionRegroup()
+    if not RateOk() then
+        return false, "rate limited"
+    end
+    MiniHUD.RememberPresent()
+    local db = DB()
+    local msg = MiniHUD.BuildRegroupMessage(db and db.regroupAnnounceMessage)
+    local ok, ch = SendGroupAnnounce(msg)
+    if ok then
+        Print("Regroup → " .. tostring(ch) .. ": " .. msg)
+        if AscensionLFM.Activity and AscensionLFM.Activity.Push then
+            AscensionLFM.Activity.Push("regroup", msg)
+        end
+    end
+
+    if type(InviteUnit) ~= "function" then
+        return ok, ch or "InviteUnit missing"
+    end
+
+    local present = CollectPresentSet()
+    local presentSet = {}
+    for k, _ in pairs(present) do
+        presentSet[k] = true
+    end
+    local roster = (db and db.regroupRoster) or {}
+    local missing = MiniHUD.SelectMissing(roster, presentSet, PlayerName(), REGROUP_INVITE_CAP)
+    local invited = 0
+    for _, name in ipairs(missing) do
+        local success = pcall(InviteUnit, name)
+        if success then
+            invited = invited + 1
+        end
+    end
+    if invited > 0 then
+        Print(string.format("Regroup invites: %d", invited))
+        if AscensionLFM.Activity and AscensionLFM.Activity.Push then
+            AscensionLFM.Activity.Push("regroup", "invited " .. tostring(invited))
+        end
+    elseif #missing == 0 then
+        Print("Regroup: everyone already here (or watch list empty)")
+    end
+    return true, invited
+end
+
 function MiniHUD.ActionFull()
     if not RateOk() then
         return false, "rate limited"
@@ -305,7 +505,7 @@ local function SetExpanded(on)
         return
     end
     if expanded then
-        frame:SetWidth(340)
+        frame:SetWidth(380)
         frame:SetHeight(72)
         if frame.titleFS then
             frame.titleFS:SetText("AscensionLFM")
@@ -369,7 +569,7 @@ local function BuildFrame()
     end
     local f = CreateFrame("Frame", FRAME_NAME, UIParent)
     f:SetFrameStrata("HIGH")
-    f:SetWidth(340)
+    f:SetWidth(380)
     f:SetHeight(72)
     f:SetMovable(true)
     f:EnableMouse(true)
@@ -468,6 +668,11 @@ local function BuildFrame()
     end)
     place(buttons.full)
 
+    buttons.regrp = MakeBtn(f, "Regrp", 44, function()
+        return MiniHUD.ActionRegroup()
+    end)
+    place(buttons.regrp)
+
     newRow()
 
     buttons.t = MakeBtn(f, "T", 24, function()
@@ -494,7 +699,7 @@ local function BuildFrame()
     statusFS:SetPoint("BOTTOMLEFT", 8, 4)
     statusFS:SetPoint("BOTTOMRIGHT", -8, 4)
     statusFS:SetJustifyH("LEFT")
-    statusFS:SetText("Wipe · Mobs=kill adds (boss shield) · Need T/H/A/D")
+    statusFS:SetText("Mobs=shield · Regrp=announce+re-invite missing")
     statusFS:SetTextColor(0.65, 0.58, 0.4)
 
     frame = f
@@ -565,4 +770,7 @@ end
 
 MiniHUD.DEFAULT_WIPE = DEFAULT_WIPE
 MiniHUD.DEFAULT_SHIELD = DEFAULT_SHIELD
+MiniHUD.DEFAULT_REGROUP = DEFAULT_REGROUP
 MiniHUD.ANNOUNCE_GAP = ANNOUNCE_GAP
+MiniHUD.REGROUP_MAX = REGROUP_MAX
+MiniHUD.REGROUP_INVITE_CAP = REGROUP_INVITE_CAP
