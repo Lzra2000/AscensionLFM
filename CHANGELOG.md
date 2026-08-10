@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.12
+
+- **Fix Mini HUD / Regrp bugs:** remember group names *before* roster sync drops
+  leavers; store display-name casing for `InviteUnit`; snapshot on login; per-action
+  rate limits (Wipe no longer blocks Mobs/Regrp); clearer empty-watch-list message.
+
 ## 0.4.11
 
 - **Mini HUD — Regrp:** announces `REGROUP — accept invite` and re-invites missing

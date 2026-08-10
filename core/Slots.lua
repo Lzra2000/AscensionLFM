@@ -139,6 +139,10 @@ function Slots.Assign(name, role)
     if db then
         db.assignedRoles[key] = role
     end
+    -- Keep proper casing for Mini HUD regroup re-invites
+    if AscensionLFM.MiniHUD and AscensionLFM.MiniHUD.RememberPlayer then
+        AscensionLFM.MiniHUD.RememberPlayer(name)
+    end
     if role == "aura" and AscensionLFM.AuraBalance and AscensionLFM.AuraBalance.Balance then
         AscensionLFM.AuraBalance.Balance()
     end

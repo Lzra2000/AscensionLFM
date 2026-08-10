@@ -347,6 +347,10 @@ end
 
 local function HandleRoster()
     local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
+    -- Snapshot names BEFORE ScanRaid/SyncFromRoster drops leavers from assignedRoles.
+    if AscensionLFM.MiniHUD and AscensionLFM.MiniHUD.RememberPresent then
+        AscensionLFM.MiniHUD.RememberPresent()
+    end
     local hostingOrPosting = db and (db.mode == "hosting" or db.autoRepost or db.fullAutoHosting)
     if hostingOrPosting and AscensionLFM.Slots and AscensionLFM.Slots.ScanRaid then
         AscensionLFM.Slots.ScanRaid()
@@ -361,9 +365,6 @@ local function HandleRoster()
     end
     if AscensionLFM.Poster and AscensionLFM.Poster.OnRosterChanged then
         AscensionLFM.Poster.OnRosterChanged()
-    end
-    if AscensionLFM.MiniHUD and AscensionLFM.MiniHUD.RememberPresent then
-        AscensionLFM.MiniHUD.RememberPresent()
     end
 end
 
