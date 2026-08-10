@@ -268,6 +268,27 @@ function Slots.Snapshot()
     return out
 end
 
+--- Recount filled from current party/raid roster + assignedRoles map.
+-- Drops leavers via SyncFromRoster, then returns a fresh Snapshot.
+-- Does not invent roles for unassigned members (whisper/host assign still required).
+-- @return snapshot, removedCount
+function Slots.ScanRaid()
+    local removed = Slots.SyncFromRoster() or 0
+    local snap = Slots.Snapshot()
+    if AscensionLFM.Poster and AscensionLFM.Poster.RefreshMessage then
+        AscensionLFM.Poster.RefreshMessage()
+    end
+    if AscensionLFM.MainWindow then
+        if AscensionLFM.MainWindow.RefreshSlots then
+            AscensionLFM.MainWindow.RefreshSlots()
+        end
+        if AscensionLFM.MainWindow.RefreshPost then
+            AscensionLFM.MainWindow.RefreshPost()
+        end
+    end
+    return snap, removed
+end
+
 function Slots._SetAssignedForTests(map)
     assigned = {}
     local db = DB()

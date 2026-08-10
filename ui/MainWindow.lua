@@ -1,6 +1,6 @@
 -- AscensionLFM: ui/MainWindow.lua
 -- Native DialogFrame settings with Categories sidebar (General / Seeking /
--- Hosting / Kick / Log). Matches docs/sketch/ascension-lfm-mockup.html.
+-- Hosting / Post / Kick / Log). Matches docs/sketch/ascension-lfm-mockup.html.
 
 local AscensionLFM = _G.AscensionLFM
 if type(AscensionLFM) ~= "table" then
@@ -13,12 +13,13 @@ AscensionLFM.MainWindow = MainWindow
 
 local FRAME_NAME = "AscensionLFMFrame"
 local FRAME_WIDTH = 720
-local FRAME_HEIGHT = 520
+local FRAME_HEIGHT = 540
 local SIDEBAR_WIDTH = 148
 
 local CAT_GENERAL = "general"
 local CAT_SEEKING = "seeking"
 local CAT_HOSTING = "hosting"
+local CAT_POST = "post"
 local CAT_KICK = "kick"
 local CAT_LOG = "log"
 
@@ -32,6 +33,9 @@ local CATEGORIES = {
     { id = CAT_HOSTING, label = "Hosting",
       title = "Hosting",
       sub = "Accept roles, invite rules, and Manastorm slot caps (default 2/3/3/7)." },
+    { id = CAT_POST, label = "Post",
+      title = "Post",
+      sub = "Compose LFM from slots, scan raid fills, post once, or opt-in auto-repost." },
     { id = CAT_KICK, label = "Kick",
       title = "Kick",
       sub = "Opt-in level-59 auto-kick with raid warning. Dangerous — default OFF." },
@@ -82,7 +86,11 @@ local widgets = {
     roleButtons = {},
     roleButtonsHost = {},
     slotEdits = {},
+    channelButtons = {},
 }
+local postStatusFS
+local postPreviewEdit
+local _syncingPost = false
 
 local function ApplyBackdrop(f, template, r, g, b, a, br, bg, bb, ba)
     if type(f) ~= "table" or type(f.SetBackdrop) ~= "function" then
@@ -212,6 +220,68 @@ function MainWindow.RefreshSlots()
     RefreshStatus()
 end
 
+local function FormatLastPostWall()
+    local db = AscensionLFM.Database.Get()
+    local t = tonumber(db.lastPostAt) or 0
+    if t <= 0 then
+        return "never"
+    end
+    if type(date) == "function" then
+        return date("%H:%M:%S", t)
+    end
+    return tostring(t)
+end
+
+function MainWindow.RefreshPost()
+    if not AscensionLFM.Poster then
+        return
+    end
+    local st = AscensionLFM.Poster.GetStatus and AscensionLFM.Poster.GetStatus()
+    if not st then
+        return
+    end
+    _syncingPost = true
+    if postPreviewEdit and postPreviewEdit.SetText and not (postPreviewEdit.HasFocus and postPreviewEdit:HasFocus()) then
+        postPreviewEdit:SetText(st.message or "")
+    end
+    if postStatusFS then
+        local bits = {}
+        if st.enabled then
+            if st.isFull then
+                table.insert(bits, "Auto-repost STOPPED (full)")
+            elseif st.mode ~= "hosting" then
+                table.insert(bits, "Auto-repost idle (set Mode=Hosting)")
+            elseif st.countdown and st.countdown > 0 then
+                table.insert(bits, string.format("Next repost in %ds", st.countdown))
+            else
+                table.insert(bits, "Next repost soon")
+            end
+        else
+            table.insert(bits, "Auto-repost OFF")
+        end
+        table.insert(bits, "Last post: " .. FormatLastPostWall())
+        table.insert(bits, "Channel: " .. tostring(st.channel or "YELL"))
+        postStatusFS:SetText(table.concat(bits, "  ·  "))
+    end
+    if widgets.autoRepost and widgets.autoRepost.SetChecked then
+        widgets.autoRepost:SetChecked(st.enabled and true or false)
+    end
+    if widgets.repostInterval and widgets.repostInterval.SetText then
+        widgets.repostInterval:SetText(tostring(st.interval or 60))
+    end
+    local db = AscensionLFM.Database.Get()
+    local ch = string.upper(tostring(db.postChannel or "YELL"))
+    for key, btn in pairs(widgets.channelButtons or {}) do
+        if btn and btn.SetChecked then
+            btn:SetChecked(key == ch)
+        end
+    end
+    if widgets.channelName and widgets.channelName.SetText then
+        widgets.channelName:SetText(tostring(db.postChannelName or ""))
+    end
+    _syncingPost = false
+end
+
 function MainWindow.RefreshMatches()
     local db = AscensionLFM.Database.Get()
     local history = db.matchHistory or {}
@@ -314,9 +384,22 @@ local function SyncWidgetsFromDB()
     if widgets.maxParty and widgets.maxParty.SetText then
         widgets.maxParty:SetText(tostring(db.maxPartySize or 15))
     end
+    if widgets.autoRepost and widgets.autoRepost.SetChecked then
+        widgets.autoRepost:SetChecked(db.autoRepost and true or false)
+    end
+    if widgets.repostInterval and widgets.repostInterval.SetText then
+        local n = 60
+        if AscensionLFM.Poster and AscensionLFM.Poster.ClampInterval then
+            n = AscensionLFM.Poster.ClampInterval(db.repostInterval)
+        else
+            n = tonumber(db.repostInterval) or 60
+        end
+        widgets.repostInterval:SetText(tostring(n))
+    end
     SyncSlotEdits()
     RefreshStatus()
     MainWindow.RefreshSlots()
+    MainWindow.RefreshPost()
     MainWindow.RefreshMatches()
     MainWindow.RefreshKicks()
 end
@@ -502,7 +585,7 @@ function MainWindow.Init()
 
     local sub = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     sub:SetPoint("TOP", title, "BOTTOM", 0, -2)
-    sub:SetText("Manastorm Level Run LFM/LFG · v" .. tostring(AscensionLFM.VERSION or "0.2.2"))
+    sub:SetText("Manastorm Level Run LFM/LFG · v" .. tostring(AscensionLFM.VERSION or "0.3.0"))
     SetInk(sub, MUTED)
 
     local shell = CreateFrame("Frame", FRAME_NAME .. "Shell", frame)
@@ -791,6 +874,201 @@ function MainWindow.Init()
     hostHint:SetJustifyH("LEFT")
     hostHint:SetText("Whisper roles: tank/OT/MT · heal/HPS · Aura of Exp / exp aura · dps/DD.")
     SetInk(hostHint, MUTED)
+
+    --------------------------------------------------------------------
+    -- Post (LFM compose / scan / repost)
+    --------------------------------------------------------------------
+    local post = BuildCategoryPage(pageHost, CAT_POST)
+    CreateSectionLabel(post, "LFM message", -4)
+
+    local previewBox = CreateFrame("Frame", nil, post)
+    previewBox:SetPoint("TOPLEFT", 0, -22)
+    previewBox:SetPoint("TOPRIGHT", 0, -22)
+    previewBox:SetHeight(52)
+    ApplyInset(previewBox)
+
+    postPreviewEdit = CreateFrame("EditBox", "AscensionLFMPostPreview", previewBox, "InputBoxTemplate")
+    postPreviewEdit:SetPoint("TOPLEFT", 8, -8)
+    postPreviewEdit:SetPoint("BOTTOMRIGHT", -8, 8)
+    postPreviewEdit:SetAutoFocus(false)
+    postPreviewEdit:SetMaxLetters(255)
+    postPreviewEdit:SetMultiLine(false)
+    postPreviewEdit:SetScript("OnEnterPressed", function(self)
+        if AscensionLFM.Poster and AscensionLFM.Poster.SetMessage then
+            AscensionLFM.Poster.SetMessage(self:GetText() or "")
+        end
+        self:ClearFocus()
+    end)
+    postPreviewEdit:SetScript("OnEditFocusLost", function(self)
+        if _syncingPost then
+            return
+        end
+        if AscensionLFM.Poster and AscensionLFM.Poster.SetMessage then
+            AscensionLFM.Poster.SetMessage(self:GetText() or "")
+        end
+    end)
+
+    CreateSectionLabel(post, "Channel", -84)
+
+    local chRow = CreateFrame("Frame", nil, post)
+    chRow:SetPoint("TOPLEFT", 0, -102)
+    chRow:SetPoint("TOPRIGHT", 0, -102)
+    chRow:SetHeight(28)
+
+    local channels = {
+        { "YELL", "Yell", 0 },
+        { "SAY", "Say", 70 },
+        { "GUILD", "Guild", 140 },
+        { "CHANNEL", "Channel", 220 },
+    }
+    for _, c in ipairs(channels) do
+        local key, label, x = c[1], c[2], c[3]
+        local btn = CreateFrame("CheckButton", nil, chRow, "UICheckButtonTemplate")
+        btn:SetPoint("TOPLEFT", chRow, "TOPLEFT", x, 0)
+        btn:SetSize(24, 24)
+        local fs = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        fs:SetPoint("LEFT", btn, "RIGHT", 2, 0)
+        fs:SetText(label)
+        SetInk(fs, INK)
+        btn:SetScript("OnClick", function()
+            AscensionLFM.Database.Get().postChannel = key
+            for k, b in pairs(widgets.channelButtons) do
+                if b and b.SetChecked then
+                    b:SetChecked(k == key)
+                end
+            end
+        end)
+        widgets.channelButtons[key] = btn
+    end
+
+    local chNameLbl = post:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    chNameLbl:SetPoint("TOPLEFT", 4, -136)
+    chNameLbl:SetText("Channel name")
+    SetInk(chNameLbl, INK)
+
+    local chNameEdit = CreateFrame("EditBox", "AscensionLFMPostChannelName", post, "InputBoxTemplate")
+    chNameEdit:SetSize(140, 20)
+    chNameEdit:SetPoint("LEFT", chNameLbl, "RIGHT", 8, 0)
+    chNameEdit:SetAutoFocus(false)
+    chNameEdit:SetMaxLetters(31)
+    chNameEdit:SetScript("OnEnterPressed", function(self)
+        AscensionLFM.Database.Get().postChannelName = self:GetText() or ""
+        self:ClearFocus()
+    end)
+    chNameEdit:SetScript("OnEditFocusLost", function(self)
+        AscensionLFM.Database.Get().postChannelName = self:GetText() or ""
+    end)
+    widgets.channelName = chNameEdit
+
+    local btnRow = CreateFrame("Frame", nil, post)
+    btnRow:SetPoint("TOPLEFT", 0, -164)
+    btnRow:SetPoint("TOPRIGHT", 0, -164)
+    btnRow:SetHeight(26)
+
+    local rebuildBtn = CreateFrame("Button", nil, btnRow, "UIPanelButtonTemplate")
+    rebuildBtn:SetSize(110, 22)
+    rebuildBtn:SetPoint("LEFT", 0, 0)
+    rebuildBtn:SetText("Rebuild")
+    rebuildBtn:SetScript("OnClick", function()
+        if AscensionLFM.Poster and AscensionLFM.Poster.RefreshMessage then
+            AscensionLFM.Poster.RefreshMessage()
+        end
+        MainWindow.RefreshPost()
+    end)
+
+    local scanBtn = CreateFrame("Button", nil, btnRow, "UIPanelButtonTemplate")
+    scanBtn:SetSize(120, 22)
+    scanBtn:SetPoint("LEFT", rebuildBtn, "RIGHT", 6, 0)
+    scanBtn:SetText("Scan raid/party")
+    scanBtn:SetScript("OnClick", function()
+        if AscensionLFM.Slots and AscensionLFM.Slots.ScanRaid then
+            AscensionLFM.Slots.ScanRaid()
+        end
+        if AscensionLFM.Poster and AscensionLFM.Poster.RefreshMessage then
+            AscensionLFM.Poster.RefreshMessage()
+        end
+        MainWindow.RefreshSlots()
+        MainWindow.RefreshPost()
+        if AscensionLFM.Print then
+            AscensionLFM.Print("scanned raid/party fills")
+        end
+    end)
+
+    local postBtn = CreateFrame("Button", nil, btnRow, "UIPanelButtonTemplate")
+    postBtn:SetSize(90, 22)
+    postBtn:SetPoint("LEFT", scanBtn, "RIGHT", 6, 0)
+    postBtn:SetText("Post once")
+    postBtn:SetScript("OnClick", function()
+        local msg = postPreviewEdit and postPreviewEdit.GetText and postPreviewEdit:GetText() or ""
+        local db = AscensionLFM.Database.Get()
+        if AscensionLFM.Poster and AscensionLFM.Poster.PostOnce then
+            AscensionLFM.Poster.PostOnce(msg, db.postChannel, db.postChannelName)
+        end
+        MainWindow.RefreshPost()
+    end)
+
+    CreateSectionLabel(post, "Auto-repost", -200)
+    widgets.autoRepost = CreateToggleRow(post, -218,
+        "Enable auto-repost (Hosting only)",
+        "Rebuild LFM from slots each tick. Stops when full or disabled. Default OFF.",
+        false,
+        function(on)
+            local db = AscensionLFM.Database.Get()
+            db.autoRepost = on and true or false
+            if on and AscensionLFM.Poster and AscensionLFM.Poster.RefreshMessage then
+                AscensionLFM.Poster.RefreshMessage()
+            end
+            MainWindow.RefreshPost()
+        end)
+
+    local intLbl = post:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    intLbl:SetPoint("TOPLEFT", 4, -272)
+    intLbl:SetText("Interval (sec, min 30)")
+    SetInk(intLbl, INK)
+
+    local intEdit = CreateFrame("EditBox", "AscensionLFMRepostInterval", post, "InputBoxTemplate")
+    intEdit:SetSize(40, 20)
+    intEdit:SetPoint("LEFT", intLbl, "RIGHT", 8, 0)
+    intEdit:SetAutoFocus(false)
+    intEdit:SetMaxLetters(3)
+    intEdit:SetNumeric(true)
+    intEdit:SetScript("OnEnterPressed", function(self)
+        local n = tonumber(self:GetText()) or 60
+        if AscensionLFM.Poster and AscensionLFM.Poster.ClampInterval then
+            n = AscensionLFM.Poster.ClampInterval(n)
+        elseif n < 30 then
+            n = 30
+        end
+        AscensionLFM.Database.Get().repostInterval = n
+        self:SetText(tostring(n))
+        self:ClearFocus()
+        MainWindow.RefreshPost()
+    end)
+    intEdit:SetScript("OnEditFocusLost", function(self)
+        local n = tonumber(self:GetText()) or 60
+        if AscensionLFM.Poster and AscensionLFM.Poster.ClampInterval then
+            n = AscensionLFM.Poster.ClampInterval(n)
+        elseif n < 30 then
+            n = 30
+        end
+        AscensionLFM.Database.Get().repostInterval = n
+        self:SetText(tostring(n))
+        MainWindow.RefreshPost()
+    end)
+    widgets.repostInterval = intEdit
+
+    postStatusFS = post:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    postStatusFS:SetPoint("TOPLEFT", 4, -300)
+    postStatusFS:SetPoint("RIGHT", -4, 0)
+    postStatusFS:SetJustifyH("LEFT")
+    SetInk(postStatusFS, MUTED)
+
+    local postHint = post:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    postHint:SetPoint("TOPLEFT", 4, -320)
+    postHint:SetPoint("RIGHT", -4, 0)
+    postHint:SetJustifyH("LEFT")
+    postHint:SetText("Example: LFM MS 0/2 Tanks 0/3 Healers 0/3 Aura 0/7 DPS — filled from Hosting slots + Scan.")
+    SetInk(postHint, MUTED)
 
     --------------------------------------------------------------------
     -- Kick

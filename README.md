@@ -1,6 +1,6 @@
 # AscensionLFM
 
-WotLK **3.3.5a** addon for Ascension that scans chat and whispers for **Manastorm Level Run** **LFM** and **LFG** messages, notifies you of matches, and optionally auto-whispers leaders or auto-invites applicants when you host — with per-role slot caps and an opt-in level-59 auto-kick.
+WotLK **3.3.5a** addon for Ascension that scans chat and whispers for **Manastorm Level Run** **LFM** and **LFG** messages, notifies you of matches, and optionally auto-whispers leaders or auto-invites applicants when you host — with per-role slot caps, an LFM post/repost composer, and an opt-in level-59 auto-kick.
 
 ## Install (EN)
 
@@ -42,6 +42,20 @@ Default Manastorm level-run caps: **2 tank / 3 healer / 3 aura / 7 DPS** (editab
 - Slot full → no invite for that role.
 - Overall **Max size** (default 15) still blocks when the group is full.
 
+## Post: LFM compose, scan, auto-repost
+
+Open **Post** in `/alfm` (separate from Hosting to avoid crowding).
+
+1. **Rebuild** / preview builds:
+   `LFM MS {tFilled}/{tMax} Tanks {hFilled}/{hMax} Healers {aFilled}/{aMax} Aura {dFilled}/{dMax} DPS`
+   from Hosting slot filled/max (`Slots.Snapshot`).
+2. Pick channel: **Yell / Say / Guild / Channel** (channel name optional for custom chat channels).
+3. **Post once** sends via `SendChatMessage`.
+4. **Scan raid/party** recounts filled from the current roster + assigned roles; while Mode is **Hosting** (or auto-repost is on), roster events auto-refresh fills and the preview.
+5. **Auto-repost** (default **OFF**): interval seconds (default **60**, minimum **30**). Only while Mode=**Hosting**. Rebuilds the message each tick; **stops** when all role caps are filled or the group hits Max size. Status shows next-repost countdown and last post time.
+
+Kick59 stays opt-in default OFF; invite path unchanged.
+
 ## Opt-in level-59 kick
 
 **Default OFF.** While **Hosting** and enabled:
@@ -74,22 +88,25 @@ Native DialogFrame with a left **Categories** sidebar:
 | **General** | Status (Listening ON/OFF) + mode Off / Notify / Seeking / Hosting |
 | **Seeking** | My roles, Scan LFG MS, auto-whisper + message |
 | **Hosting** | Accept roles, auto-invite, require-role, max size, slot caps T/H/A/D + filled |
+| **Post** | LFM preview, channel, Post once, Scan raid/party, auto-repost |
 | **Kick** | Opt-in level-59 kick + recent kick log |
 | **Log** | Recent LFM/LFG matches (Clear) |
 
-## How to enable hosting + slots + 59-kick
+## How to enable hosting + slots + post + 59-kick
 
 1. `/alfm` → **General** → Mode **Hosting**.
 2. **Hosting** → check **Accept roles** (Tank / Healer / Aura / DPS).
 3. Set **Max T/H/A/D** slot caps (defaults 2/3/3/7) and **Max size** (15).
 4. Leave **Auto-invite matching role whispers** and **Require role in whisper** on.
-5. Optionally **Kick** → enable **Kick at level 59 + raid warning** (dangerous; default off).
+5. **Post** → **Scan raid/party** (optional) → pick channel → **Post once**, or enable **Auto-repost** (interval ≥ 30s).
+6. Optionally **Kick** → enable **Kick at level 59 + raid warning** (dangerous; default off).
 
 ## Safety
 
-- Default mode is **Notify** (Log only). Auto-invite, auto-whisper, and level-59 kick remain **opt-in**; kick defaults off.
+- Default mode is **Notify** (Log only). Auto-invite, auto-whisper, auto-repost, and level-59 kick remain **opt-in**; kick and auto-repost default off.
 - Never invites when the group is at **Max size** or the role **slot is full**.
-- Skips ignored players; rate-limits whispers/invites; kick RW cadence 10s.
+- Auto-repost stops when slots are full or Max size is reached.
+- Skips ignored players; rate-limits whispers/invites; kick RW cadence 10s; repost min interval 30s.
 - Classic chat/party APIs only (`InviteUnit`, `UninviteUnit`, `SendChatMessage`, roster APIs). No `C_*`, Draft/HoF, or Rapid Rolling hooks.
 
 ## Development
@@ -98,7 +115,7 @@ Native DialogFrame with a left **Categories** sidebar:
 sh scripts/check.sh
 ```
 
-Runs `luac5.1 -p` on all Lua files and pure Lua unit tests (parser / invite / slots / kick / defaults).
+Runs `luac5.1 -p` on all Lua files and pure Lua unit tests (parser / invite / slots / kick / poster / defaults).
 
 ## License
 

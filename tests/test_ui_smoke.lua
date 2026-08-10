@@ -148,7 +148,7 @@ SlashCmdList = SlashCmdList or {}
 
 -- Load Database + MainWindow (no Scanner/Invite needed for UI smoke).
 dofile("core/Database.lua")
-AscensionLFM.VERSION = "0.2.2"
+AscensionLFM.VERSION = "0.3.0"
 AscensionLFM.Slots = {
     Snapshot = function()
         return {
@@ -166,6 +166,38 @@ AscensionLFM.Slots = {
         local db = AscensionLFM.Database.Get()
         return db.slotMax[role]
     end,
+    ScanRaid = function()
+        return AscensionLFM.Slots.Snapshot(), 0
+    end,
+}
+AscensionLFM.Poster = {
+    ClampInterval = function(n)
+        n = tonumber(n) or 60
+        if n < 30 then return 30 end
+        if n > 600 then return 600 end
+        return n
+    end,
+    RefreshMessage = function()
+        return "LFM MS 0/2 Tanks 0/3 Healers 0/3 Aura 0/7 DPS"
+    end,
+    GetStatus = function()
+        local db = AscensionLFM.Database.Get()
+        return {
+            enabled = db.autoRepost and true or false,
+            mode = db.mode,
+            interval = AscensionLFM.Poster.ClampInterval(db.repostInterval),
+            lastPostAt = 0,
+            nextPostAt = 0,
+            countdown = 0,
+            isFull = false,
+            status = "idle",
+            message = "LFM MS 0/2 Tanks 0/3 Healers 0/3 Aura 0/7 DPS",
+            channel = db.postChannel or "YELL",
+            channelName = db.postChannelName or "",
+        }
+    end,
+    SetMessage = function() end,
+    PostOnce = function() return true end,
 }
 
 AscensionLFM.Database.Init()
@@ -183,15 +215,20 @@ local f = MW.GetFrame()
 check("frame created", type(f) == "table")
 check("frame named", f._name == "AscensionLFMFrame")
 check("frame size width", f._width == 720)
-check("frame size height", f._height == 520)
+check("frame size height", f._height == 540)
 check("default category general", MW.GetActiveCategory() == "general")
 check("UISpecialFrames registered", UISpecialFrames[1] == "AscensionLFMFrame")
 
-local cats = { "general", "seeking", "hosting", "kick", "log" }
+local cats = { "general", "seeking", "hosting", "post", "kick", "log" }
 for i = 1, #cats do
     MW.SelectCategory(cats[i])
     check("select " .. cats[i], MW.GetActiveCategory() == cats[i])
 end
+
+MW.SelectCategory("post")
+check("post category active", MW.GetActiveCategory() == "post")
+check("RefreshPost exists", type(MW.RefreshPost) == "function")
+MW.RefreshPost()
 
 MW.SelectCategory("not-a-real-category")
 check("unknown category falls back to general", MW.GetActiveCategory() == "general")
@@ -210,12 +247,14 @@ AscensionLFM.Database.SetMode("hosting")
 MW.SelectCategory("general")
 check("mode hosting persisted", AscensionLFM.Database.Get().mode == "hosting")
 
--- Kick default remains off
+-- Kick default remains off; autoRepost default off
 check("kick default off", AscensionLFM.Database.Get().autoKickLevel59 == false)
+check("autoRepost default off", AscensionLFM.Database.Get().autoRepost == false)
 -- Fresh Init default mode is notify (Listening ON)
 _G.AscensionLFMDB = nil
 AscensionLFM.Database.Init()
 check("default mode notify", AscensionLFM.Database.Get().mode == "notify")
+check("default autoRepost off after init", AscensionLFM.Database.Get().autoRepost == false)
 
 if failed > 0 then
     io.stderr:write(string.format("test_ui_smoke: %d failed, %d passed\n", failed, passed))
