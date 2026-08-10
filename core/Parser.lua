@@ -15,7 +15,15 @@ AscensionLFM.Parser = Parser
 -- for slot capture; OT/MT/HPS/Aura-of-Exp variants included for hosting whispers.
 local ROLE_PATTERNS = {
     tank = { "tanks?", "tn?ks?", "%f[%w]ot%f[%W]", "%f[%w]mt%f[%W]", "%f[%w]ot$", "%f[%w]mt$" },
-    healer = { "healers?", "heals?", "heal", "hps", "%f[%w]h%f[%W]", "%f[%w]h$" },
+    healer = {
+        "healers?",
+        "heals?",
+        "heal",
+        "heiler", -- DE
+        "hps",
+        "%f[%w]h%f[%W]",
+        "%f[%w]h$",
+    },
     aura = {
         "aura%s*of%s*exp[%w]*",
         "exp%s*aura",
@@ -24,7 +32,7 @@ local ROLE_PATTERNS = {
         "auras?",
         "aura",
     },
-    dps = { "dps", "%f[%w]dd%f[%W]", "%f[%w]dd$", "damage" },
+    dps = { "dps", "%f[%w]dd%f[%W]", "%f[%w]dd$", "damage", "dmg" },
 }
 
 local function Lower(s)
@@ -149,12 +157,16 @@ local function SoftRoleRequest(text, raw, ms)
     local hasRoleWord = text:find("tank") or text:find("heal") or text:find("dps")
         or text:find("aura") or text:find("%f[%w]dd%f[%W]")
         or text:find("%f[%w]ot%f[%W]") or text:find("%f[%w]mt%f[%W]")
-        or text:find("hps") or text:find("damage")
+        or text:find("hps") or text:find("damage") or text:find("dmg", 1, true)
+        or text:find("heiler", 1, true)
         or text:find("exp%s*aura") or text:find("aoe%s*aura")
-    local bareRole = text:match(
-        "^%s*(tanks?|ot|mt|healers?|heals?|heal|hps|dps|auras?|aura|dd|damage|aura%s+of%s+exp[%w]*|exp%s+aura|aoe%s+aura)%s*$"
+    -- Strip trailing punctuation for bare / letter matches ("healers!", "H?")
+    local stripped = text:gsub("[!%?%.%,%;%:]+$", ""):gsub("^%s+", ""):gsub("%s+$", "")
+    local bareRole = stripped:match(
+        "^(tanks?|ot|mt|healers?|heals?|heal|heiler|hps|dps|auras?|aura|dd|damage|dmg|aura%s+of%s+exp[%w]*|exp%s+aura|aoe%s+aura)$"
     )
-    local allow = bareRole or (hasRoleWord and (ms or invish or #text <= 40))
+    local letterRole = stripped:match("^([thad])$")
+    local allow = bareRole or letterRole or (hasRoleWord and (ms or invish or #text <= 48))
     if not allow then
         return nil
     end
@@ -170,6 +182,15 @@ local function SoftRoleRequest(text, raw, ms)
                 total = t,
                 mentioned = mentioned and true or false,
             }
+            any = true
+        end
+    end
+    -- Letter-only whispers: map t/h/a/d when pattern scan found nothing
+    if not any and letterRole then
+        local map = { t = "tank", h = "healer", a = "aura", d = "dps" }
+        local role = map[letterRole]
+        if role then
+            roles[role] = { open = true, filled = nil, total = nil, mentioned = true }
             any = true
         end
     end
@@ -318,6 +339,67 @@ function Parser.RequestedRole(parsed)
         if info and (info.mentioned or info.open) then
             return role
         end
+    end
+    return nil
+end
+
+--- Aggressive fallback role guess for hosting whispers / Role Check replies.
+-- Accepts T/H/A/D letters, plurals, DE "heiler", trailing punctuation, short phrases.
+function Parser.GuessRole(message)
+    local t = Lower(message)
+    t = t:gsub("^%s+", ""):gsub("%s+$", "")
+    t = t:gsub("[!%?%.%,%;%:]+$", ""):gsub("^[!%?%.%,%;%:]+", "")
+    if t == "" then
+        return nil
+    end
+
+    -- Whole-message / first-token exact map
+    local token = t:match("^(%S+)") or t
+    token = token:gsub("[!%?%.%,%;%:]+$", "")
+    local exact = {
+        t = "tank",
+        tank = "tank",
+        tanks = "tank",
+        ot = "tank",
+        mt = "tank",
+        h = "healer",
+        heal = "healer",
+        heals = "healer",
+        healer = "healer",
+        healers = "healer",
+        heiler = "healer",
+        hps = "healer",
+        a = "aura",
+        aura = "aura",
+        auras = "aura",
+        d = "dps",
+        dps = "dps",
+        dd = "dps",
+        damage = "dps",
+        dmg = "dps",
+    }
+    if exact[t] then
+        return exact[t]
+    end
+    if exact[token] then
+        return exact[token]
+    end
+
+    -- Prefer longer / more specific keywords first
+    if t:find("heiler", 1, true) or t:find("healer", 1, true) or t:find("healers", 1, true)
+        or t:find("heals", 1, true) or t:find("heal", 1, true) or t:find("hps", 1, true) then
+        return "healer"
+    end
+    if t:find("aura", 1, true) or t:find("exp%s*aura") or t:find("aoe%s*aura") then
+        return "aura"
+    end
+    if t:find("tank", 1, true) or t == "ot" or t == "mt"
+        or t:find("%f[%w]ot%f[%W]") or t:find("%f[%w]mt%f[%W]") then
+        return "tank"
+    end
+    if t:find("dps", 1, true) or t:find("damage", 1, true) or t:find("dmg", 1, true)
+        or t:find("%f[%w]dd%f[%W]") or t == "dd" then
+        return "dps"
     end
     return nil
 end

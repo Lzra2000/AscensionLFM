@@ -66,6 +66,27 @@ invited = {}
 ok = Invite.TryHostInvite("Carl", "inv ms heal")
 check("host invite heal", ok == true)
 
+Invite._ResetCooldowns()
+invited = {}
+Slots.ClearAll()
+ok = Invite.TryHostInvite("Dana", "healers")
+check("host invite healers plural", ok == true, tostring(ok))
+check("healers → healer", Slots.GetAssigned("Dana") == "healer")
+
+Invite._ResetCooldowns()
+invited = {}
+Slots.ClearAll()
+ok = Invite.TryHostInvite("Eva", "H")
+check("host invite letter H", ok == true, tostring(ok))
+check("H → healer", Slots.GetAssigned("Eva") == "healer")
+
+Invite._ResetCooldowns()
+invited = {}
+Slots.ClearAll()
+ok = Invite.TryHostInvite("Fritz", "heiler")
+check("host invite DE heiler", ok == true, tostring(ok))
+check("heiler → healer", Slots.GetAssigned("Fritz") == "healer")
+
 -- Slot full blocks invite
 Slots.ClearAll()
 Slots.Assign("T1", "tank")

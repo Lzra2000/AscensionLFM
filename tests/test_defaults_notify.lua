@@ -29,7 +29,7 @@ Database.Init()
 local db = Database.Get()
 
 check("default mode is notify", db.mode == "notify")
-check("defaultsRev is 3", tonumber(db.defaultsRev) == 3)
+check("defaultsRev is 4", tonumber(db.defaultsRev) == 4)
 check("autoKick still off", db.autoKickLevel59 == false)
 check("autoWhisper still off", db.autoWhisper == false)
 check("autoRepost still off", db.autoRepost == false)
@@ -37,8 +37,8 @@ check("fullAutoHosting still off", db.fullAutoHosting == false)
 check("rejectRewhisper still off", db.rejectRewhisper == false)
 check("repostInterval default 60", tonumber(db.repostInterval) == 60)
 check("postChannel default YELL", db.postChannel == "YELL")
-check("roleCheckMessage short default",
-    db.roleCheckMessage == "ROLE CHECK — whisper tank / heal / aura / dps")
+check("roleCheckMessage mentions T/H/A/D",
+    tostring(db.roleCheckMessage):find("T/H/A/D", 1, true) ~= nil)
 
 -- Fresh defaults table
 local defs = Database.Defaults()
@@ -52,7 +52,7 @@ _G.AscensionLFMDB = {
 }
 Database.Init()
 check("migrate off→notify", Database.Get().mode == "notify")
-check("migrate sets defaultsRev 3", tonumber(Database.Get().defaultsRev) == 3)
+check("migrate sets defaultsRev 4", tonumber(Database.Get().defaultsRev) == 4)
 
 -- Do not re-flip after user sets Off post-migration
 Database.SetMode("off")
@@ -67,7 +67,7 @@ _G.AscensionLFMDB = {
 }
 Database.Init()
 check("migrate shortens stock RW msg",
-    Database.Get().roleCheckMessage == "ROLE CHECK — whisper tank / heal / aura / dps")
+    tostring(Database.Get().roleCheckMessage):find("T/H/A/D", 1, true) ~= nil)
 _G.AscensionLFMDB = {
     mode = "notify",
     defaultsRev = 2,
