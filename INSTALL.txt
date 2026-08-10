@@ -16,7 +16,9 @@ ENGLISH
    AscensionLFM is enabled (folder must be AscensionLFM), then /reload. Try /alfm status —
    if that prints, the addon loaded. Default mode is Notify (Listening ON).
 5. Full Auto Hosting: /alfm → Hosting → enable the master toggle (default OFF). Kick59 stays OFF.
-6. Optional: /alfm test injects a fake match so you can verify the Log UI. /alfm help lists commands.
+6. Role Check / Aura: Hosting → RW Role Check; keep “Auto-move Auras (1 per raid group)” on
+   so each raid group has at most one Aura.
+7. Optional: /alfm test injects a fake match so you can verify the Log UI. /alfm help lists commands.
 
 DEUTSCH
 -------
@@ -32,4 +34,6 @@ DEUTSCH
 4. /alfm (oder /mslfm) öffnet die Einstellungen. Passiert nichts: AddOns-Liste prüfen
    (Ordner AscensionLFM, Häkchen an), dann /reload. /alfm status muss eine Zeile drucken.
 5. Full Auto Hosting: /alfm → Hosting → Master-Schalter (Standard AUS). Kick59 bleibt AUS.
-6. Optional: /alfm test · /alfm help
+6. Role Check / Aura: Hosting → RW Role Check; „Auto-move Auras (1 per raid group)“ AN lassen
+   (max. eine Aura pro Raid-Gruppe 1–8, Rest wird automatisch umgestellt).
+7. Optional: /alfm test · /alfm help

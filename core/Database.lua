@@ -81,7 +81,7 @@ local DEFAULTS = {
     soundOnMatch = false,
     soundOnApplicant = false,
     -- RW Role Check + Aura 1-per-subgroup auto-move
-    roleCheckMessage = "ROLE CHECK — whisper me tank / heal / aura / dps to sync MS slots",
+    roleCheckMessage = "ROLE CHECK — whisper tank / heal / aura / dps",
     roleCheckDuration = 60,
     roleCheckWindow = 60,
     roleCheckMinInterval = 30,
@@ -133,6 +133,15 @@ function Database.Init()
                 _G.AscensionLFMDB.mode = "notify"
             end
             _G.AscensionLFMDB.defaultsRev = 2
+            rev = 2
+        end
+        -- v0.4.2: shorter default Role Check raid warning if still on the old stock text.
+        if rev < 3 then
+            local oldMsg = "ROLE CHECK — whisper me tank / heal / aura / dps to sync MS slots"
+            if _G.AscensionLFMDB.roleCheckMessage == oldMsg then
+                _G.AscensionLFMDB.roleCheckMessage = DEFAULTS.roleCheckMessage
+            end
+            _G.AscensionLFMDB.defaultsRev = 3
         end
     end
 end
