@@ -450,6 +450,13 @@ local function SyncWidgetsFromDB()
     end
     SyncRoleGroup(widgets.roleButtons, db)
     SyncRoleGroup(widgets.roleButtonsHost, db)
+    if widgets.hostRoleButtons then
+        for r, btn in pairs(widgets.hostRoleButtons) do
+            if btn and btn.SetChecked then
+                btn:SetChecked(db.hostRole == r)
+            end
+        end
+    end
     if widgets.scanLfg and widgets.scanLfg.SetChecked then
         widgets.scanLfg:SetChecked(db.scanLfg ~= false)
     end
@@ -1129,7 +1136,7 @@ function MainWindow.Init()
     --------------------------------------------------------------------
     -- Hosting
     --------------------------------------------------------------------
-    local hosting = BuildCategoryPage(pageHost, CAT_HOSTING, 960)
+    local hosting = BuildCategoryPage(pageHost, CAT_HOSTING, 1060)
     CreateSectionLabel(hosting, "Full Auto", -4)
     widgets.fullAuto = CreateToggleRow(hosting, -22,
         "Full Auto Hosting (master)",
@@ -1149,8 +1156,93 @@ function MainWindow.Init()
     MakeRoleCheck(hostRoles, "aura", "Aura", 190, 0, widgets.roleButtonsHost)
     MakeRoleCheck(hostRoles, "dps", "DPS", 280, 0, widgets.roleButtonsHost)
 
-    CreateSectionLabel(hosting, "Invite + reject", -154)
-    local hy = -172
+    -- My host role: which role YOU take (Slots.EnsureHostAssigned picks this
+    -- when set, instead of guessing). Applies to your own slot immediately —
+    -- not just a preference for the next auto-assign. "Auto" clears it and
+    -- lets the host auto-pick an open accepted role again (default).
+    CreateSectionLabel(hosting, "My host role", -156)
+    local hostRoleRow = CreateFrame("Frame", nil, hosting)
+    hostRoleRow:SetPoint("TOPLEFT", 0, -174)
+    hostRoleRow:SetPoint("TOPRIGHT", 0, -174)
+    hostRoleRow:SetHeight(24)
+    widgets.hostRoleButtons = {}
+
+    local function SyncHostRoleButtons(activeRole)
+        for r, btn in pairs(widgets.hostRoleButtons) do
+            if btn and btn.SetChecked then
+                btn:SetChecked(r == activeRole)
+            end
+        end
+    end
+
+    local function SetHostRole(role)
+        local hdb = AscensionLFM.Database.Get()
+        hdb.hostRole = role
+        if role and type(UnitName) == "function" then
+            local me = UnitName("player")
+            if me and AscensionLFM.Slots and AscensionLFM.Slots.Assign then
+                AscensionLFM.Slots.Assign(me, role)
+            end
+        end
+        SyncHostRoleButtons(role)
+        MainWindow.RefreshSlots()
+    end
+
+    local function ClearHostRole()
+        local hdb = AscensionLFM.Database.Get()
+        hdb.hostRole = nil
+        if type(UnitName) == "function" then
+            local me = UnitName("player")
+            if me and AscensionLFM.Slots and AscensionLFM.Slots.ClearName then
+                AscensionLFM.Slots.ClearName(me)
+            end
+        end
+        SyncHostRoleButtons(nil)
+        MainWindow.RefreshSlots()
+    end
+
+    local function MakeHostRoleCheck(parent, role, label, x, y)
+        local btn = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
+        btn:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
+        btn:SetSize(24, 24)
+        local fs = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        fs:SetPoint("LEFT", btn, "RIGHT", 2, 0)
+        fs:SetText(label)
+        SetInk(fs, INK)
+        btn:SetScript("OnClick", function(self)
+            if CheckButtonIsOn(self) then
+                SetHostRole(role)
+            else
+                ClearHostRole()
+            end
+        end)
+        widgets.hostRoleButtons[role] = btn
+        return btn
+    end
+
+    MakeHostRoleCheck(hostRoleRow, "tank", "Tank", 0, 0)
+    MakeHostRoleCheck(hostRoleRow, "healer", "Healer", 90, 0)
+    MakeHostRoleCheck(hostRoleRow, "aura", "Aura", 190, 0)
+    MakeHostRoleCheck(hostRoleRow, "dps", "DPS", 280, 0)
+
+    local hostRoleAutoBtn = CreateFrame("Button", nil, hostRoleRow, "UIPanelButtonTemplate")
+    hostRoleAutoBtn:SetSize(56, 20)
+    hostRoleAutoBtn:SetPoint("LEFT", hostRoleRow, "LEFT", 380, 0)
+    hostRoleAutoBtn:SetText("Auto")
+    hostRoleAutoBtn:SetScript("OnClick", ClearHostRole)
+
+    local hostRoleHint = hosting:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    hostRoleHint:SetPoint("TOPLEFT", 4, -202)
+    hostRoleHint:SetPoint("RIGHT", -4, 0)
+    hostRoleHint:SetJustifyH("LEFT")
+    if hostRoleHint.SetNonSpaceWrap then
+        hostRoleHint:SetNonSpaceWrap(true)
+    end
+    hostRoleHint:SetText("Sets your own slot immediately. Auto lets the host auto-pick an open accepted role again (default).")
+    SetInk(hostRoleHint, MUTED)
+
+    CreateSectionLabel(hosting, "Invite + reject", -250)
+    local hy = -268
     widgets.autoInvite = CreateToggleRow(hosting, hy,
         "Auto-invite matching role whispers",
         "InviteUnit when role accepted + slot open. Full Auto turns this on.",

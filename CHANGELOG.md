@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.22
+
+- **New: "My host role" picker (Hosting tab).** `Slots.EnsureHostAssigned()`
+  already supported a `db.hostRole` override to let you pick your own role
+  instead of auto-guessing, but nothing ever set that field — no default,
+  no UI. Added a Tank/Healer/Aura/DPS picker under Accept roles: picking one
+  sets your own slot immediately (not just a preference for the next
+  auto-assign) and remembers it; "Auto" clears it and lets the host
+  auto-pick an open accepted role again, matching prior behavior.
+
 ## 0.4.21
 
 - **Fix: Log tab notified about LFG posts for disabled roles while
