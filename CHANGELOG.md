@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.21
+
+- **Fix: Log tab notified about LFG posts for disabled roles while
+  Hosting.** `Scanner.lua`'s hosting-mode notify check had two branches: a
+  specific-role branch (when the LFG line names a role) only checked
+  `Slots.HasOpenSlot(role)`, while the generic/ambiguous branch right below
+  it correctly also checked `db.roles[role]` (whether that role is even
+  accepted). Since `HasOpenSlot` only looks at the slot cap, not
+  acceptance, a host who explicitly turned off e.g. Healer still got Log
+  entries for "LFG MS heal" posts as long as the healer slot cap
+  technically had room. Both branches now check acceptance consistently.
+
 ## 0.4.20
 
 - **Fix: unrelated whispers triggered a confusing auto-reply.** Reported

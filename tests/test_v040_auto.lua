@@ -278,6 +278,23 @@ check("variant3", w3 == "ms healer ready", w3)
 local w4 = AscensionLFM.Scanner._NextWhisperMessage(db, "dps")
 check("variant wraps", w4 == "inv ms dps", w4)
 
+-- Regression: hosting-mode LFG notify must respect db.roles acceptance, not
+-- just HasOpenSlot — the specific-role branch used to skip the db.roles
+-- check that the generic/ambiguous branch right below it already had,
+-- so a disabled role (e.g. healer explicitly off) still logged LFG matches
+-- for it as long as the slot cap technically had room.
+db.mode = "hosting"
+db.roles = { tank = true, healer = false, aura = true, dps = true }
+db.slotMax = { tank = 2, healer = 3, aura = 3, dps = 7 }
+AscensionLFM.Slots.ClearAll()
+local beforeCount = #db.matchHistory
+AscensionLFM.Scanner._HandlePublicListing("DisabledRoleLeader", "LFG MS heal", "CHAT_MSG_SAY")
+check("disabled role LFG not logged", #db.matchHistory == beforeCount, tostring(#db.matchHistory))
+
+db.roles.healer = true
+AscensionLFM.Scanner._HandlePublicListing("AcceptedRoleLeader", "LFG MS heal", "CHAT_MSG_SAY")
+check("accepted role LFG still logged", #db.matchHistory == beforeCount + 1, tostring(#db.matchHistory))
+
 io.write(string.format("test_v040_auto: %d passed, %d failed\n", passed, failed))
 if failed > 0 then
     os.exit(1)

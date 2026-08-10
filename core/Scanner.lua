@@ -248,7 +248,8 @@ local function ShouldNotify(db, parsed, leader)
             local role = AscensionLFM.Parser and AscensionLFM.Parser.RequestedRole
                 and AscensionLFM.Parser.RequestedRole(parsed)
             if role and AscensionLFM.Slots and AscensionLFM.Slots.HasOpenSlot then
-                return AscensionLFM.Slots.HasOpenSlot(role) and true or false
+                local accepted = db.roles and db.roles[role]
+                return (accepted and AscensionLFM.Slots.HasOpenSlot(role)) and true or false
             end
             -- Generic / ambiguous LFG: notify only if any accepted role has room
             if AscensionLFM.Slots and AscensionLFM.Slots.HasOpenSlot and db.roles then
