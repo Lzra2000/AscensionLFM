@@ -149,6 +149,23 @@ check("regroup ok", ok2 == true, tostring(ok2))
 check("regroup announced", _G._chats[1] and tostring(_G._chats[1].msg):find("REGROUP", 1, true) ~= nil)
 check("regroup invited missing", #invited == 2, table.concat(invited, ","))
 
+-- Shared rate limit must not block different actions
+MiniHUD._ResetForTests()
+_G._chats = {}
+ok = MiniHUD.ActionWipe()
+check("wipe ok", ok == true)
+ok = MiniHUD.ActionShield()
+check("shield not blocked by wipe rate", ok == true)
+ok = MiniHUD.ActionWipe()
+check("same-kind wipe rate limited", ok == false)
+
+-- RememberPlayer keeps casing
+MiniHUD._ResetForTests()
+AscensionLFM.Database.Get().regroupRoster = {}
+AscensionLFM.Database.Get().regroupDisplay = {}
+check("RememberPlayer", MiniHUD.RememberPlayer("BobTheTank") == true)
+check("display casing", AscensionLFM.Database.Get().regroupDisplay.bobthetank == "BobTheTank")
+
 MiniHUD._ResetForTests()
 _G._chats = {}
 ok = MiniHUD.ActionNeed("tank")

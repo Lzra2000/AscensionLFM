@@ -22,7 +22,7 @@ local REGROUP_INVITE_CAP = 15
 local frame
 local expanded = true
 local buttons = {}
-local lastAnnounceAt = 0
+local lastAnnounceAt = {} -- [kind] = GetTime()
 local statusFS
 
 local function Now()
@@ -201,12 +201,14 @@ local function SendGroupAnnounce(msg)
     return false, "send failed"
 end
 
-local function RateOk()
+local function RateOk(kind)
+    kind = tostring(kind or "default")
     local now = Now()
-    if (now - lastAnnounceAt) < ANNOUNCE_GAP then
+    local last = tonumber(lastAnnounceAt[kind]) or 0
+    if (now - last) < ANNOUNCE_GAP then
         return false
     end
-    lastAnnounceAt = now
+    lastAnnounceAt[kind] = now
     return true
 end
 
@@ -269,7 +271,7 @@ function MiniHUD.ActionResync()
 end
 
 function MiniHUD.ActionWipe()
-    if not RateOk() then
+    if not RateOk("wipe") then
         return false, "rate limited"
     end
     local db = DB()
@@ -285,7 +287,7 @@ function MiniHUD.ActionWipe()
 end
 
 function MiniHUD.ActionShield()
-    if not RateOk() then
+    if not RateOk("shield") then
         return false, "rate limited"
     end
     local db = DB()
@@ -342,6 +344,8 @@ local function CollectPresentSet()
 end
 
 --- Snapshot current party/raid into the regroup watch list (survives leavers).
+-- Call BEFORE Slots.ScanRaid/SyncFromRoster so leavers are still known this tick
+-- only via the existing watch list (present set is already without them).
 function MiniHUD.RememberPresent()
     local db = DB()
     if not db then
@@ -350,31 +354,46 @@ function MiniHUD.RememberPresent()
     if type(db.regroupRoster) ~= "table" then
         db.regroupRoster = {}
     end
+    if type(db.regroupDisplay) ~= "table" then
+        db.regroupDisplay = {}
+    end
     local list = db.regroupRoster
     local present = CollectPresentSet()
     local n = 0
-    for _, name in pairs(present) do
+    for key, name in pairs(present) do
         local me = PlayerName()
-        if not me or LowerName(name) ~= LowerName(me) then
+        if not me or key ~= LowerName(me) then
             list = MiniHUD.RememberName(list, name, REGROUP_MAX)
+            db.regroupDisplay[key] = name
             n = n + 1
-        end
-    end
-    -- Also remember assigned-role names (may already have left)
-    if type(db.assignedRoles) == "table" then
-        for key, _ in pairs(db.assignedRoles) do
-            if type(key) == "string" and key ~= "" then
-                -- assignedRoles keys are already lowercased; keep as-is for InviteUnit
-                list = MiniHUD.RememberName(list, key, REGROUP_MAX)
-            end
         end
     end
     db.regroupRoster = list
     return n
 end
 
+--- Remember a player for regroup (keeps original casing for InviteUnit).
+function MiniHUD.RememberPlayer(name)
+    if type(name) ~= "string" or name == "" then
+        return false
+    end
+    local db = DB()
+    if not db then
+        return false
+    end
+    if type(db.regroupRoster) ~= "table" then
+        db.regroupRoster = {}
+    end
+    if type(db.regroupDisplay) ~= "table" then
+        db.regroupDisplay = {}
+    end
+    db.regroupRoster = MiniHUD.RememberName(db.regroupRoster, name, REGROUP_MAX)
+    db.regroupDisplay[LowerName(name)] = name
+    return true
+end
+
 function MiniHUD.ActionRegroup()
-    if not RateOk() then
+    if not RateOk("regroup") then
         return false, "rate limited"
     end
     MiniHUD.RememberPresent()
@@ -386,10 +405,12 @@ function MiniHUD.ActionRegroup()
         if AscensionLFM.Activity and AscensionLFM.Activity.Push then
             AscensionLFM.Activity.Push("regroup", msg)
         end
+    else
+        Print("Regroup warn failed: " .. tostring(ch))
     end
 
     if type(InviteUnit) ~= "function" then
-        return ok, ch or "InviteUnit missing"
+        return false, "InviteUnit missing"
     end
 
     local present = CollectPresentSet()
@@ -398,12 +419,20 @@ function MiniHUD.ActionRegroup()
         presentSet[k] = true
     end
     local roster = (db and db.regroupRoster) or {}
+    local display = (db and db.regroupDisplay) or {}
     local missing = MiniHUD.SelectMissing(roster, presentSet, PlayerName(), REGROUP_INVITE_CAP)
     local invited = 0
+    local failed = 0
     for _, name in ipairs(missing) do
-        local success = pcall(InviteUnit, name)
+        local inviteName = display[LowerName(name)] or name
+        local success, err = pcall(InviteUnit, inviteName)
         if success then
             invited = invited + 1
+        else
+            failed = failed + 1
+            if err then
+                Print("Regroup invite failed: " .. tostring(inviteName) .. " (" .. tostring(err) .. ")")
+            end
         end
     end
     if invited > 0 then
@@ -412,13 +441,24 @@ function MiniHUD.ActionRegroup()
             AscensionLFM.Activity.Push("regroup", "invited " .. tostring(invited))
         end
     elseif #missing == 0 then
-        Print("Regroup: everyone already here (or watch list empty)")
+        local watch = (db and type(db.regroupRoster) == "table" and #db.regroupRoster) or 0
+        if watch == 0 then
+            Print("Regroup: watch list empty — group up first so names are remembered")
+        else
+            Print("Regroup: everyone on the watch list is already here")
+        end
+    elseif failed > 0 and invited == 0 then
+        return false, "invites failed"
     end
-    return true, invited
+    -- Success if warn worked and/or at least one invite went out, or nothing to do.
+    if ok or invited > 0 or #missing == 0 then
+        return true, invited
+    end
+    return false, tostring(ch or "warn failed")
 end
 
 function MiniHUD.ActionFull()
-    if not RateOk() then
+    if not RateOk("full") then
         return false, "rate limited"
     end
     local db = DB()
@@ -427,12 +467,12 @@ function MiniHUD.ActionFull()
     if AscensionLFM.Poster and AscensionLFM.Poster.PostOnce then
         return AscensionLFM.Poster.PostOnce(msg, channel, db and db.postChannelName)
     end
-    local ok, ch = SendGroupAnnounce(msg)
-    return ok, ch
+    local sent, ch = SendGroupAnnounce(msg)
+    return sent, ch
 end
 
 function MiniHUD.ActionNeed(role)
-    if not RateOk() then
+    if not RateOk("need:" .. tostring(role or "")) then
         return false, "rate limited"
     end
     local msg = MiniHUD.BuildNeedMessage(role)
@@ -442,8 +482,8 @@ function MiniHUD.ActionNeed(role)
     local db = DB()
     local channel = (db and db.postChannel) or "YELL"
     if AscensionLFM.Poster and AscensionLFM.Poster.PostOnce then
-        local ok, err = AscensionLFM.Poster.PostOnce(msg, channel, db and db.postChannelName)
-        return ok, err or channel
+        local sent, err = AscensionLFM.Poster.PostOnce(msg, channel, db and db.postChannelName)
+        return sent, err or channel
     end
     return SendGroupAnnounce(msg)
 end
@@ -761,10 +801,11 @@ function MiniHUD.Start()
         return
     end
     MiniHUD.Ensure()
+    MiniHUD.RememberPresent()
 end
 
 function MiniHUD._ResetForTests()
-    lastAnnounceAt = 0
+    lastAnnounceAt = {}
     expanded = true
 end
 

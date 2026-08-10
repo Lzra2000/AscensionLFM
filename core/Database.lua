@@ -66,6 +66,7 @@ local DEFAULTS = {
     shieldAnnounceMessage = "KILL MOBS — boss shield still up!",
     regroupAnnounceMessage = "REGROUP — accept invite",
     regroupRoster = {}, -- display names remembered for regroup re-invite
+    regroupDisplay = {}, -- [nameLower] = displayName for InviteUnit casing
     -- Mini Quick HUD (floating bar — no /alfm needed)
     miniHudShow = true,
     miniHudExpanded = true,
