@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.10
+
+- **Mini HUD — Mobs:** new **Mobs** button raid-warns
+  `KILL MOBS — boss shield still up!` (party/yell fallback). Reminds the group to
+  clear adds so the boss shield drops. Custom text via `shieldAnnounceMessage`.
+
 ## 0.4.9
 
 - **Mini Quick HUD:** floating click bar (default ON) — LFM / RW / Sync / Wipe / FULL /

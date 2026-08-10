@@ -63,6 +63,7 @@ local DEFAULTS = {
     announceFull = false, -- optional one FULL line when stop-when-full fires
     fullAnnounceMessage = "LFM MS FULL — thanks!",
     wipeAnnounceMessage = "WIPE",
+    shieldAnnounceMessage = "KILL MOBS — boss shield still up!",
     -- Mini Quick HUD (floating bar — no /alfm needed)
     miniHudShow = true,
     miniHudExpanded = true,

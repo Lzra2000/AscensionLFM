@@ -78,8 +78,14 @@ check("wipe default", MiniHUD.BuildWipeMessage(nil) == "WIPE")
 check("wipe custom", MiniHUD.BuildWipeMessage("  WIPE NOW  ") == "WIPE NOW")
 check("wipe truncate", #MiniHUD.BuildWipeMessage(string.rep("W", 300)) == 255)
 
+check("shield default", MiniHUD.BuildShieldMessage(nil) == MiniHUD.DEFAULT_SHIELD)
+check("shield custom", MiniHUD.BuildShieldMessage("  KILL ADDS  ") == "KILL ADDS")
+check("shield has mobs", tostring(MiniHUD.DEFAULT_SHIELD):find("MOBS", 1, true) ~= nil)
+check("shield has shield", tostring(MiniHUD.DEFAULT_SHIELD):lower():find("shield", 1, true) ~= nil)
+
 check("default miniHudShow on", AscensionLFM.Database.Get().miniHudShow == true)
 check("default wipe msg", AscensionLFM.Database.Get().wipeAnnounceMessage == "WIPE")
+check("default shield msg", AscensionLFM.Database.Get().shieldAnnounceMessage == MiniHUD.DEFAULT_SHIELD)
 
 -- Action wipe with stubs
 MiniHUD._ResetForTests()
@@ -99,6 +105,13 @@ check("wipe text", _G._chats[1] and _G._chats[1].msg == "WIPE")
 
 ok = MiniHUD.ActionWipe()
 check("wipe rate limited", ok == false)
+
+MiniHUD._ResetForTests()
+_G._chats = {}
+ok, ch = MiniHUD.ActionShield()
+check("shield sends", ok == true, tostring(ok) .. "/" .. tostring(ch))
+check("shield text", _G._chats[1] and tostring(_G._chats[1].msg):find("MOBS", 1, true) ~= nil)
+check("shield mentions shield", _G._chats[1] and tostring(_G._chats[1].msg):lower():find("shield", 1, true) ~= nil)
 
 MiniHUD._ResetForTests()
 _G._chats = {}

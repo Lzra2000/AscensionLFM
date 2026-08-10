@@ -7,7 +7,7 @@ WotLK **3.3.5a** addon for Ascension that scans chat and whispers for **Manastor
 1. Download **`AscensionLFM.zip`** from [Releases](https://github.com/Lzra2000/AscensionLFM/releases) — **not** GitHub “Source code” / Code → Download ZIP (that becomes `AscensionLFM-main` and **will not** appear in the AddOns list).
 2. Extract so you have exactly `Interface/AddOns/AscensionLFM/AscensionLFM.toc` (folder name must match the `.toc` basename).
 3. Enable the addon on the character select AddOns list, then login or `/reload`.
-4. `/alfm` opens settings. Default mode is **Notify** (Listening ON). A **Mini Quick HUD** appears for LFM/RW/Wipe/Need clicks without typing `/alfm`. Use `/alfm test` to inject a fake Log entry.
+4. `/alfm` opens settings. Default mode is **Notify** (Listening ON). A **Mini Quick HUD** appears for LFM/RW/Wipe/Mobs/Need clicks without typing `/alfm`. Use `/alfm test` to inject a fake Log entry.
 
 See `INSTALL.txt` inside the zip for a short checklist.
 
@@ -27,6 +27,22 @@ See `INSTALL.txt` inside the zip for a short checklist.
 | `/alfm status` | Rich status (Full Auto, invites, repost, slots, queue) |
 | `/alfm test` | Inject a fake match into the Log |
 | `/alfm help` | List commands |
+
+## Mini Quick HUD
+
+Floating bar (default **ON**) — mid-run clicks without typing `/alfm`:
+
+| Button | Action |
+|--------|--------|
+| **LFM** | Post current LFM line (Post channel) |
+| **RW** | Start Role Check raid warning |
+| **Sync** | Resync roles / filled counts |
+| **Wipe** | Raid warning `WIPE` |
+| **Mobs** | Raid warning `KILL MOBS — boss shield still up!` |
+| **FULL** | Announce FULL line |
+| **T H A D** | Short need Tank/Healer/Aura/DPS on Post channel |
+
+Drag the title to move. **×** collapses to an `ALFM` chip (click to expand). Title click opens full settings. Toggle under **General → Show floating quick bar**.
 
 ## Modes (default: **Notify** — Listening ON)
 
