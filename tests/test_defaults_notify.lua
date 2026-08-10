@@ -29,7 +29,7 @@ Database.Init()
 local db = Database.Get()
 
 check("default mode is notify", db.mode == "notify")
-check("defaultsRev is 4", tonumber(db.defaultsRev) == 4)
+check("defaultsRev is 5", tonumber(db.defaultsRev) == 5)
 check("autoKick still off", db.autoKickLevel59 == false)
 check("autoWhisper still off", db.autoWhisper == false)
 check("autoRepost still off", db.autoRepost == false)
@@ -52,7 +52,7 @@ _G.AscensionLFMDB = {
 }
 Database.Init()
 check("migrate off→notify", Database.Get().mode == "notify")
-check("migrate sets defaultsRev 4", tonumber(Database.Get().defaultsRev) == 4)
+check("migrate sets defaultsRev 5", tonumber(Database.Get().defaultsRev) == 5)
 
 -- Do not re-flip after user sets Off post-migration
 Database.SetMode("off")
@@ -68,6 +68,8 @@ _G.AscensionLFMDB = {
 Database.Init()
 check("migrate shortens stock RW msg",
     tostring(Database.Get().roleCheckMessage):find("T/H/A/D", 1, true) ~= nil)
+check("migrate mentions party replies",
+    tostring(Database.Get().roleCheckMessage):find("party", 1, true) ~= nil)
 _G.AscensionLFMDB = {
     mode = "notify",
     defaultsRev = 2,
@@ -87,7 +89,7 @@ _G.AscensionLFMDB = {
 }
 Database.Init()
 local migrated = Database.Get()
-check("full auto migrate rev 4", tonumber(migrated.defaultsRev) == 4)
+check("full auto migrate rev 5", tonumber(migrated.defaultsRev) == 5)
 check("full auto migrate healer on", migrated.roles.healer == true)
 check("full auto migrate aura on", migrated.roles.aura == true)
 

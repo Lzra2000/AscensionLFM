@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.8
+
+- **Fix RW Role Check:** accept `UnitIsPartyLeader("player")` (same Ascension privilege
+  gap as Kick59). Roster membership uses `UnitName` when `GetRaidRosterInfo` name is
+  empty so member role replies are not dropped.
+- During the listen window, **party/raid chat** role replies count (not only whispers) —
+  common after a raid warning.
+- Stock RW text mentions party replies; `/alfm status` prints canWarn / lastStart /
+  reply count.
+
 ## 0.4.7
 
 - **Fix Kick59:** roster level `0` no longer blocks kicks — prefer `UnitLevel` when

@@ -11,7 +11,7 @@ end
 local RoleCheck = {}
 AscensionLFM.RoleCheck = RoleCheck
 
-local DEFAULT_MSG = "ROLE CHECK — whisper tank/heal/aura/dps (or T/H/A/D)"
+local DEFAULT_MSG = "ROLE CHECK — whisper or party: tank/heal/aura/dps (T/H/A/D)"
 local DEFAULT_DURATION = 60
 local MIN_RW_GAP = 30
 local MIN_DURATION = 15
@@ -23,6 +23,8 @@ local responses = {} -- [nameLower] = role
 local lastResponseCount = 0
 local frame
 local endedResyncDone = false
+local lastStartReason = "idle"
+local lastReplyAt = 0
 
 local function Now()
     return (type(GetTime) == "function" and GetTime()) or os.clock()
@@ -219,34 +221,60 @@ function RoleCheck.GetResponses()
     return responses
 end
 
---- Live privilege check (Kick.lua pattern).
+--- Live privilege check (same hardened path as Kick.CanKick).
 function RoleCheck.CanRaidWarn()
     local raid = (type(GetNumRaidMembers) == "function" and GetNumRaidMembers()) or 0
+    local party = (type(GetNumPartyMembers) == "function" and GetNumPartyMembers()) or 0
+    local groupKind = "none"
     if raid and raid > 0 then
+        groupKind = "raid"
+    elseif party and party > 0 then
+        groupKind = "party"
+    else
+        return false, "none"
+    end
+
+    -- Most reliable on 3.3.5a / Ascension for both party and raid lead.
+    if type(UnitIsPartyLeader) == "function" and UnitIsPartyLeader("player") then
+        return true, groupKind
+    end
+
+    if groupKind == "raid" then
         local lead = (type(IsRaidLeader) == "function" and IsRaidLeader()) or false
         local assist = (type(IsRaidOfficer) == "function" and IsRaidOfficer()) or false
         return lead or assist, "raid"
     end
-    local party = (type(GetNumPartyMembers) == "function" and GetNumPartyMembers()) or 0
-    if party and party > 0 then
-        if type(IsPartyLeader) == "function" then
-            return IsPartyLeader() and true or false, "party"
-        end
-        return false, "party"
+
+    if type(IsPartyLeader) == "function" then
+        return IsPartyLeader() and true or false, "party"
     end
-    return false, "none"
+    return false, "party"
+end
+
+local function RosterNameAt(i, unit)
+    local name
+    if type(GetRaidRosterInfo) == "function" then
+        name = GetRaidRosterInfo(i)
+    end
+    if (type(name) ~= "string" or name == "") and type(UnitName) == "function" and unit then
+        name = UnitName(unit)
+    end
+    return name
 end
 
 local function IsGroupMember(name)
     local key = LowerName(name)
+    if key == "" then
+        return false
+    end
     local me = PlayerName()
     if me and LowerName(me) == key then
         return true
     end
     local raid = (type(GetNumRaidMembers) == "function" and GetNumRaidMembers()) or 0
-    if raid and raid > 0 and type(GetRaidRosterInfo) == "function" then
+    if raid and raid > 0 then
         for i = 1, raid do
-            local n = GetRaidRosterInfo(i)
+            local n = RosterNameAt(i, "raid" .. i)
             if type(n) == "string" and LowerName(n) == key then
                 return true
             end
@@ -263,6 +291,11 @@ local function IsGroupMember(name)
         end
     end
     return false
+end
+
+--- Live membership (UnitName fallback when GetRaidRosterInfo name is empty).
+function RoleCheck.IsLiveGroupMember(name)
+    return IsGroupMember(name)
 end
 
 local function SendWarn(msg, groupKind)
@@ -295,9 +328,9 @@ end
 local function CollectPresent()
     local present = {}
     local raid = (type(GetNumRaidMembers) == "function" and GetNumRaidMembers()) or 0
-    if raid and raid > 0 and type(GetRaidRosterInfo) == "function" then
+    if raid and raid > 0 then
         for i = 1, raid do
-            local n = GetRaidRosterInfo(i)
+            local n = RosterNameAt(i, "raid" .. i)
             if type(n) == "string" and n ~= "" then
                 present[LowerName(n)] = true
             end
@@ -413,6 +446,7 @@ function RoleCheck.StartCheck(msgOrNow)
         msgOverride = msgOrNow
     end
     if not IsHosting(db) then
+        lastStartReason = "not hosting"
         if AscensionLFM.Print then
             AscensionLFM.Print("Role Check needs Hosting mode (or Full Auto)")
         end
@@ -421,6 +455,7 @@ function RoleCheck.StartCheck(msgOrNow)
     local now = nowOverride or Now()
     local minGap = RoleCheck.ClampMinInterval(db and db.roleCheckMinInterval)
     if not RoleCheck.ShouldAllowRW(now, lastRwAt, minGap) then
+        lastStartReason = "rate limited"
         if AscensionLFM.Print then
             AscensionLFM.Print("Role Check: wait before the next raid warning")
         end
@@ -428,6 +463,7 @@ function RoleCheck.StartCheck(msgOrNow)
     end
     local can, groupKind = RoleCheck.CanRaidWarn()
     if not can then
+        lastStartReason = "no privilege"
         if AscensionLFM.Print then
             AscensionLFM.Print("Role Check: need raid lead/assist (or party lead)")
         end
@@ -444,12 +480,15 @@ function RoleCheck.StartCheck(msgOrNow)
     endedResyncDone = false
     activeUntil = now + dur
     lastRwAt = now
+    lastStartReason = "started:" .. tostring(groupKind)
     SendWarn(msg, groupKind)
     if AscensionLFM.Activity and AscensionLFM.Activity.Push then
         AscensionLFM.Activity.Push("rolecheck", "RW role check started (" .. dur .. "s)")
     end
     if AscensionLFM.Print then
-        AscensionLFM.Print("Role Check open — whisper tank / heal / aura / dps (" .. dur .. "s)")
+        AscensionLFM.Print(
+            "Role Check open — whisper or party/raid chat: tank / heal / aura / dps (" .. dur .. "s)"
+        )
     end
     RoleCheck.EnsureTicker()
     RefreshUI()
@@ -461,6 +500,7 @@ function RoleCheck.Start(msgOverride)
     return RoleCheck.StartCheck(msgOverride)
 end
 
+--- Accept a role reply (whisper or party/raid chat) from a group member.
 function RoleCheck.HandleWhisper(sender, message)
     if not RoleCheck.IsActive() then
         return false
@@ -476,6 +516,7 @@ function RoleCheck.HandleWhisper(sender, message)
         return false
     end
     responses[LowerName(sender)] = role
+    lastReplyAt = Now()
     if AscensionLFM.Slots and AscensionLFM.Slots.Assign then
         AscensionLFM.Slots.Assign(sender, role)
     end
@@ -486,6 +527,7 @@ function RoleCheck.HandleWhisper(sender, message)
     return true, role
 end
 RoleCheck.OnWhisper = RoleCheck.HandleWhisper
+RoleCheck.HandleRoleReply = RoleCheck.HandleWhisper
 
 function RoleCheck.GetStatus()
     local db = DB()
@@ -493,6 +535,7 @@ function RoleCheck.GetStatus()
     local left = RoleCheck.SecondsLeft()
     local count = active and RoleCheck.ResponseCount() or lastResponseCount
     local autoMove = db and db.autoMoveAura ~= false
+    local can, groupKind = RoleCheck.CanRaidWarn()
     return {
         active = active,
         remaining = left,
@@ -500,6 +543,11 @@ function RoleCheck.GetStatus()
         responses = count,
         status = RoleCheck.BuildStatusText(active, left, count, autoMove),
         lastRwAt = lastRwAt,
+        lastStart = lastStartReason,
+        lastReplyAt = lastReplyAt,
+        canWarn = can and true or false,
+        group = groupKind,
+        hosting = IsHosting(db) and true or false,
     }
 end
 
@@ -560,6 +608,8 @@ function RoleCheck._ResetForTests()
     responses = {}
     lastResponseCount = 0
     endedResyncDone = false
+    lastStartReason = "idle"
+    lastReplyAt = 0
 end
 
 function RoleCheck._SetLastRwAt(t)

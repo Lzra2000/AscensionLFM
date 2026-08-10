@@ -60,12 +60,12 @@ Open **Post** in `/alfm` (separate from Hosting to avoid crowding).
 While **Mode = Hosting** (or Full Auto) and you are raid lead/assist (party lead → party/yell fallback):
 
 1. `/alfm` → **Hosting** (or **Post**) → **RW Role Check**
-2. Sends a configurable raid warning (default: `ROLE CHECK — whisper tank / heal / aura / dps`)
-3. Opens a **listening window** (default **60s**): party/raid members who whisper a role update slot assignments live
+2. Sends a configurable raid warning (default mentions whisper **or party** `tank/heal/aura/dps`)
+3. Opens a **listening window** (default **60s**): party/raid members who whisper **or type in party/raid chat** a role update slot assignments live
 4. Status shows `Role check active — Xs left · N responses`
 5. When the window ends (if **Auto-resync** is on) — or anytime via **Resync roles now** — leavers are removed, whispered roles re-applied, filled counts and the LFM preview refresh
 
-RW is rate-limited (minimum **30s** between warnings). **Resync roles now** works without a prior RW (roster cleanup + recount only).
+RW is rate-limited (minimum **30s** between warnings). **Resync roles now** works without a prior RW (roster cleanup + recount only). If the button does nothing, `/alfm status` shows `roleCheck: canWarn=… · lastStart=…`.
 
 **Aura auto-move** (default ON, Hosting): at most one Aura player per raid group (1–8). Extra Auras move (or swap into full groups) one at a time after assign / scan / resync; skipped in combat.
 

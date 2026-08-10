@@ -81,8 +81,10 @@ ok, reason = RoleCheck.StartCheck()
 check("refuse without privilege", ok == false and reason == "no privilege")
 
 _G.GetNumRaidMembers = function() return 3 end
+_G.GetNumPartyMembers = function() return 0 end
 _G.IsRaidLeader = function() return true end
 _G.IsRaidOfficer = function() return false end
+_G.UnitIsPartyLeader = function() return false end
 _G.GetRaidRosterInfo = function(i)
     return ({ "Host", "Alice", "Bob" })[i]
 end
@@ -91,6 +93,9 @@ _G.SendChatMessage = function(msg, ch)
 end
 _G.UnitName = function(u)
     if u == "player" then return "Host" end
+    if u == "raid1" then return "Host" end
+    if u == "raid2" then return "Alice" end
+    if u == "raid3" then return "Bob" end
     return nil
 end
 _G.GetTime = function() return _G._now or 2000 end
@@ -148,6 +153,34 @@ db.fullAutoHosting = true
 _G._now = 4000
 ok, reason = RoleCheck.StartCheck()
 check("full auto allows check", ok == true, tostring(reason))
+
+-- UnitIsPartyLeader alone is enough (IsRaidLeader false — Ascension quirk)
+RoleCheck._ResetForTests()
+db.mode = "hosting"
+db.fullAutoHosting = false
+_G.IsRaidLeader = function() return false end
+_G.UnitIsPartyLeader = function(u) return u == "player" end
+_G._now = 5000
+ok, reason = RoleCheck.StartCheck()
+check("UnitIsPartyLeader enough", ok == true, tostring(reason))
+
+-- Roster name nil + UnitName fallback still counts as member
+RoleCheck._ResetForTests()
+_G.GetRaidRosterInfo = function(i)
+    -- name empty/nil (Ascension load flake); UnitName still has it
+    return nil
+end
+_G._now = 6000
+ok = RoleCheck.StartCheck()
+check("start with nil roster names", ok == true)
+handled = RoleCheck.HandleWhisper("Alice", "dps")
+check("UnitName fallback membership", handled == true, tostring(handled))
+check("alice dps via UnitName", Slots.GetAssigned("Alice") == "dps")
+
+local st = RoleCheck.GetStatus()
+check("status canWarn", st.canWarn == true)
+check("status hosting", st.hosting == true)
+check("status lastStart", type(st.lastStart) == "string" and st.lastStart:find("started", 1, true) ~= nil)
 
 if failed > 0 then
     io.stderr:write(string.format("test_rolecheck: %d failed, %d passed\n", failed, passed))
