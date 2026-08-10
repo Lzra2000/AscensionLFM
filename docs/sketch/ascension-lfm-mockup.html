@@ -253,42 +253,44 @@
 </style>
 </head>
 <body>
-  <h1>AscensionLFM — Categories sidebar settings (v0.2.1)</h1>
+  <h1>AscensionLFM — Categories sidebar settings (v0.3.0)</h1>
   <p class="lead">
     AscensionSuite-style native WotLK chrome: left <strong>Categories</strong>, right parchment
     page per category (not one cramped column). Slash: <code>/alfm</code> · DialogFrame / parchment /
     <code>UIPanelButton</code> / <code>UICheckButton</code>. Click nav to preview pages.
+    <strong>Post</strong> = LFM compose / scan / auto-repost.
   </p>
 
   <div class="stage">
     <div class="dialog" id="dlg">
       <div class="titlebar">
         <h2>AscensionLFM</h2>
-        <p class="subhead">Manastorm Level Run LFM/LFG · v0.2.1</p>
+        <p class="subhead">Manastorm Level Run LFM/LFG · v0.3.0</p>
       </div>
       <div class="close">×</div>
 
       <div class="body">
         <nav class="sidebar" id="sidebar">
           <div class="side-lbl">Categories</div>
-          <div class="nav on" data-cat="general">General</div>
+          <div class="nav" data-cat="general">General</div>
           <div class="nav" data-cat="seeking">Seeking</div>
           <div class="nav" data-cat="hosting">Hosting</div>
+          <div class="nav on" data-cat="post">Post</div>
           <div class="nav" data-cat="kick">Kick</div>
           <div class="nav" data-cat="log">Log</div>
         </nav>
 
         <div class="main">
           <div class="main-head">
-            <h3 id="head-title">General</h3>
-            <p class="sub" id="head-sub">Mode, status, and safety overview. Scanner stays idle until you leave Off.</p>
+            <h3 id="head-title">Post</h3>
+            <p class="sub" id="head-sub">Compose LFM from slots, scan raid fills, post once, or opt-in auto-repost.</p>
           </div>
 
           <div class="scroll">
             <!-- GENERAL -->
-            <div class="page on" data-page="general">
+            <div class="page" data-page="general">
               <div class="status">
-                Status: <strong>Listening</strong> · Mode: <span class="mode">Hosting</span> · <span class="kick">Kick59 ON</span><br />
+                Status: <strong>Listening ON</strong> · Mode: <span class="mode">Hosting</span> · Kick59 off<br />
                 Last match: <em>Thrall</em> — MS 0/2 T · 1/3 H · 0/3 A · 2/7 D
               </div>
               <div class="sec">Mode</div>
@@ -299,8 +301,8 @@
                 <span class="radio on"><span class="dot"></span> Hosting</span>
               </div>
               <p class="hint">
-                <b>Off</b> — no scanning side effects.<br />
-                <b>Notify</b> — print MS LFM/LFG matches to chat + Log.<br />
+                <b>Off</b> — Listening OFF (no chat scan).<br />
+                <b>Notify</b> — Listening ON: print MS LFM/LFG to chat + Log (default).<br />
                 <b>Seeking</b> — match open roles; optional auto-whisper LFM leaders.<br />
                 <b>Hosting</b> — role whispers → invite only if accepted role + open slot.
               </p>
@@ -371,11 +373,45 @@
               <p class="hint">Whisper roles: tank/OT/MT · heal/HPS · Aura of Exp / exp aura · dps/DD.</p>
             </div>
 
+            <!-- POST -->
+            <div class="page on" data-page="post">
+              <div class="sec">LFM message</div>
+              <div class="status" style="font-family:monospace;font-size:.72rem;">
+                LFM MS 1/2 Tanks 0/3 Healers 1/3 Aura 2/7 DPS
+              </div>
+              <div class="sec">Channel</div>
+              <div class="row">
+                <span class="radio on"><span class="dot"></span> Yell</span>
+                <span class="radio"><span class="dot"></span> Say</span>
+                <span class="radio"><span class="dot"></span> Guild</span>
+                <span class="radio"><span class="dot"></span> Channel</span>
+                <label>Name <input type="text" value="" placeholder="optional" style="width:100px;" /></label>
+              </div>
+              <div class="row" style="margin-top:8px;">
+                <div class="btn">Rebuild</div>
+                <div class="btn">Scan raid/party</div>
+                <div class="btn">Post once</div>
+              </div>
+              <div class="sec">Auto-repost</div>
+              <div class="toggle">
+                <div class="tbox"></div>
+                <div>
+                  <div class="t">Enable auto-repost (Hosting only)</div>
+                  <div class="d">Rebuild LFM from slots each tick. Stops when full or disabled. Default OFF.</div>
+                </div>
+              </div>
+              <div class="row">
+                <label>Interval (sec, min 30) <input class="tiny" type="text" value="60" /></label>
+              </div>
+              <div class="filled">Auto-repost OFF  ·  Last post: never  ·  Channel: YELL</div>
+              <p class="hint">Filled counts drive the LFM string. Roster events auto-refresh while Hosting.</p>
+            </div>
+
             <!-- KICK -->
             <div class="page" data-page="kick">
               <div class="sec">Level-59 auto-kick</div>
               <div class="toggle danger">
-                <div class="tbox on"></div>
+                <div class="tbox"></div>
                 <div>
                   <div class="t">Enable kick at level 59 + raid warning every 10s</div>
                   <div class="d">Hosting only · leader/assist · ignores self · RW then UninviteUnit. Default OFF.</div>
@@ -410,7 +446,7 @@
           </div>
 
           <div class="footer">
-            <span class="status-txt" id="foot">Mode Hosting · Kick59 ON</span>
+            <span class="status-txt" id="foot">Listening ON · Mode Hosting · Kick59 off</span>
             <div class="btn" id="clear-btn" style="display:none;">Clear</div>
             <div class="btn">Close</div>
           </div>
@@ -424,6 +460,7 @@
         <li><b>General</b> — status + mode Off/Notify/Seeking/Hosting</li>
         <li><b>Seeking</b> — my roles, scan LFG, auto-whisper + message</li>
         <li><b>Hosting</b> — accept roles, invite toggles, slot maxes + filled</li>
+        <li><b>Post</b> — LFM preview, channel, Post once, Scan, auto-repost</li>
         <li><b>Kick</b> — opt-in level-59 kick + recent kick log</li>
         <li><b>Log</b> — recent LFM/LFG matches (Clear)</li>
       </ul>
@@ -436,9 +473,10 @@
 <script>
 (function () {
   var titles = {
-    general: ["General", "Mode, status, and safety overview. Scanner stays idle until you leave Off."],
+    general: ["General", "Mode and status. Default Notify = Listening ON (Log fills; no auto-invite)."],
     seeking: ["Seeking", "Roles you play and optional auto-whisper when an LFM still needs you."],
     hosting: ["Hosting", "Accept roles, invite rules, and Manastorm slot caps (default 2/3/3/7)."],
+    post: ["Post", "Compose LFM from slots, scan raid fills, post once, or opt-in auto-repost."],
     kick: ["Kick", "Opt-in level-59 auto-kick with raid warning. Dangerous — default OFF."],
     log: ["Log", "Recent Manastorm LFM/LFG matches from public chat and whispers."]
   };
@@ -466,7 +504,9 @@
       ? "Kick log · Clear removes kick history"
       : (cat === "log")
         ? "Match log · Clear removes match history"
-        : "Mode Hosting · Kick59 ON";
+        : (cat === "post")
+          ? "Post · Scan fills · Auto-repost opt-in"
+          : "Listening ON · Mode Hosting · Kick59 off";
   }
 
   for (var k = 0; k < navs.length; k++) {

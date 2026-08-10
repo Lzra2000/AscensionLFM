@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.3.0
+
+- **LFM Post composer** (new **Post** sidebar category): preview/edit box builds
+  `LFM MS {t}/{tmax} Tanks {h}/{hmax} Healers {a}/{amax} Aura {d}/{dmax} DPS`
+  from Hosting slot filled/max; channel YELL / SAY / GUILD / CHANNEL (+ optional name);
+  **Post once** via `SendChatMessage`.
+- **Scan raid/party** recounts filled from roster + `assignedRoles`; auto-refresh on
+  `PARTY_MEMBERS_CHANGED` / `RAID_ROSTER_UPDATE` while Hosting or auto-repost is on.
+- **Auto-repost** (default OFF): interval seconds (default 60, min 30); Hosting only;
+  rebuilds the LFM string each tick; stops when all role caps are filled or group hits
+  Max size; status shows next-repost countdown and last post time.
+- Kick59 and invite behavior unchanged (kick still opt-in default OFF).
+- TOC load order: Database → Parser → Slots → Invite → Kick → **Poster** → Scanner →
+  MainWindow → **Bootstrap last**.
+- Tests for message builder, stop-when-full, interval clamp; mockup updated.
+
 ## 0.2.2
 
 - **Fix empty Match Log / “addon does nothing”:** default mode is now **Notify** (Listening ON). Public LFM/LFG MS lines go to chat + Log without setup; kick and auto-invite stay off. One-time upgrade flips leftover `Off` installs to Notify.

@@ -249,11 +249,18 @@ local function HandleWhisper(sender, message)
 end
 
 local function HandleRoster()
-    if AscensionLFM.Slots and AscensionLFM.Slots.SyncFromRoster then
+    local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
+    local hostingOrPosting = db and (db.mode == "hosting" or db.autoRepost)
+    if hostingOrPosting and AscensionLFM.Slots and AscensionLFM.Slots.ScanRaid then
+        AscensionLFM.Slots.ScanRaid()
+    elseif AscensionLFM.Slots and AscensionLFM.Slots.SyncFromRoster then
         AscensionLFM.Slots.SyncFromRoster()
+        if AscensionLFM.MainWindow and AscensionLFM.MainWindow.RefreshSlots then
+            AscensionLFM.MainWindow.RefreshSlots()
+        end
     end
-    if AscensionLFM.MainWindow and AscensionLFM.MainWindow.RefreshSlots then
-        AscensionLFM.MainWindow.RefreshSlots()
+    if AscensionLFM.Poster and AscensionLFM.Poster.OnRosterChanged then
+        AscensionLFM.Poster.OnRosterChanged()
     end
 end
 

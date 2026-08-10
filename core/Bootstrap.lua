@@ -8,7 +8,7 @@ if type(AscensionLFM) ~= "table" then
     _G.AscensionLFM = AscensionLFM
 end
 
-AscensionLFM.VERSION = "0.2.2"
+AscensionLFM.VERSION = "0.3.0"
 AscensionLFM.ADDON_NAME = "AscensionLFM"
 
 local function Print(msg)
@@ -64,6 +64,9 @@ bootFrame:SetScript("OnEvent", function(self, event, arg1)
         if AscensionLFM.Scanner and AscensionLFM.Scanner.Start then
             AscensionLFM.Scanner.Start()
         end
+        if AscensionLFM.Poster and AscensionLFM.Poster.Start then
+            AscensionLFM.Poster.Start()
+        end
         if AscensionLFM.MainWindow and AscensionLFM.MainWindow.Init then
             AscensionLFM.MainWindow.Init()
         end
@@ -71,7 +74,7 @@ bootFrame:SetScript("OnEvent", function(self, event, arg1)
         local mode = (db and db.mode) or "notify"
         Print("v" .. AscensionLFM.VERSION .. " — mode=" .. ModeLabel(mode))
         Print("/alfm to open settings · /alfm test for a fake Log entry")
-        Print("set Mode → Hosting for auto-invite (kick stays opt-in OFF)")
+        Print("Hosting → invite; Post → LFM compose/scan/repost (kick stays opt-in OFF)")
         self:UnregisterEvent("PLAYER_LOGIN")
     end
 end)

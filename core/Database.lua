@@ -42,6 +42,12 @@ local DEFAULTS = {
     autoKickLevel59 = false,
     kickLevel = 59,
     kickWarnInterval = 10,
+    -- LFM Post / auto-repost (default OFF)
+    postChannel = "YELL", -- YELL | SAY | GUILD | CHANNEL
+    postChannelName = "", -- used when postChannel == CHANNEL
+    autoRepost = false,
+    repostInterval = 60, -- seconds; clamped to min 30
+    lastPostAt = 0, -- wall-clock unix when last post succeeded (display)
     matchHistory = {}, -- { {leader=, text=, source=, t=}, ... } max 30
     kickHistory = {}, -- { {name=, level=, t=}, ... } max 20
 }
