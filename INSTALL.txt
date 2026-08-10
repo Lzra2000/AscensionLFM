@@ -12,10 +12,10 @@ ENGLISH
 
    Folder name MUST match the .toc basename: AscensionLFM (classic 3.3.5a rule).
 3. Enable AscensionLFM in the character AddOns list, then login or /reload.
-4. Type /alfm to open settings. Default mode is Notify (Listening ON) — matches appear
-   in the Log. Set Hosting for auto-invite. Use the Post category to compose/post LFM
-   (Scan raid/party + optional auto-repost).
-5. Optional: /alfm test injects a fake match so you can verify the Log UI.
+4. Type /alfm (or /mslfm) to open settings. If nothing happens: check the AddOns list that
+   AscensionLFM is enabled (folder must be AscensionLFM), then /reload. Try /alfm status —
+   if that prints, the addon loaded. Default mode is Notify (Listening ON).
+5. Optional: /alfm test injects a fake match so you can verify the Log UI. /alfm help lists commands.
 
 DEUTSCH
 -------
@@ -28,7 +28,6 @@ DEUTSCH
 
    Der Ordnername MUSS AscensionLFM heißen (Regel von WoW 3.3.5a).
 3. Addon in der Charakter-AddOns-Liste aktivieren, einloggen oder /reload.
-4. /alfm öffnet die Einstellungen. Standardmodus ist Notify (Listening ON) — Treffer
-   erscheinen im Log. Hosting für Auto-Invite; Kategorie Post für LFM-Text / Scan /
-   Auto-Repost.
-5. Optional: /alfm test legt einen Test-Eintrag ins Log.
+4. /alfm (oder /mslfm) öffnet die Einstellungen. Passiert nichts: AddOns-Liste prüfen
+   (Ordner AscensionLFM, Häkchen an), dann /reload. /alfm status muss eine Zeile drucken.
+5. Optional: /alfm test · /alfm help

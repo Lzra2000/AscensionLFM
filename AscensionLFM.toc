@@ -2,15 +2,16 @@
 ## Title: AscensionLFM
 ## Notes: Manastorm Level Run LFM/LFG scanner — notify, optional auto-whisper, host slots + auto-invite, LFM post/repost, opt-in level-59 kick.
 ## Author: Lzra2000
-## Version: 0.3.0
+## Version: 0.3.1
 ## SavedVariables: AscensionLFMDB
+## DefaultState: enabled
 
-core/Database.lua
-core/Parser.lua
-core/Slots.lua
-core/Invite.lua
-core/Kick.lua
-core/Poster.lua
-core/Scanner.lua
-ui/MainWindow.lua
-core/Bootstrap.lua
+core\Database.lua
+core\Parser.lua
+core\Slots.lua
+core\Invite.lua
+core\Kick.lua
+core\Poster.lua
+core\Scanner.lua
+ui\MainWindow.lua
+core\Bootstrap.lua

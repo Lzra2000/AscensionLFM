@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.1
+
+- **Fix `/alfm` not working on Ascension:** TOC file paths use Windows backslashes
+  (`core\Bootstrap.lua`) like AscensionSuite — forward slashes often prevent Lua from
+  loading on 3.3.5a/Ascension, so slash commands never register.
+- Slash re-registered on `ADDON_LOADED` / `PLAYER_LOGIN`; aliases `/mslfm`, `/alfmshow`.
+- UI `Init`/`Toggle` wrapped with `pcall` + dialog-template fallback; errors print to chat
+  instead of silently failing. `/alfm help` and clearer status hints.
+
 ## 0.3.0
 
 - **LFM Post composer** (new **Post** sidebar category): preview/edit box builds
