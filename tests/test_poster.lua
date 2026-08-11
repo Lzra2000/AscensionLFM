@@ -38,7 +38,7 @@ local emptySnap = {
     dps = { filled = 0, max = 7 },
 }
 local msg = Poster.BuildMessage(emptySnap)
-check("empty build format", msg == "LFM MS 0/2 Tanks 0/3 Healers 0/3 Aura 0/7 DPS", msg)
+check("empty build format", msg == "LFM MS | 0/2 Tanks | 0/3 Healers | 0/3 Aura | 0/7 DPS", msg)
 
 local midSnap = {
     tank = { filled = 1, max = 2 },
@@ -47,7 +47,26 @@ local midSnap = {
     dps = { filled = 5, max = 7 },
 }
 msg = Poster.BuildMessage(midSnap)
-check("mid build format", msg == "LFM MS 1/2 Tanks 2/3 Healers 0/3 Aura 5/7 DPS", msg)
+check("mid build format", msg == "LFM MS | 1/2 Tanks | 2/3 Healers | 0/3 Aura | 5/7 DPS", msg)
+
+-- Full/disabled roles are omitted entirely, not shown as 0/0 or N/N
+local partialFullSnap = {
+    tank = { filled = 2, max = 2 },
+    healer = { filled = 1, max = 3 },
+    aura = { filled = 0, max = 0 }, -- disabled
+    dps = { filled = 7, max = 7 },
+}
+msg = Poster.BuildMessage(partialFullSnap)
+check("full/disabled roles omitted", msg == "LFM MS | 1/3 Healers", msg)
+
+local allFullSnap = {
+    tank = { filled = 2, max = 2 },
+    healer = { filled = 3, max = 3 },
+    aura = { filled = 3, max = 3 },
+    dps = { filled = 7, max = 7 },
+}
+msg = Poster.BuildMessage(allFullSnap)
+check("all full fallback text", msg == "LFM MS — full", msg)
 
 check("nil snapshot still builds", type(Poster.BuildMessage(nil)) == "string")
 
@@ -180,16 +199,18 @@ check("ScanRaid removed number", type(removed) == "number")
 -- positive slotMax must not still get advertised in the posted LFM text —
 -- previously "0/3 Healers" would show even with healer explicitly off,
 -- contradicting the "role filtered" reject applicants for that role got.
+-- Since v0.4.29, full/disabled roles are omitted from the message
+-- entirely (not shown as 0/0) — Healer must not appear at all.
 local db = AscensionLFM.Database.Get()
 db.roles = { tank = true, healer = false, aura = true, dps = true }
 db.slotMax = { tank = 2, healer = 3, aura = 3, dps = 7 }
 Slots.ClearAll()
 local disabledMsg = Poster.RefreshMessage()
-check("disabled role shows 0/0 not raw slotMax", disabledMsg:find("0/0 Healers", 1, true) ~= nil, disabledMsg)
+check("disabled role omitted entirely", disabledMsg:find("Healers", 1, true) == nil, disabledMsg)
 check("disabled role max not leaked", disabledMsg:find("0/3 Healers", 1, true) == nil, disabledMsg)
 
 local disabledStatus = Poster.GetStatus()
-check("GetStatus message also filtered", disabledStatus.message:find("0/0 Healers", 1, true) ~= nil,
+check("GetStatus message also filtered", disabledStatus.message:find("Healers", 1, true) == nil,
     disabledStatus.message)
 
 io.write(string.format("poster tests: %d passed, %d failed\n", passed, failed))

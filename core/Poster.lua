@@ -66,9 +66,17 @@ function Poster.BuildMessage(snapshot)
         local max = tonumber(s.max) or 0
         if filled < 0 then filled = 0 end
         if max < 0 then max = 0 end
-        table.insert(bits, string.format("%d/%d %s", filled, max, ROLE_LABELS[role]))
+        -- Only advertise roles that are actually open (max>0 and not yet
+        -- filled) — a full or disabled role adds noise without adding
+        -- information; readers only need to see what's still needed.
+        if max > 0 and filled < max then
+            table.insert(bits, string.format("%d/%d %s", filled, max, ROLE_LABELS[role]))
+        end
     end
-    return table.concat(bits, " ")
+    if #bits == 1 then
+        return "LFM MS — full"
+    end
+    return table.concat(bits, " | ")
 end
 
 --- Pure: true when every role cap is filled (max>0 roles only) OR group size >= maxPartySize.

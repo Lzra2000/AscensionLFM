@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.29
+
+- **Improved LFM message readability: only shows open roles, with clear
+  separators.** Was: `LFM MS 2/2 Tanks 2/3 Healers 1/3 Aura 7/7 DPS` — hard
+  to scan, and full roles (2/2, 7/7) added noise without information. Now:
+  `LFM MS | 2/3 Healers | 1/3 Aura` — full or disabled roles are omitted
+  entirely, remaining roles separated with `|` for quick scanning. If
+  every role is full, posts `LFM MS — full` instead of an empty tail.
+  Updated the Post tab's example hint text and test_poster.lua/
+  test_v040_auto.lua's format assertions to match. `Parser.Parse()` (which
+  reads *other* players' LFM posts) is unaffected — it still needs to
+  handle whatever format other hosts use, old or new.
+
 ## 0.4.28
 
 - **Fix: Kick59 warns but nobody actually gets removed, with zero error

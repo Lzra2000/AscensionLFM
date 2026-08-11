@@ -1757,7 +1757,7 @@ function MainWindow.Init()
     postHint:SetPoint("TOPLEFT", 4, -456)
     postHint:SetPoint("RIGHT", -4, 0)
     postHint:SetJustifyH("LEFT")
-    postHint:SetText("Example: LFM MS 0/2 Tanks 0/3 Healers 0/3 Aura 0/7 DPS — filled from Hosting slots + Scan.")
+    postHint:SetText("Example: LFM MS | 2/3 Healers | 1/3 Aura — full roles omitted, filled from Hosting slots + Scan.")
     SetInk(postHint, MUTED)
 
     --------------------------------------------------------------------

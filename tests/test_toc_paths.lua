@@ -17,10 +17,10 @@ end
 local toc = f:read("*a")
 f:close()
 
-if not toc:find("## Version: 0.4.28", 1, true) then
-    Fail("toc version should be 0.4.28")
+if not toc:find("## Version: 0.4.29", 1, true) then
+    Fail("toc version should be 0.4.29")
 end
-Ok("version 0.4.28")
+Ok("version 0.4.29")
 
 -- Forward-slash lua paths break Ascension load for many clients.
 if toc:find("core/Database.lua", 1, true)
