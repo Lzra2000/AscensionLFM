@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.32
+
+- **Fix: manually-picked "My host role" (v0.4.22) ignored being disabled
+  later.** If you picked e.g. Healer as your own host role via the
+  Hosting tab picker, then later turned off Healer under Accept Roles,
+  `Slots.EnsureHostAssigned()` still blindly trusted the stale
+  `db.hostRole` and kept assigning you to a role you'd explicitly said
+  you no longer accept — bypassing the auto-pick fallback entirely. Same
+  "don't trust a stale/disabled role selection" pattern already fixed for
+  the dps-fallback (v0.4.17), Log-tab notify (v0.4.21), and posted LFM
+  text (v0.4.26). Now falls through to auto-pick (first accepted role
+  with room) whenever the picked host role is no longer accepted.
+  Regression test added to test_slots.lua.
+
 ## 0.4.31
 
 - **Fix: v0.4.30's follow-up auto-reply fired on the bot's own

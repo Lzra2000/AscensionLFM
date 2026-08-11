@@ -8,7 +8,7 @@ if type(AscensionLFM) ~= "table" then
     _G.AscensionLFM = AscensionLFM
 end
 
-AscensionLFM.VERSION = "0.4.31"
+AscensionLFM.VERSION = "0.4.32"
 AscensionLFM.ADDON_NAME = "AscensionLFM"
 
 local function Print(msg)

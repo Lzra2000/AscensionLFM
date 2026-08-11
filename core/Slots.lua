@@ -290,6 +290,13 @@ function Slots.EnsureHostAssigned()
     if type(role) ~= "string" or role == "" then
         role = nil
     end
+    -- A manually-picked host role (v0.4.22) that's since been disabled via
+    -- Accept Roles must not still be trusted — fall through to auto-pick
+    -- instead of assigning the host to a role they no longer accept. Same
+    -- "don't trust a stale role selection" pattern as v0.4.17/21/26.
+    if role and db and type(db.roles) == "table" and not db.roles[role] then
+        role = nil
+    end
     if not role and db and type(db.roles) == "table" then
         for _, r in ipairs({ "tank", "healer", "aura", "dps" }) do
             if db.roles[r] and Slots.HasOpenSlot(r) then

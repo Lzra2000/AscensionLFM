@@ -74,6 +74,20 @@ check("no forced dps fallback when full/disabled", noRole == nil, tostring(noRol
 check("host stays unassigned", Slots.GetAssigned("HostPlayer") == nil, tostring(Slots.GetAssigned("HostPlayer")))
 check("dps not silently filled", Slots.CountFilled("dps") == 0, tostring(Slots.CountFilled("dps")))
 
+-- Regression: a manually-picked db.hostRole (v0.4.22) that's since been
+-- disabled via Accept Roles must not still be trusted — should fall
+-- through to auto-pick instead of assigning a no-longer-accepted role.
+Slots.ClearAll()
+db.mode = "hosting"
+db.hostRole = "healer"
+db.roles = { tank = true, healer = false, aura = true, dps = true }
+db.slotMax = { tank = 2, healer = 3, aura = 3, dps = 7 }
+local staleRole = Slots.EnsureHostAssigned()
+check("stale hostRole falls through to auto-pick", staleRole == "tank", tostring(staleRole))
+check("not assigned to disabled hostRole", Slots.GetAssigned("HostPlayer") ~= "healer",
+    tostring(Slots.GetAssigned("HostPlayer")))
+db.hostRole = nil
+
 io.write(string.format("slots tests: %d passed, %d failed\n", passed, failed))
 if failed > 0 then
     os.exit(1)
