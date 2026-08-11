@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.4.41
+
+- **CRITICAL FIX: a freshly-invited applicant's role could be wiped
+  before they even finished joining.** Reported live via a detailed log:
+  right after "invited Bebi as dps" → "Bebi has joined the raid group",
+  the "in group without role" count went UP instead of staying the same
+  or going down — despite Bebi having just been explicitly invited *as
+  dps*. Traced and reproduced exactly: `Slots.Assign()` records a role
+  the instant `InviteUnit` succeeds, but `InviteUnit` is fire-and-forget —
+  there's a real gap before the player actually appears in the live
+  roster ("X has joined the raid group" lags behind). If a resync (from
+  `RoleCheck.Resync()` *or* the independent roster-change-triggered
+  `Slots.SyncFromRoster()`/`ScanRaid()` path) landed in that gap, it saw
+  "assigned but not currently present" and wrongly pruned the brand-new
+  assignment as if it were a stale leaver's — so by the time the player
+  actually joined a moment later, their role was already gone.
+  Fixed with a time-based grace period: new `Slots.RecentlyAssigned(name,
+  graceSeconds=20)` tracks when each assignment happened; both pruning
+  paths (`RoleCheck.ResyncAssigned` and `Slots.ReconcileAssigned`) now
+  accept an optional `protectedNames` set built from it, so a just-invited
+  name is protected from removal for ~20s — long enough to actually join —
+  while a genuinely stale assignment (declined/expired invite, real
+  leaver) still gets correctly cleaned up once the grace period elapses.
+  Regression tests added to test_slots.lua (unit-level: `RecentlyAssigned`
+  timing, `ReconcileAssigned` with/without protection) and
+  test_rolecheck.lua (integration: a fresh assignment survives an
+  immediate resync, then correctly gets pruned once 20s+ have passed with
+  no join). Full suite green.
+
 ## 0.4.40
 
 - **New: auto-convert party to raid when growing past 5 members.**

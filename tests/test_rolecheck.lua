@@ -136,7 +136,16 @@ Slots.Assign("Ghost", "dps")
 local rem = RoleCheck.Resync()
 check("resync returns", rem ~= nil)
 check("alice still healer after resync", Slots.GetAssigned("Alice") == "healer")
-check("ghost cleared", Slots.GetAssigned("Ghost") == nil)
+check("ghost protected immediately after assign (grace period)", Slots.GetAssigned("Ghost") == "dps",
+    tostring(Slots.GetAssigned("Ghost")))
+
+-- Ghost never actually shows up in the roster; once the grace period
+-- (default 20s) has genuinely elapsed, the NEXT resync correctly prunes
+-- it as a real stale assignment (declined/expired invite).
+_G._now = 2000 + 25
+rem = RoleCheck.Resync()
+check("ghost cleared after grace period elapses", Slots.GetAssigned("Ghost") == nil,
+    tostring(Slots.GetAssigned("Ghost")))
 
 -- Auto-resync on window end
 RoleCheck._ResetForTests()

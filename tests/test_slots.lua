@@ -88,6 +88,37 @@ check("not assigned to disabled hostRole", Slots.GetAssigned("HostPlayer") ~= "h
     tostring(Slots.GetAssigned("HostPlayer")))
 db.hostRole = nil
 
+-- Regression: Slots.RecentlyAssigned / ReconcileAssigned protection
+-- (the race-condition fix for a just-invited applicant getting pruned
+-- before they've actually shown up in the roster).
+_G.GetTime = function() return _G._slotsNow or 5000 end
+_G._slotsNow = 5000
+Slots.ClearAll()
+Slots.Assign("Freshy", "dps")
+check("recently assigned right after Assign", Slots.RecentlyAssigned("Freshy") == true)
+check("recently assigned respects custom grace window",
+    Slots.RecentlyAssigned("Freshy", 0) == false, "0s grace should already be expired")
+
+_G._slotsNow = 5000 + 25
+check("no longer recently assigned after grace period", Slots.RecentlyAssigned("Freshy") == false)
+check("unknown name never recently assigned", Slots.RecentlyAssigned("NeverAssigned") == false)
+
+-- ReconcileAssigned: protectedNames keeps an absent-but-protected name;
+-- without protection (or once expired) it's correctly pruned as usual.
+_G._slotsNow = 5000
+local map = { freshy = "dps", stale = "tank" }
+local present = {} -- nobody present
+local protectedNames = { freshy = true } -- only Freshy is protected
+local kept, removedCount = Slots.ReconcileAssigned(map, present, protectedNames)
+check("protected name kept despite absence", kept.freshy == "dps", tostring(kept.freshy))
+check("unprotected name still pruned", kept.stale == nil)
+check("removed count reflects only the unprotected one", removedCount == 1, tostring(removedCount))
+
+local keptNoProtect, removedNoProtect = Slots.ReconcileAssigned(map, present)
+check("no protectedNames arg behaves as before (both pruned)",
+    keptNoProtect.freshy == nil and keptNoProtect.stale == nil)
+check("removed count both without protection", removedNoProtect == 2, tostring(removedNoProtect))
+
 io.write(string.format("slots tests: %d passed, %d failed\n", passed, failed))
 if failed > 0 then
     os.exit(1)

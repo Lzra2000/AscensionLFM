@@ -172,13 +172,17 @@ end
 
 --- Pure: prune leavers then overlay role-check responses for present members.
 -- @return newMap, removedCount, appliedCount
-function RoleCheck.ResyncAssigned(assignedMap, responseMap, presentSet)
+--- @param protectedNames optional set of lowered names to never prune even
+--   if not currently present — for a just-invited applicant who hasn't had
+--   time to actually show up in the roster yet (see Slots.RecentlyAssigned).
+function RoleCheck.ResyncAssigned(assignedMap, responseMap, presentSet, protectedNames)
     presentSet = presentSet or {}
+    protectedNames = protectedNames or {}
     local base = {}
     local removed = 0
     if type(assignedMap) == "table" then
         for name, role in pairs(assignedMap) do
-            if presentSet[name] then
+            if presentSet[name] or protectedNames[name] then
                 base[name] = role
             else
                 removed = removed + 1
@@ -417,9 +421,24 @@ function RoleCheck.Resync()
         end
     end
 
+    -- Protect a just-invited applicant's assignment from being pruned by
+    -- this exact resync: InviteUnit succeeding doesn't mean they've
+    -- actually joined yet (there's a real gap before "X has joined the
+    -- raid group"), and a resync landing in that gap would otherwise see
+    -- "assigned but not present" and wrongly clean it up as a stale
+    -- leaver's assignment.
+    local protectedNames = {}
+    if AscensionLFM.Slots and AscensionLFM.Slots.RecentlyAssigned then
+        for name in pairs(assignedMap) do
+            if AscensionLFM.Slots.RecentlyAssigned(name) then
+                protectedNames[name] = true
+            end
+        end
+    end
+
     local removed, applied = 0, 0
     if groupSize > 0 then
-        local newMap, rem, app = RoleCheck.ResyncAssigned(assignedMap, responses, present)
+        local newMap, rem, app = RoleCheck.ResyncAssigned(assignedMap, responses, present, protectedNames)
         removed, applied = rem, app
         if AscensionLFM.Slots and AscensionLFM.Slots.ClearAll then
             AscensionLFM.Slots.ClearAll()

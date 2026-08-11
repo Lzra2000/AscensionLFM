@@ -22,6 +22,11 @@ local DEFAULT_MAX = {
 
 -- Runtime maps (also mirrored into SavedVariables via Database when available)
 local assigned = {} -- [nameLower] = role
+local assignedAt = {} -- [nameLower] = GetTime() when last (re)assigned
+
+local function Now()
+    return (type(GetTime) == "function" and GetTime()) or os.clock()
+end
 
 local function LowerName(name)
     return tostring(name or ""):lower():gsub("%-.*$", "")
@@ -127,6 +132,22 @@ function Slots.GetAssigned(name)
     return assigned[key]
 end
 
+--- Whether name was (re)assigned within the last graceSeconds. Used to
+-- protect a just-invited applicant's role from being pruned by a resync
+-- that races ahead of them actually appearing in the live roster —
+-- InviteUnit succeeding doesn't mean they've joined yet; there's a real
+-- gap between "invited" and "X has joined the raid group", and a resync
+-- landing in that gap would otherwise see "assigned but not present" and
+-- wrongly treat it as a stale leaver's assignment to clean up.
+function Slots.RecentlyAssigned(name, graceSeconds)
+    local key = LowerName(name)
+    local t = assignedAt[key]
+    if not t then
+        return false
+    end
+    return (Now() - t) < (tonumber(graceSeconds) or 20)
+end
+
 --- Remember whisper role for a player (invite path).
 function Slots.Assign(name, role)
     if type(name) ~= "string" or name == "" or type(role) ~= "string" then
@@ -134,6 +155,7 @@ function Slots.Assign(name, role)
     end
     local key = LowerName(name)
     assigned[key] = role
+    assignedAt[key] = Now()
     local db = DB()
     EnsureDBSlots(db)
     if db then
@@ -152,6 +174,7 @@ end
 function Slots.ClearName(name)
     local key = LowerName(name)
     assigned[key] = nil
+    assignedAt[key] = nil
     local db = DB()
     if db and type(db.assignedRoles) == "table" then
         db.assignedRoles[key] = nil
@@ -160,6 +183,7 @@ end
 
 function Slots.ClearAll()
     assigned = {}
+    assignedAt = {}
     local db = DB()
     if db then
         db.assignedRoles = {}
@@ -182,15 +206,19 @@ end
 -- @param assignedMap { [nameLower]=role }
 -- @param presentSet { [nameLower]=true }
 -- @return newMap, removedCount
-function Slots.ReconcileAssigned(assignedMap, presentSet)
+--- @param protectedNames optional set of lowered names to never prune even
+--   if not currently present — see Slots.RecentlyAssigned / the same
+--   protection RoleCheck.ResyncAssigned applies.
+function Slots.ReconcileAssigned(assignedMap, presentSet, protectedNames)
     local out = {}
     local removed = 0
     if type(assignedMap) ~= "table" then
         return out, 0
     end
     presentSet = presentSet or {}
+    protectedNames = protectedNames or {}
     for name, role in pairs(assignedMap) do
-        if presentSet[name] then
+        if presentSet[name] or protectedNames[name] then
             out[name] = role
         else
             removed = removed + 1
@@ -333,7 +361,13 @@ function Slots.SyncFromRoster()
         -- No roster info (tests / loading) — leave assignments alone.
         return 0
     end
-    local newMap, removed = Slots.ReconcileAssigned(map, present)
+    local protectedNames = {}
+    for k in pairs(map) do
+        if Slots.RecentlyAssigned(k) then
+            protectedNames[k] = true
+        end
+    end
+    local newMap, removed = Slots.ReconcileAssigned(map, present, protectedNames)
     assigned = {}
     for k, v in pairs(newMap) do
         assigned[k] = v
