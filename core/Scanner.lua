@@ -333,6 +333,95 @@ local function TryRoleCheckReply(sender, message)
     return fn(sender, message) and true or false
 end
 
+local function PrimarySeekRoleExcludingAura(roles)
+    for _, role in ipairs({ "tank", "healer", "dps" }) do
+        if roles and roles[role] then
+            return role
+        end
+    end
+    return "dps" -- no clear primary configured; still answer rather than stay silent
+end
+
+-- Follow-up replies from a host's OWN registration bot (e.g. "What level
+-- are you?", "Please whisper your role and aura as: Tank/Heal/DPS + Aura
+-- yes/no.") after we already whispered them via MaybeAutoWhisper. Level is
+-- unambiguous (always just a number). Role/aura phrasing varies a lot
+-- between different hosts' bots, so this is inherently best-effort — it
+-- mirrors the "{role} + aura yes/no" convention from Hasan's own manual
+-- replies, not a universal standard.
+local FOLLOWUP_WINDOW = 300 -- 5 min: only reply to hosts we recently applied to
+
+local function DetectFollowUpKind(text)
+    local lower = tostring(text or ""):lower()
+    local hasLevel = lower:find("%f[%w]level%f[%W]") ~= nil
+    local hasRole = lower:find("%f[%w]role%f[%W]") ~= nil
+    local hasAura = lower:find("%f[%w]aura%f[%W]") ~= nil
+    if hasLevel then
+        return "level"
+    end
+    if hasRole and hasAura then
+        return "role_aura"
+    end
+    if hasRole then
+        return "role"
+    end
+    if hasAura then
+        return "aura"
+    end
+    return nil
+end
+
+local function BuildFollowUpReply(kind, db)
+    if kind == "level" then
+        local lvl = type(UnitLevel) == "function" and tonumber(UnitLevel("player")) or nil
+        if not lvl or lvl <= 0 then
+            return nil
+        end
+        return tostring(lvl)
+    end
+    local roles = (db and db.roles) or {}
+    local primary = PrimarySeekRoleExcludingAura(roles)
+    local label = primary == "tank" and "tank" or primary == "healer" and "heal" or "dps"
+    local auraYes = roles.aura and true or false
+    if kind == "role_aura" then
+        return string.format("%s + aura %s", label, auraYes and "yes" or "no")
+    elseif kind == "role" then
+        return label
+    elseif kind == "aura" then
+        return auraYes and "aura yes" or "aura no"
+    end
+    return nil
+end
+
+local function TryFollowUpReply(sender, message, db)
+    if not db.autoWhisper then
+        return false
+    end
+    if type(SendChatMessage) ~= "function" then
+        return false
+    end
+    local key = LowerName(sender)
+    local last = whisperSent[key]
+    if not last or (Now() - last) > FOLLOWUP_WINDOW then
+        return false -- never applied to this host, or too long ago — don't guess
+    end
+    local kind = DetectFollowUpKind(message)
+    if not kind then
+        return false
+    end
+    local reply = BuildFollowUpReply(kind, db)
+    if not reply or reply == "" then
+        return false
+    end
+    pcall(SendChatMessage, reply, "WHISPER", nil, sender)
+    if AscensionLFM.Activity and AscensionLFM.Activity.Push then
+        AscensionLFM.Activity.Push("match",
+            string.format("auto-replied %s (%s): %s", tostring(sender), kind, reply),
+            { name = sender })
+    end
+    return true
+end
+
 local function HandleWhisper(sender, message)
     local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
     if not db then
@@ -356,6 +445,9 @@ local function HandleWhisper(sender, message)
                 end
             end
             return
+        end
+        if db.mode == "seeking" then
+            TryFollowUpReply(sender, message, db)
         end
     end
 

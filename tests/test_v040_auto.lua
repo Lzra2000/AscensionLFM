@@ -302,6 +302,57 @@ db.roles.healer = true
 AscensionLFM.Scanner._HandlePublicListing("AcceptedRoleLeader", "LFG MS heal", "CHAT_MSG_SAY")
 check("accepted role LFG still logged", #db.matchHistory == beforeCount + 1, tostring(#db.matchHistory))
 
+--------------------------------------------------------------------
+-- Seeking: auto-reply to a host's own follow-up questions (level, and
+-- role+aura) after we already auto-whispered them — the Suriana-style
+-- multi-step registration bot flow reported live.
+--------------------------------------------------------------------
+db.mode = "seeking"
+db.fullAutoHosting = false
+db.autoWhisper = true
+db.whisperCooldown = 30
+db.dedupeSeconds = 45
+db.roles = { tank = false, healer = false, aura = true, dps = true }
+db.whisperVariants = { "inv ms {role}" }
+db.useWhisperVariants = false
+db.whisperMessage = "inv ms {role}"
+_G.UnitName = function(u) if u == "player" then return "Wildcard" end return nil end
+_G.UnitLevel = function(u) if u == "player" then return 21 end return 0 end
+local followSent = {}
+_G.SendChatMessage = function(msg, chan, lang, target)
+    table.insert(followSent, { msg = msg, chan = chan, target = target })
+end
+_G.IsIgnored = function() return false end
+if AscensionLFM.Database and AscensionLFM.Database.IsLeaderBlacklisted then
+    AscensionLFM.Database.IsLeaderBlacklisted = function() return false end
+end
+
+-- Step 1: Suriana posts an LFM, we auto-whisper to apply (seeds whisperSent)
+followSent = {}
+AscensionLFM.Scanner._HandlePublicListing("Suriana", "LFM MS 0/2 Tanks 0/3 Healers 0/3 Aura 0/7 DPS", "CHAT_MSG_SAY")
+check("seeking: applied to Suriana", #followSent == 1, tostring(#followSent))
+
+-- Step 2: Suriana's bot whispers back asking for role+aura
+followSent = {}
+AscensionLFM.Scanner._HandleWhisper("Suriana", "Please whisper your role and aura as: Tank/Heal/DPS + Aura yes/no.")
+check("seeking: role+aura auto-reply sent", #followSent == 1, tostring(#followSent))
+check("seeking: role+aura reply content", followSent[1] and followSent[1].msg == "dps + aura yes",
+    followSent[1] and followSent[1].msg or "none")
+
+-- Step 3: Suriana's bot asks for level
+followSent = {}
+AscensionLFM.Scanner._HandleWhisper("Suriana", "What level are you? Please reply with a number from 1 to 60.")
+check("seeking: level auto-reply sent", #followSent == 1, tostring(#followSent))
+check("seeking: level reply content", followSent[1] and followSent[1].msg == "21",
+    followSent[1] and followSent[1].msg or "none")
+
+-- A stranger we never whispered asking the same question gets no reply —
+-- avoids the exact "unsolicited auto-reply to someone unrelated" mistake
+-- already fixed on the hosting side (v0.4.20).
+followSent = {}
+AscensionLFM.Scanner._HandleWhisper("RandomStranger", "What level are you?")
+check("seeking: no reply to someone we never applied to", #followSent == 0, tostring(#followSent))
+
 io.write(string.format("test_v040_auto: %d passed, %d failed\n", passed, failed))
 if failed > 0 then
     os.exit(1)

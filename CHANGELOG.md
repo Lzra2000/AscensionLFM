@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.4.30
+
+- **New: Seeking mode auto-replies to a host's own follow-up questions.**
+  Reported live (screenshot): applying to another host's group (Suriana),
+  their own registration bot asked "Please whisper your role and aura as:
+  Tank/Heal/DPS + Aura yes/no." then "What level are you?" — Seeking mode
+  had no way to handle this, so Hasan had to type "dps + aura" and "21"
+  manually. Now, for 5 minutes after auto-whispering an LFM leader
+  (`autoWhisper` toggle), a follow-up whisper from that same host
+  containing "level" gets an automatic numeric reply (`UnitLevel`); one
+  containing "role" and/or "aura" gets a best-effort reply in the
+  "{role} + aura yes/no" convention. Never replies to hosts we didn't
+  recently whisper — same anti-spam principle as the v0.4.20 fix on the
+  hosting side. Role/aura phrasing varies a lot between different hosts'
+  bots, so this is explicitly best-effort, not a universal parser — risk
+  accepted knowingly rather than staying silent.
+  Regression tests added to test_v040_auto.lua covering the full Suriana
+  flow (apply → role+aura question → level question) plus confirming no
+  reply goes to an unrelated stranger.
+
 ## 0.4.29
 
 - **Improved LFM message readability: only shows open roles, with clear

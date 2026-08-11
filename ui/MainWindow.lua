@@ -1017,7 +1017,7 @@ function MainWindow.Init()
         end)
     widgets.autoWhisper = CreateToggleRow(seeking, -80 - TOGGLE_STEP,
         "Auto-whisper LFM leader",
-        "Rate-limited whisper when a listing still needs one of your roles. Off by default.",
+        "Rate-limited whisper when needed, plus best-effort replies to their level/role/aura follow-ups. Off by default.",
         false,
         function(on)
             AscensionLFM.Database.Get().autoWhisper = on and true or false
