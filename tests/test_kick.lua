@@ -117,14 +117,83 @@ local pend = Kick._GetPending()
 check("pending queued", pend and #pend.targets == 1)
 
 st = Kick.Tick(1000 + Kick.KICK_DELAY + 0.01)
-check("tick kicks after delay", st == "kicked", tostring(st))
+check("tick attempts uninvite, awaits verify", st == "verifying", tostring(st))
 check("uninvited Bob", #uninvited == 1 and uninvited[1] == "Bob", table.concat(uninvited, ","))
+check("not yet confirmed kicked", Kick.GetStatus().last ~= "kicked")
+
+-- Roster confirms Bob actually left before the verify delay — should not
+-- yet resolve (still waiting out VERIFY_DELAY)
+st = Kick.Tick(1000 + Kick.KICK_DELAY + 0.5)
+check("still verifying before delay elapses", st == "verifying", tostring(st))
+
+-- Bob genuinely left the roster; verify delay elapsed -> confirmed kicked
+_G.GetRaidRosterInfo = function(i)
+    if i == 1 then return "Host", 2, 1, 0 end
+    return nil
+end
+_G.GetNumRaidMembers = function() return 1 end
+st = Kick.Tick(1000 + Kick.KICK_DELAY + Kick.VERIFY_DELAY + 0.1)
+check("verify confirms kicked once gone from roster", st == "kicked", tostring(st))
+
+-- Restore full 2-member roster for subsequent tests
+_G.GetRaidRosterInfo = function(i)
+    if i == 1 then return "Host", 2, 1, 0 end
+    if i == 2 then return "Bob", 0, 1, 0 end
+    return nil
+end
+_G.GetNumRaidMembers = function() return 2 end
 
 -- Status helpers
 local gs = Kick.GetStatus()
 check("status enabled", gs.enabled == true)
 check("status hosting", gs.hosting == true)
 check("status canKick", gs.canKick == true)
+
+--------------------------------------------------------------------
+-- Regression: UninviteUnit "succeeds" (no Lua error) but the target is
+-- still in the roster afterward — e.g. a server-side privilege edge case
+-- that silently no-ops the request. Previously this was blindly trusted
+-- as a real kick (LogKick fired, no further action) even though the
+-- player never actually left, matching a live report: "warning fires,
+-- nobody gets removed, no error printed at all".
+--------------------------------------------------------------------
+Kick._ResetForTests()
+db.mode = "hosting"
+db.fullAutoHosting = false
+db.autoKickLevel59 = true
+db.kickLevel = 59
+db.kickWarnInterval = 10
+uninvited = {}
+warned = {}
+_G.GetRaidRosterInfo = function(i)
+    if i == 1 then return "Host", 2, 1, 0 end
+    if i == 2 then return "Ghosty", 0, 1, 0 end
+    return nil
+end
+_G.GetNumRaidMembers = function() return 2 end
+_G.UnitName = function(u)
+    if u == "player" then return "Host" end
+    if u == "raid1" then return "Host" end
+    if u == "raid2" then return "Ghosty" end
+    return nil
+end
+_G.UnitLevel = function(u)
+    if u == "raid1" then return 60 end
+    if u == "raid2" then return 59 end
+    return 0
+end
+_G.UninviteUnit = function(name) table.insert(uninvited, name) end -- "succeeds" but roster never actually changes
+
+local gt = 5000
+st = Kick.Tick(gt)
+check("silent-noop: warns", st == "warned", tostring(st))
+st = Kick.Tick(gt + Kick.KICK_DELAY + 0.01)
+check("silent-noop: attempts uninvite", #uninvited == 1)
+st = Kick.Tick(gt + Kick.KICK_DELAY + Kick.VERIFY_DELAY + 0.1)
+check("silent-noop: verify catches still-present target as a failure", st == "kick failed", tostring(st))
+check("silent-noop: not falsely confirmed kicked", Kick.GetStatus().last ~= "kicked")
+check("silent-noop: attempt counted", Kick._GetFailedAttempts()["ghosty"] == 1,
+    tostring(Kick._GetFailedAttempts()["ghosty"]))
 
 -- Mode gate: notify without full auto
 Kick._ResetForTests()

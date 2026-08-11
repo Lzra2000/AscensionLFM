@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.4.28
+
+- **Fix: Kick59 warns but nobody actually gets removed, with zero error
+  message.** Reported live: the raid warning fires, the target stays in
+  the group, and nothing else prints at all — not even a failure message.
+  Root cause: `DoKick()` treated `pcall(UninviteUnit, name)` succeeding
+  with no Lua error as proof the kick worked. `UninviteUnit` doesn't
+  reliably error even when the server silently ignores the request (e.g.
+  a privilege edge case), so a no-op request was being logged as a
+  successful kick and no retry ever happened — the addon believed the job
+  was done while the player was still sitting in the raid.
+  `Kick.lua` now verifies: after a `UninviteUnit` call that didn't error,
+  it waits ~1.5s (for `RAID_ROSTER_UPDATE` to settle) and checks the live
+  roster. Only confirmed-gone counts as kicked; still-present now counts
+  as a failed attempt and feeds into the existing retry/give-up-after-3
+  logic (v0.4.18), so a silently-ignored kick now gets retried and
+  eventually surfaces a clear "giving up — remove manually" message
+  instead of silently doing nothing forever.
+  Regression test added to test_kick.lua simulating exactly this:
+  `UninviteUnit` "succeeds" but the roster never actually changes — now
+  correctly caught as a failure instead of falsely logged as kicked.
+
 ## 0.4.27
 
 - **Fix: LFG-chat auto-invite/reply DMing strangers who never applied.**

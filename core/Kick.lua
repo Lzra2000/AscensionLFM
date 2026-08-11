@@ -16,6 +16,7 @@ local DEFAULT_INTERVAL = 10
 local KICK_DELAY = 0.6
 local KICK_STAGGER = 0.35
 local MAX_KICK_ATTEMPTS = 3
+local VERIFY_DELAY = 1.5 -- give RAID_ROSTER_UPDATE time to land before checking
 
 local frame
 local lastWarnAt = 0
@@ -24,6 +25,9 @@ local lastStatus = "idle"
 local lastDetail = nil
 -- { targets = { {name=, level=}... }, readyAt = number }
 local pending = nil
+-- { name=, level=, checkAt= } — set after a DoKick() attempt that didn't
+-- error, to confirm the target actually left the roster before trusting it
+local pendingVerify = nil
 local failedAttempts = {} -- [nameLower] = count of failed UninviteUnit attempts
 local gaveUp = {} -- [nameLower] = true once MAX_KICK_ATTEMPTS reached — stop re-warning
 
@@ -294,6 +298,66 @@ local function DoKick(name)
     return false, "UninviteUnit failed"
 end
 
+local function RecordFailure(name, key, reason)
+    failedAttempts[key] = (failedAttempts[key] or 0) + 1
+    if failedAttempts[key] >= MAX_KICK_ATTEMPTS then
+        gaveUp[key] = true
+        SetStatus("gave up", name)
+        if AscensionLFM.Print then
+            AscensionLFM.Print(string.format(
+                "Kick59: giving up on %s after %d failed attempts (%s) — remove manually",
+                tostring(name), failedAttempts[key], tostring(reason)))
+        end
+        if AscensionLFM.Activity and AscensionLFM.Activity.Push then
+            AscensionLFM.Activity.Push("kick", string.format(
+                "gave up kicking %s after %d attempts (%s)",
+                tostring(name), failedAttempts[key], tostring(reason)))
+        end
+        return "gave up"
+    end
+    SetStatus("kick failed", tostring(reason or name))
+    if AscensionLFM.Print then
+        AscensionLFM.Print(string.format("kick failed for %s (%s) — attempt %d/%d",
+            tostring(name), tostring(reason), failedAttempts[key], MAX_KICK_ATTEMPTS))
+    end
+    return "kick failed"
+end
+
+--- Confirm a prior DoKick() attempt actually removed the target from the
+-- roster. UninviteUnit succeeding with no Lua error is NOT reliable proof
+-- of an actual removal — some servers/edge cases silently no-op the
+-- request (e.g. a privilege check that fails without erroring the client),
+-- which previously meant the addon logged "kicked" and moved on while the
+-- player was still sitting in the raid with zero further action taken.
+local function CheckVerify(now)
+    if not pendingVerify then
+        return nil
+    end
+    if now < (tonumber(pendingVerify.checkAt) or 0) then
+        return "verifying"
+    end
+    local name, level = pendingVerify.name, pendingVerify.level
+    local key = LowerName(name)
+    pendingVerify = nil
+
+    local stillPresent = false
+    for _, m in ipairs(Kick.BuildRoster()) do
+        if LowerName(m.name) == key then
+            stillPresent = true
+            break
+        end
+    end
+
+    if not stillPresent then
+        LogKick(name, level)
+        SetStatus("kicked", name)
+        failedAttempts[key] = nil
+        gaveUp[key] = nil
+        return "kicked"
+    end
+    return RecordFailure(name, key, "still in group after UninviteUnit")
+end
+
 local function ProcessPending(now)
     if not pending or type(pending.targets) ~= "table" then
         pending = nil
@@ -311,40 +375,21 @@ local function ProcessPending(now)
     end
     local ok, err = DoKick(t.name)
     local key = LowerName(t.name)
+    local result
     if ok then
-        LogKick(t.name, t.level)
-        SetStatus("kicked", t.name)
-        failedAttempts[key] = nil
-        gaveUp[key] = nil
+        -- Don't trust "no Lua error" yet — verify on a later tick.
+        pendingVerify = { name = t.name, level = t.level, checkAt = now + VERIFY_DELAY }
+        SetStatus("verifying", t.name)
+        result = "verifying"
     else
-        failedAttempts[key] = (failedAttempts[key] or 0) + 1
-        if failedAttempts[key] >= MAX_KICK_ATTEMPTS then
-            gaveUp[key] = true
-            SetStatus("gave up", t.name)
-            if AscensionLFM.Print then
-                AscensionLFM.Print(string.format(
-                    "Kick59: giving up on %s after %d failed attempts (%s) — remove manually",
-                    tostring(t.name), failedAttempts[key], tostring(err)))
-            end
-            if AscensionLFM.Activity and AscensionLFM.Activity.Push then
-                AscensionLFM.Activity.Push("kick", string.format(
-                    "gave up kicking %s after %d attempts (%s)",
-                    tostring(t.name), failedAttempts[key], tostring(err)))
-            end
-        else
-            SetStatus("kick failed", tostring(err or t.name))
-            if AscensionLFM.Print then
-                AscensionLFM.Print(string.format("kick failed for %s (%s) — attempt %d/%d",
-                    tostring(t.name), tostring(err), failedAttempts[key], MAX_KICK_ATTEMPTS))
-            end
-        end
+        result = RecordFailure(t.name, key, err)
     end
     if #pending.targets == 0 then
         pending = nil
     else
         pending.readyAt = now + KICK_STAGGER
     end
-    return ok and "kicked" or "kick failed"
+    return result
 end
 
 local function IsHosting(db)
@@ -354,6 +399,15 @@ end
 --- One warn+kick cycle if enabled and privileged. Returns status string.
 function Kick.Tick(now)
     now = tonumber(now) or Now()
+
+    -- Confirm any prior kick attempt before anything else, even if toggles
+    -- flip mid-cycle.
+    if pendingVerify then
+        local v = CheckVerify(now)
+        if v then
+            return v
+        end
+    end
 
     -- Finish deferred uninvites even if toggles flip mid-cycle.
     if pending then
@@ -485,12 +539,14 @@ function Kick.Start()
         lastTickAt = lastTickAt + (elapsed or 0)
         -- Poll every ~1s; internal rate limit enforces warn cadence
         if lastTickAt < 1 then
-            -- Still drain deferred kicks on a faster cadence
-            if pending then
-                local now = Now()
-                if now >= (tonumber(pending.readyAt) or 0) then
-                    Kick.Tick(now)
-                end
+            -- Still drain deferred kicks / verification on a faster cadence
+            local now = Now()
+            if pendingVerify and now >= (tonumber(pendingVerify.checkAt) or 0) then
+                Kick.Tick(now)
+                return
+            end
+            if pending and now >= (tonumber(pending.readyAt) or 0) then
+                Kick.Tick(now)
             end
             return
         end
@@ -511,6 +567,7 @@ function Kick._ResetForTests()
     lastStatus = "idle"
     lastDetail = nil
     pending = nil
+    pendingVerify = nil
     failedAttempts = {}
     gaveUp = {}
 end
@@ -521,6 +578,10 @@ end
 
 function Kick._GetPending()
     return pending
+end
+
+function Kick._GetPendingVerify()
+    return pendingVerify
 end
 
 function Kick._GetGaveUp()
@@ -535,3 +596,4 @@ Kick.DEFAULT_LEVEL = DEFAULT_LEVEL
 Kick.DEFAULT_INTERVAL = DEFAULT_INTERVAL
 Kick.KICK_DELAY = KICK_DELAY
 Kick.MAX_KICK_ATTEMPTS = MAX_KICK_ATTEMPTS
+Kick.VERIFY_DELAY = VERIFY_DELAY
