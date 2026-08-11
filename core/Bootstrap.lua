@@ -8,7 +8,7 @@ if type(AscensionLFM) ~= "table" then
     _G.AscensionLFM = AscensionLFM
 end
 
-AscensionLFM.VERSION = "0.4.38"
+AscensionLFM.VERSION = "0.4.39"
 AscensionLFM.ADDON_NAME = "AscensionLFM"
 
 local function Print(msg)
@@ -46,6 +46,11 @@ local function PrintStatus()
     Print(string.format("autoWhisper=%s · variants=%s · Kick59=%s · announceFull=%s",
         OnOff(db.autoWhisper), OnOff(db.useWhisperVariants ~= false),
         OnOff(db.autoKickLevel59), OnOff(db.announceFull)))
+    if AscensionLFM.Invite and AscensionLFM.Invite._GetPendingRetries then
+        local pr = AscensionLFM.Invite._GetPendingRetries()
+        Print(string.format("invite: cooldown=%ss · pending retries=%d",
+            tostring(db.inviteCooldown or 3), pr and #pr or 0))
+    end
     if AscensionLFM.Kick and AscensionLFM.Kick.GetStatus then
         local ks = AscensionLFM.Kick.GetStatus()
         if ks then
@@ -61,11 +66,14 @@ local function PrintStatus()
     if AscensionLFM.RoleCheck and AscensionLFM.RoleCheck.GetStatus then
         local okRc, rc = pcall(AscensionLFM.RoleCheck.GetStatus)
         if okRc and rc then
-            Print(string.format("roleCheck: %s · window=%ss · autoResync=%s · autoMoveAura=%s",
+            Print(string.format("roleCheck: %s · window=%ss · autoResync=%s · autoMove T/H/A=%s/%s/%s · passiveDetect=%s",
                 tostring(rc.status or "idle"),
                 tostring(db.roleCheckWindow or db.roleCheckDuration or 60),
                 OnOff(db.roleCheckAutoResync ~= false),
-                OnOff(db.autoMoveAura ~= false)))
+                OnOff(db.autoMoveTank ~= false),
+                OnOff(db.autoMoveHealer ~= false),
+                OnOff(db.autoMoveAura ~= false),
+                OnOff(db.passiveRoleDetect ~= false)))
             Print(string.format("roleCheck: canWarn=%s · group=%s · hosting=%s · lastStart=%s · replies=%s",
                 OnOff(rc.canWarn),
                 tostring(rc.group or "?"),

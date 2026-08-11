@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.4.39
+
+- **API validation pass using the real 3.3.5a (build 30300)
+  Blizzard_APIDocumentation dump.** Cross-referenced every WoW API call in
+  the addon (SetRaidSubgroup, SwapRaidSubgroup, UninviteUnit, InviteUnit,
+  IsInInstance, GetChannelName, GetChannelList, IsIgnored, UnitName,
+  UnitLevel, GetNumPartyMembers, GetNumRaidMembers, IsPartyLeader/
+  IsRaidLeader/IsRaidOfficer, UnitAffectingCombat, GetRaidRosterInfo, and
+  more) against the documented signatures for this exact client build.
+  All confirmed correct — no API misuse bugs found. Caught and correctly
+  avoided two false positives along the way (`IsIgnored` and `UnitName`'s
+  documented-but-effectively-optional trailing parameter) by cross-checking
+  against real-world community usage before "fixing" something that
+  wasn't actually broken.
+- **`/alfm status` now shows the new toggles.** The roleCheck status line
+  was missing `autoMoveTank`/`autoMoveHealer`/`passiveRoleDetect`
+  (all added in v0.4.35/37) — now shown as `autoMove T/H/A=.../../...`
+  and `passiveDetect=...`. Added a new `invite: cooldown=... · pending
+  retries=N` line so the v0.4.38 auto-retry queue is visible for future
+  diagnostics, matching the pattern Kick59's `gaveUp=N` already
+  established.
+
 ## 0.4.38
 
 - **CRITICAL FIX: legitimate tank/healer invites silently swallowed by
