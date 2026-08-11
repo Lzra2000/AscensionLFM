@@ -8,7 +8,7 @@ if type(AscensionLFM) ~= "table" then
     _G.AscensionLFM = AscensionLFM
 end
 
-AscensionLFM.VERSION = "0.4.36"
+AscensionLFM.VERSION = "0.4.38"
 AscensionLFM.ADDON_NAME = "AscensionLFM"
 
 local function Print(msg)
@@ -220,6 +220,7 @@ bootFrame:SetScript("OnEvent", function(self, event, arg1)
         end
         RegisterSlash()
         SafeStart("Scanner.Start", AscensionLFM.Scanner and AscensionLFM.Scanner.Start)
+        SafeStart("Invite.Start", AscensionLFM.Invite and AscensionLFM.Invite.Start)
         SafeStart("Kick.Start", AscensionLFM.Kick and AscensionLFM.Kick.Start)
         SafeStart("Poster.Start", AscensionLFM.Poster and AscensionLFM.Poster.Start)
         SafeStart("RoleCheck.EnsureTicker", AscensionLFM.RoleCheck and AscensionLFM.RoleCheck.EnsureTicker)

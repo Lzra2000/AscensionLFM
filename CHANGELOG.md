@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.4.38
+
+- **CRITICAL FIX: legitimate tank/healer invites silently swallowed by
+  the invite cooldown during busy hosting sessions.** Reported live via
+  a long whisper log: DPS/Aura applicants always got some visible
+  response (invited, "Sorry, X is full", or "prefer support seat"), but
+  Tank/Healer applicants with genuinely open slots ("Jimsalabim whispers:
+  tank", "Trogosr whispers: heal") got absolutely nothing — no invite, no
+  reject message — and had to notice and re-whisper themselves.
+  Root cause: `CanInvite()`'s per-name/global invite cooldown (default 3s,
+  meant to avoid flooding `InviteUnit` calls) was blocking these, but
+  "global cooldown"/"per-name cooldown" are deliberately NOT in
+  `Reject.REJECTABLE` (correctly — replying to a transient internal
+  throttle would be misleading), so the applicant got zero feedback of
+  any kind. Reproduced exactly: DPS/Aura requests mostly get caught by
+  "prefer support seat" or "slot full" checks that run *before* the
+  cooldown check, masking the issue for those roles, while Tank/Healer
+  requests routinely reach the cooldown check itself during a busy
+  session with many simultaneous applicants.
+  Fixed with an auto-retry queue instead of a silent drop: when
+  `InvitePlayer` fails specifically due to a cooldown, the exact same
+  application is automatically re-attempted once the cooldown window has
+  passed (staggered if multiple are queued, so a retry burst can't
+  re-trigger the same global cooldown on itself). New `Invite.Tick()` +
+  `Invite.Start()` (own lightweight ticker, wired into Bootstrap
+  alongside Scanner/Kick/Poster), covers both the whisper path
+  (`TryHostInvite`) and the LFG-chat-scan path (`TryLfgInvite`).
+  Regression test added to test_invite.lua reproducing the exact
+  scenario: a cooldown-blocked applicant gets nothing immediately, stays
+  queued if ticked too early, then gets auto-invited once the cooldown
+  has genuinely elapsed. Full suite green.
+
 ## 0.4.37
 
 - **New: catch role words in raid/party chat anytime, not just during an

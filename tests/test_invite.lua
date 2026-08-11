@@ -216,6 +216,48 @@ check("slot-full auto-reply mentions tank", whispersSent[1] and whispersSent[1].
 db.roles.tank = true
 db.slotMax = { tank = 2, healer = 3, aura = 3, dps = 7 }
 
+--------------------------------------------------------------------
+-- Regression: a cooldown-blocked invite ("global cooldown"/"per-name
+-- cooldown") must auto-retry once the cooldown passes, not silently drop
+-- the applicant forever. Reported live: in a busy hosting session, a
+-- genuinely acceptable tank/healer whisper got zero feedback (no invite,
+-- no reject message — those cooldown reasons are deliberately NOT
+-- rejectable, since replying to a transient internal throttle would be
+-- misleading) whenever it landed within ~3s of another successful invite.
+--------------------------------------------------------------------
+Invite._ResetForTests()
+Invite._ResetCooldowns()
+db.roles = { tank = true, healer = true, aura = true, dps = true }
+db.slotMax = { tank = 2, healer = 3, aura = 3, dps = 7 }
+db.inviteCooldown = 3
+Slots.ClearAll()
+_G.GetTime = function() return 9000 end
+invited = {}
+ok, reason = Invite.TryHostInvite("First", "tank")
+check("retry-regress: first invite succeeds", ok == true, tostring(reason))
+check("retry-regress: first invited", invited[1] == "First")
+
+invited = {}
+ok, reason = Invite.TryHostInvite("Second", "heal")
+check("retry-regress: second hits global cooldown immediately", ok == false and reason == "global cooldown",
+    tostring(reason))
+check("retry-regress: second NOT invited yet", #invited == 0)
+check("retry-regress: queued for retry", #Invite._GetPendingRetries() == 1,
+    tostring(#Invite._GetPendingRetries()))
+
+-- Ticking before the cooldown has elapsed does nothing yet.
+local processedEarly = Invite.Tick(9001)
+check("retry-regress: no early retry before cooldown elapses", processedEarly == 0, tostring(processedEarly))
+check("retry-regress: still not invited", #invited == 0)
+
+-- Once the cooldown (+buffer) has passed, the tick auto-retries and it
+-- succeeds normally.
+_G.GetTime = function() return 9003.3 end
+local processed = Invite.Tick(9003.3)
+check("retry-regress: tick processes the queued retry", processed == 1, tostring(processed))
+check("retry-regress: second now invited automatically", invited[1] == "Second", tostring(invited[1]))
+check("retry-regress: queue drained", #Invite._GetPendingRetries() == 0)
+
 io.write(string.format("invite tests: %d passed, %d failed\n", passed, failed))
 if failed > 0 then
     os.exit(1)

@@ -13,6 +13,10 @@ AscensionLFM.Invite = Invite
 
 local lastInviteAt = {} -- [nameLower] = GetTime()
 local lastInviteGlobal = 0
+-- { sender=, message=, retryAt= } — cooldown-blocked applicants to retry
+-- once the (global or per-name) invite cooldown has passed.
+local pendingRetries = {}
+local RETRY_STAGGER = 0.4
 
 local function Now()
     return (type(GetTime) == "function" and GetTime()) or os.clock()
@@ -226,6 +230,30 @@ local function ShouldPreferSupportOverDps(db, role)
     return FirstOpenHostRole(db, true) ~= nil
 end
 
+-- Reported live: a busy hosting session has many applicants whispering
+-- within the same few seconds; the per-name/global invite cooldown
+-- (CanInvite, default 3s) then silently swallows a genuinely acceptable
+-- role request — "global cooldown"/"per-name cooldown" are deliberately
+-- NOT in Reject.REJECTABLE (a cooldown isn't a real rejection, replying
+-- would be misleading), so the applicant got zero feedback and had to
+-- notice nothing happened and re-whisper themselves. Auto-retry instead:
+-- once the cooldown window has passed, re-attempt the exact same
+-- application automatically.
+local function ScheduleRetry(kind, sender, message, now)
+    local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
+    local cd = tonumber(db and db.inviteCooldown) or 3
+    -- Stagger multiple queued retries so a burst of cooldown-blocked
+    -- applicants doesn't all re-trigger the global cooldown simultaneously
+    -- again on retry.
+    local retryAt = now + cd + 0.2
+    for _, p in ipairs(pendingRetries) do
+        if p.retryAt >= retryAt then
+            retryAt = p.retryAt + RETRY_STAGGER
+        end
+    end
+    table.insert(pendingRetries, { kind = kind, sender = sender, message = message, retryAt = retryAt })
+end
+
 --- Hosting path: parse whisper for a role we accept + open slot, then invite.
 function Invite.TryHostInvite(sender, message)
     local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
@@ -285,6 +313,9 @@ function Invite.TryHostInvite(sender, message)
     -- role is accepted here, matching the behavior this always actually had.
     local ok, reason = Invite.InvitePlayer(sender, role)
     AfterHostResult(sender, message, role, ok, reason)
+    if not ok and (reason == "global cooldown" or reason == "per-name cooldown") then
+        ScheduleRetry("whisper", sender, message, Now())
+    end
     return ok, reason
 end
 
@@ -413,6 +444,9 @@ function Invite.TryLfgInvite(leader, message, parsed)
     PlayApplicantSound(db)
     local ok, reason = Invite.InvitePlayer(leader, role)
     AfterHostResult(leader, message, role, ok, reason)
+    if not ok and (reason == "global cooldown" or reason == "per-name cooldown") then
+        ScheduleRetry("lfg", leader, message, Now())
+    end
     if ok and AscensionLFM.Print then
         AscensionLFM.Print("LFG auto-invite " .. tostring(leader) .. " as " .. role)
     end
@@ -424,4 +458,59 @@ Invite._FirstOpenAcceptedRole = FirstOpenAcceptedRole
 Invite._ResetCooldowns = function()
     lastInviteAt = {}
     lastInviteGlobal = 0
+end
+
+--- Process due cooldown-retry applicants. Processes all whose retryAt has
+-- passed (they're already time-staggered by ScheduleRetry, so normally at
+-- most one is due per tick); each retried call re-runs the full
+-- TryHostInvite/TryLfgInvite logic, so a still-cooling-down retry simply
+-- re-queues itself again rather than looping.
+-- @return number processed this call
+function Invite.Tick(now)
+    now = tonumber(now) or Now()
+    local processed = 0
+    local i = 1
+    while i <= #pendingRetries do
+        local p = pendingRetries[i]
+        if now >= (tonumber(p.retryAt) or 0) then
+            table.remove(pendingRetries, i)
+            if p.kind == "lfg" then
+                Invite.TryLfgInvite(p.sender, p.message)
+            else
+                Invite.TryHostInvite(p.sender, p.message)
+            end
+            processed = processed + 1
+        else
+            i = i + 1
+        end
+    end
+    return processed
+end
+
+local frame
+local lastTickAt = 0
+
+--- Start the retry ticker. Safe to call multiple times (no-ops after first).
+function Invite.Start()
+    if frame then
+        return
+    end
+    frame = CreateFrame("Frame")
+    frame:SetScript("OnUpdate", function(_, elapsed)
+        lastTickAt = lastTickAt + (elapsed or 0)
+        if lastTickAt < 0.5 then
+            return
+        end
+        lastTickAt = 0
+        Invite.Tick(Now())
+    end)
+end
+
+function Invite._GetPendingRetries()
+    return pendingRetries
+end
+
+function Invite._ResetForTests()
+    pendingRetries = {}
+    lastTickAt = 0
 end
