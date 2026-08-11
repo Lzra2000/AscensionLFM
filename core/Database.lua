@@ -31,6 +31,7 @@ local DEFAULTS = {
     assignedRoles = {}, -- [nameLower] = role
     scanLfg = true, -- also scan LFG Manastorm lines
     requireRoleWhisper = true, -- default-deny blind invites without a role
+    passiveRoleDetect = true, -- catch exact bare role words in raid/party chat continuously, not just during an active Role Check
     autoWhisper = false,
     whisperMessage = "inv ms tank",
     -- Seeking: rotating auto-whisper variants ({role} substituted)

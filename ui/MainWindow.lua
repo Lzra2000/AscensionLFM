@@ -502,6 +502,9 @@ local function SyncWidgetsFromDB()
     if widgets.autoMoveAura and widgets.autoMoveAura.SetChecked then
         widgets.autoMoveAura:SetChecked(db.autoMoveAura ~= false)
     end
+    if widgets.passiveRoleDetect and widgets.passiveRoleDetect.SetChecked then
+        widgets.passiveRoleDetect:SetChecked(db.passiveRoleDetect ~= false)
+    end
     if widgets.fullAuto and widgets.fullAuto.SetChecked then
         widgets.fullAuto:SetChecked(db.fullAutoHosting and true or false)
     end
@@ -1142,7 +1145,7 @@ function MainWindow.Init()
     --------------------------------------------------------------------
     -- Hosting
     --------------------------------------------------------------------
-    local hosting = BuildCategoryPage(pageHost, CAT_HOSTING, 1260)
+    local hosting = BuildCategoryPage(pageHost, CAT_HOSTING, 1330)
     CreateSectionLabel(hosting, "Full Auto", -4)
     widgets.fullAuto = CreateToggleRow(hosting, -22,
         "Full Auto Hosting (master)",
@@ -1443,8 +1446,15 @@ function MainWindow.Init()
         function(on)
             AscensionLFM.Database.Get().roleCheckAutoResync = on and true or false
         end)
+    widgets.passiveRoleDetect = CreateToggleRow(hosting, rcY - 18 - TOGGLE_STEP * 4,
+        "Catch role words in raid/party chat anytime",
+        "Assign a role the moment someone types exactly 'heal'/'tank'/'dps'/'aura' in group chat — no active Role Check needed. Default ON.",
+        false,
+        function(on)
+            AscensionLFM.Database.Get().passiveRoleDetect = on and true or false
+        end)
 
-    local rcFieldsY = rcY - 18 - TOGGLE_STEP * 3 - TOGGLE_ROW_H - 12
+    local rcFieldsY = rcY - 18 - TOGGLE_STEP * 4 - TOGGLE_ROW_H - 12
     local rcMsgLbl = hosting:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     rcMsgLbl:SetPoint("TOPLEFT", 4, rcFieldsY)
     rcMsgLbl:SetText("RW message")

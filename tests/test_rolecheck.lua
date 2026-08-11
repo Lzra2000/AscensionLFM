@@ -204,6 +204,49 @@ ok, reason = RoleCheck.StartCheck()
 check("solo start ok", ok == true, tostring(reason))
 check("solo yells", _G._lastRW and _G._lastRW.ch == "YELL", tostring(_G._lastRW and _G._lastRW.ch))
 
+--------------------------------------------------------------------
+-- Regression: passive group-chat role detection (no active Role Check
+-- required). Reported live: "Thapuckyman" replied "heal" in raid chat
+-- ([R]) well outside any formal role-check window — players often just
+-- say their role whenever it occurs to them, not right after an RW.
+--------------------------------------------------------------------
+db.mode = "hosting"
+db.fullAutoHosting = false
+Slots.ClearAll()
+RoleCheck._ResetForTests()
+_G.GetNumRaidMembers = function() return 3 end
+_G.GetRaidRosterInfo = function(i)
+    return ({ "Host", "Alice", "Thapuckyman" })[i]
+end
+_G.UnitName = function(u)
+    if u == "player" then return "Host" end
+    if u == "raid1" then return "Host" end
+    if u == "raid2" then return "Alice" end
+    if u == "raid3" then return "Thapuckyman" end
+    return nil
+end
+check("no active role check right now", RoleCheck.IsActive() == false)
+
+local passiveOk, passiveRole = RoleCheck.HandlePassiveGroupChat("Thapuckyman", "heal")
+check("passive raid-chat 'heal' recognized without active role check",
+    passiveOk == true and passiveRole == "healer", tostring(passiveRole))
+check("passive reply assigned via Slots", Slots.GetAssigned("Thapuckyman") == "healer",
+    tostring(Slots.GetAssigned("Thapuckyman")))
+
+-- Exact-only: a full sentence merely mentioning "heal" must NOT match —
+-- this runs continuously (not window-gated), so it must stay conservative.
+Slots.ClearAll()
+local sentenceOk = RoleCheck.HandlePassiveGroupChat("Thapuckyman", "was dyslexic not perma afk ?")
+check("unrelated raid chat is not misread as a role", sentenceOk == false, tostring(sentenceOk))
+local sentenceOk2 = RoleCheck.HandlePassiveGroupChat("Thapuckyman", "that fight needs more heal players")
+check("mid-sentence 'heal' mention does not match (exact-only)", sentenceOk2 == false, tostring(sentenceOk2))
+check("no false-positive assignment", Slots.GetAssigned("Thapuckyman") == nil,
+    tostring(Slots.GetAssigned("Thapuckyman")))
+
+-- Not a group member: no match, no assignment.
+local strangerOk = RoleCheck.HandlePassiveGroupChat("SomeRandomPerson", "dps")
+check("non-group-member raid chat ignored", strangerOk == false, tostring(strangerOk))
+
 if failed > 0 then
     io.stderr:write(string.format("test_rolecheck: %d failed, %d passed\n", failed, passed))
     os.exit(1)

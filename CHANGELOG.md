@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.4.37
+
+- **New: catch role words in raid/party chat anytime, not just during an
+  active Role Check.** Reported live: a player ("Thapuckyman") replied
+  "heal" in raid chat well outside any formal Role Check window — people
+  often just type their role whenever it occurs to them rather than
+  whispering or waiting for the RW prompt. Added
+  `RoleCheck.HandlePassiveGroupChat()`, wired into Scanner's group-chat
+  dispatch as a fallback after the existing active-Role-Check handling.
+  Deliberately uses a new strict exact-word-only matcher
+  (`RoleCheck.ParseBareRoleWord`) instead of the broader Parser/substring
+  matching `ParseWhisperRole` uses — since this now runs continuously
+  while hosting, a substring match would risk assigning a role off an
+  unrelated sentence that merely mentions a role word ("that fight needs
+  more heal players" correctly does NOT match). New toggle in the Hosting
+  tab (default ON): "Catch role words in raid/party chat anytime".
+  Regression tests added to test_rolecheck.lua and test_whisper_hosting.lua
+  covering the exact reported message, unrelated-sentence false-positive
+  prevention, non-group-member rejection, and the toggle-off case.
+
 ## 0.4.36
 
 - **CRITICAL FIX: LFM posting was completely broken since v0.4.29.**

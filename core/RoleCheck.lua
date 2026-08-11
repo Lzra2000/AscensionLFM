@@ -101,6 +101,34 @@ function RoleCheck.IsGroupMemberName(name, presentSet)
     return presentSet[LowerName(name)] == true
 end
 
+--- Pure: strict exact-word-only role match — no substring/Parser fallback.
+-- Deliberately narrower than ParseWhisperRole: used for passive group-chat
+-- detection that runs continuously (not gated to an active Role Check
+-- window), so a substring match here would risk misfiring on ordinary
+-- raid banter that merely mentions a role word mid-sentence
+-- ("that fight needs more heal players" must NOT match — only an exact
+-- "heal" reply does).
+function RoleCheck.ParseBareRoleWord(message)
+    local t = tostring(message or ""):lower()
+    t = t:gsub("^%s+", ""):gsub("%s+$", ""):gsub("[!%?%.%,%;%:]+$", "")
+    if t == "" then
+        return nil
+    end
+    if t == "t" or t == "tank" or t == "tanks" or t == "ot" or t == "mt" then
+        return "tank"
+    end
+    if t == "h" or t == "heal" or t == "heals" or t == "healer" or t == "healers" or t == "heiler" or t == "hps" then
+        return "healer"
+    end
+    if t == "a" or t == "aura" or t == "auras" then
+        return "aura"
+    end
+    if t == "d" or t == "dps" or t == "dd" or t == "damage" or t == "dmg" then
+        return "dps"
+    end
+    return nil
+end
+
 --- Pure: extract role from whisper text (Parser when available).
 function RoleCheck.ParseWhisperRole(message)
     if AscensionLFM.Parser and AscensionLFM.Parser.Parse then
@@ -547,6 +575,37 @@ function RoleCheck.HandleWhisper(sender, message)
     return true, role
 end
 RoleCheck.OnWhisper = RoleCheck.HandleWhisper
+
+--- Passive role detection for GROUP chat (party/raid) — unlike
+-- HandleWhisper, does NOT require an active formal Role Check. Reported
+-- live: players often just type "heal"/"dps" in raid chat whenever it
+-- occurs to them, not necessarily right after an RW prompt, and won't
+-- bother whispering. Uses ONLY ParseBareRoleWord's exact-word matching
+-- (never the broader substring/Parser fallback ParseWhisperRole uses),
+-- since this fires continuously while hosting — a loose match here would
+-- risk assigning a role off an unrelated sentence.
+function RoleCheck.HandlePassiveGroupChat(sender, message)
+    if type(sender) ~= "string" or sender == "" then
+        return false
+    end
+    if not IsGroupMember(sender) then
+        return false
+    end
+    local role = RoleCheck.ParseBareRoleWord(message)
+    if not role then
+        return false
+    end
+    responses[LowerName(sender)] = role
+    lastReplyAt = Now()
+    if AscensionLFM.Slots and AscensionLFM.Slots.Assign then
+        AscensionLFM.Slots.Assign(sender, role)
+    end
+    if AscensionLFM.Print then
+        AscensionLFM.Print("Role Check: " .. tostring(sender) .. " → " .. role .. " (raid chat)")
+    end
+    RefreshUI()
+    return true, role
+end
 RoleCheck.HandleRoleReply = RoleCheck.HandleWhisper
 
 function RoleCheck.GetStatus()

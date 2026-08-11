@@ -333,6 +333,24 @@ local function TryRoleCheckReply(sender, message)
     return fn(sender, message) and true or false
 end
 
+-- Fallback for when no formal Role Check is active (or it didn't match):
+-- passively catch exact bare-word role replies ("heal", "tank", "dps",
+-- "aura") in party/raid chat while hosting. Deliberately exact-only via
+-- RoleCheck.ParseBareRoleWord — see its comment for why.
+local function TryPassiveGroupRoleReply(sender, message)
+    local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
+    if not db or db.mode ~= "hosting" then
+        return false
+    end
+    if db.passiveRoleDetect == false then
+        return false
+    end
+    if not AscensionLFM.RoleCheck or not AscensionLFM.RoleCheck.HandlePassiveGroupChat then
+        return false
+    end
+    return AscensionLFM.RoleCheck.HandlePassiveGroupChat(sender, message) and true or false
+end
+
 local function PrimarySeekRoleExcludingAura(roles)
     for _, role in ipairs({ "tank", "healer", "dps" }) do
         if roles and roles[role] then
@@ -530,8 +548,13 @@ function Scanner.Start()
         else
             -- During Role Check, party/raid chat role replies count too
             -- (players often answer the RW in party instead of whispering).
-            if IsGroupChatEvent(event) and TryRoleCheckReply(sender, message) then
-                return
+            if IsGroupChatEvent(event) then
+                if TryRoleCheckReply(sender, message) then
+                    return
+                end
+                if TryPassiveGroupRoleReply(sender, message) then
+                    return
+                end
             end
             HandlePublicListing(sender, message, event)
         end
@@ -549,6 +572,7 @@ Scanner._HandlePublicLFM = HandlePublicListing
 Scanner._HandlePublicListing = HandlePublicListing
 Scanner._HandleWhisper = HandleWhisper
 Scanner._TryRoleCheckReply = TryRoleCheckReply
+Scanner._TryPassiveGroupRoleReply = TryPassiveGroupRoleReply
 Scanner._IsGroupChatEvent = IsGroupChatEvent
 Scanner._Fingerprint = Fingerprint
 Scanner._NextWhisperMessage = NextWhisperMessage

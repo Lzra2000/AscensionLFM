@@ -94,6 +94,27 @@ check("party role reply consumed", Scanner._TryRoleCheckReply("Alice", "tank") =
 check("alice tank from party chat", Slots.GetAssigned("Alice") == "tank")
 check("party reply not invited", invited[1] == nil)
 
+-- Passive group-chat detection (no active Role Check): "heal" in raid
+-- chat, well outside any role-check window.
+RoleCheck._ResetForTests()
+check("no active role check", RoleCheck.IsActive() == false)
+db.mode = "hosting"
+db.passiveRoleDetect = true
+Slots.ClearAll()
+check("passive wrapper picks it up",
+    Scanner._TryPassiveGroupRoleReply("Alice", "heal") == true)
+check("alice healer via passive raid chat", Slots.GetAssigned("Alice") == "healer",
+    tostring(Slots.GetAssigned("Alice")))
+
+-- Toggle off: passiveRoleDetect=false disables it entirely.
+Slots.ClearAll()
+db.passiveRoleDetect = false
+check("passive detection disabled via toggle",
+    Scanner._TryPassiveGroupRoleReply("Alice", "heal") == false)
+check("no assignment while toggle is off", Slots.GetAssigned("Alice") == nil,
+    tostring(Slots.GetAssigned("Alice")))
+db.passiveRoleDetect = true
+
 io.write(string.format("test_whisper_hosting: %d passed, %d failed\n", passed, failed))
 if failed > 0 then
     os.exit(1)
