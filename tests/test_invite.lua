@@ -258,6 +258,37 @@ check("retry-regress: tick processes the queued retry", processed == 1, tostring
 check("retry-regress: second now invited automatically", invited[1] == "Second", tostring(invited[1]))
 check("retry-regress: queue drained", #Invite._GetPendingRetries() == 0)
 
+--------------------------------------------------------------------
+-- New: auto-convert party->raid when about to grow past 5, so inviting
+-- a 6th person while still a plain party (which WoW rejects client-side)
+-- doesn't silently cap group size below the addon's own slotMax total.
+--------------------------------------------------------------------
+Invite._ResetCooldowns()
+db.roles = { tank = true, healer = true, aura = true, dps = true }
+db.slotMax = { tank = 2, healer = 3, aura = 3, dps = 7 }
+Slots.ClearAll()
+_G.GetTime = function() return 10000 end
+_G.GetNumRaidMembers = function() return 0 end
+_G.GetNumPartyMembers = function() return 4 end -- 4 others + you = full 5-person party
+local convertCalled = 0
+_G.ConvertToRaid = function() convertCalled = convertCalled + 1 end
+invited = {}
+ok, reason = Invite.TryHostInvite("SixthPerson", "dps")
+check("convert: 6th invite still succeeds", ok == true, tostring(reason))
+check("convert: ConvertToRaid called once", convertCalled == 1, tostring(convertCalled))
+check("convert: sixth person invited", invited[1] == "SixthPerson", tostring(invited[1]))
+
+-- Already in a raid: never calls ConvertToRaid again.
+convertCalled = 0
+_G.GetNumRaidMembers = function() return 6 end
+_G.GetNumPartyMembers = function() return 0 end
+Invite._ResetCooldowns()
+invited = {}
+ok = Invite.TryHostInvite("SeventhPerson", "dps")
+check("convert: no-op once already a raid", convertCalled == 0, tostring(convertCalled))
+_G.GetNumRaidMembers = function() return 0 end
+_G.GetNumPartyMembers = function() return 2 end
+
 io.write(string.format("invite tests: %d passed, %d failed\n", passed, failed))
 if failed > 0 then
     os.exit(1)

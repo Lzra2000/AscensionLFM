@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.4.40
+
+- **New: auto-convert party to raid when growing past 5 members.**
+  Found while exploring the API docs (`RaidDocumentation.lua`): WoW caps
+  a plain party at 5 members — inviting a 6th person while still a party
+  (not yet converted to raid) fails client-side. AscensionLFM's own
+  slotMax defaults total up to 15 (2 tank + 3 heal + 3 aura + 7 dps), so
+  a host who started from a small party could hit an invisible 5-person
+  wall well before their configured slots were full. `Invite.InvitePlayer`
+  now calls `ConvertToRaid()` automatically right when the party is full
+  (4 others + you) and about to grow past it — a no-op once already a
+  raid. Covers both the whisper (`TryHostInvite`) and LFG-chat-scan
+  (`TryLfgInvite`) paths, since both funnel through the same
+  `InvitePlayer`.
+  Regression tests added to test_invite.lua: inviting a 6th person from a
+  full 5-person party triggers exactly one `ConvertToRaid()` call and the
+  invite still succeeds; already being in a raid never calls it again.
+
 ## 0.4.39
 
 - **API validation pass using the real 3.3.5a (build 30300)

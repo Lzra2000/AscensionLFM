@@ -106,6 +106,23 @@ local function PlayApplicantSound(db)
     end
 end
 
+-- WoW caps a party at 5; inviting a 6th person while still a plain party
+-- (not yet a raid) fails client-side even though the addon's own slot
+-- tracking allows far more (slotMax defaults total up to 15). Auto-convert
+-- right when the party is full and about to grow past it, so hosting
+-- larger groups (the whole point of Manastorm-scale slotMax) doesn't hit
+-- an invisible 5-person wall.
+local function EnsureRaidIfNeeded()
+    local raid = (type(GetNumRaidMembers) == "function" and GetNumRaidMembers()) or 0
+    if raid > 0 then
+        return -- already a raid
+    end
+    local party = (type(GetNumPartyMembers) == "function" and GetNumPartyMembers()) or 0
+    if party >= 4 and type(ConvertToRaid) == "function" then
+        pcall(ConvertToRaid)
+    end
+end
+
 function Invite.InvitePlayer(name, role)
     local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
     local ok, reason = CanInvite(name, db)
@@ -115,6 +132,7 @@ function Invite.InvitePlayer(name, role)
     if type(InviteUnit) ~= "function" then
         return false, "InviteUnit missing"
     end
+    EnsureRaidIfNeeded()
     local success, err = pcall(InviteUnit, name)
     if not success then
         return false, tostring(err)
