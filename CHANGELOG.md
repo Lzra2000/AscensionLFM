@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.4.36
+
+- **CRITICAL FIX: LFM posting was completely broken since v0.4.29.**
+  Reported live: `[AscensionLFM] LFM failed: SendChatMessage(): Invalid
+  escape code in chat message` on every single post attempt (both regular
+  posting and the Mini HUD LFM button). Root cause: v0.4.29's readability
+  change introduced `" | "` as the separator between roles in the posted
+  LFM text — but WoW reserves `|` as the start of a chat escape/color/link
+  code (`|cAARRGGBB`, `|H...|h`, `|T...|t`), so an unescaped `|` not
+  followed by a recognized code throws this exact error and the entire
+  `SendChatMessage` call fails outright.
+  Fixed by escaping `|` → `||` (the standard WoW convention for a literal
+  pipe, which renders identically to a single `|` for readers) right
+  before the actual `SendChatMessage` call in both `Poster.PostOnce()`
+  and the "announce FULL" message — `BuildMessage()`'s output, the Post
+  tab's preview box, and `Parser.Parse()` (reading other hosts' posts)
+  are untouched and still show/expect a clean single pipe.
+  Regression test added to test_poster.lua reproducing the exact
+  failure: builds a `|`-separated message, posts it, and asserts the
+  actual `SendChatMessage` call receives escaped `||` while the
+  internal/UI-facing message and `/alfm status` still show a clean
+  single `|`. Full suite green.
+
 ## 0.4.35
 
 - **New: Auto-move Tanks and Healers to one-per-raid-group (extends the

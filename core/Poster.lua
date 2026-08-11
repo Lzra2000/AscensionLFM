@@ -265,6 +265,19 @@ end
 
 --- Send one LFM post via SendChatMessage. Uses msg or live rebuild.
 -- @return ok, err
+--- Escape literal "|" for SendChatMessage. WoW's chat system reserves "|"
+-- as the start of an escape/color/link code (|cAARRGGBB..., |H...|h, |T...|t);
+-- a raw "|" not followed by a recognized code throws "Invalid escape code
+-- in chat message" and the whole send fails. "||" is the standard WoW
+-- escape for a literal pipe — it renders as a single "|" to readers, so
+-- the visible " | " role separator (v0.4.29) looks identical once
+-- escaped. Only applied right before the actual SendChatMessage call —
+-- BuildMessage()'s output, the UI preview box, and Parser.Parse() (which
+-- reads other hosts' raw posts) all keep the clean, single-pipe text.
+local function EscapeForSend(s)
+    return tostring(s or ""):gsub("|", "||")
+end
+
 function Poster.PostOnce(msg, channel, channelName, nowOverride)
     local db = DB()
     channel = NormalizeChannel(channel or (db and db.postChannel) or "YELL")
@@ -279,6 +292,7 @@ function Poster.PostOnce(msg, channel, channelName, nowOverride)
     if type(SendChatMessage) ~= "function" then
         return false, "SendChatMessage missing"
     end
+    local sendMsg = EscapeForSend(msg)
 
     local ok, err
     if channel == "CHANNEL" then
@@ -312,9 +326,9 @@ function Poster.PostOnce(msg, channel, channelName, nowOverride)
             end
             return false, reason
         end
-        ok, err = pcall(SendChatMessage, msg, "CHANNEL", nil, id)
+        ok, err = pcall(SendChatMessage, sendMsg, "CHANNEL", nil, id)
     else
-        ok, err = pcall(SendChatMessage, msg, channel)
+        ok, err = pcall(SendChatMessage, sendMsg, channel)
     end
     if not ok then
         return false, tostring(err)
@@ -404,14 +418,15 @@ function Poster.Tick(now)
                 if db.announceFull then
                     local fullMsg = tostring(db.fullAnnounceMessage or "LFM MS FULL — thanks!")
                     if fullMsg ~= "" and type(SendChatMessage) == "function" then
+                        local sendFullMsg = EscapeForSend(fullMsg)
                         local ch = NormalizeChannel(db.postChannel)
                         if ch == "CHANNEL" then
                             local id = ResolveChannelIndex(db.postChannelName)
                             if id then
-                                pcall(SendChatMessage, fullMsg, "CHANNEL", nil, id)
+                                pcall(SendChatMessage, sendFullMsg, "CHANNEL", nil, id)
                             end
                         else
-                            pcall(SendChatMessage, fullMsg, ch)
+                            pcall(SendChatMessage, sendFullMsg, ch)
                         end
                     end
                     lastStatus = "stopped: full (announced)"

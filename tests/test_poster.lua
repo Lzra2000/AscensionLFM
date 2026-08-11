@@ -281,6 +281,30 @@ check("joined channel still posts", ok5 == true, tostring(err5))
 check("sent to channel 4", chSent[1] and chSent[1].target == 4, chSent[1] and tostring(chSent[1].target) or "none")
 _G.GetChannelList = nil
 
+--------------------------------------------------------------------
+-- Regression: v0.4.29's " | " role separator broke SendChatMessage
+-- outright — WoW reserves "|" as its escape-code prefix, so an unescaped
+-- pipe throws "Invalid escape code in chat message" and the whole post
+-- silently fails. Reported live: "[AscensionLFM] LFM failed:
+-- SendChatMessage(): Invalid escape code in chat message" on every post.
+--------------------------------------------------------------------
+db.roles = { tank = true, healer = true, aura = true, dps = true }
+db.slotMax = { tank = 2, healer = 3, aura = 3, dps = 7 }
+Slots.ClearAll()
+db.postChannel = "YELL"
+chSent = {}
+local pipeMsg = Poster.RefreshMessage()
+check("built message still uses a single pipe internally", pipeMsg:find("||", 1, true) == nil
+    and pipeMsg:find("|", 1, true) ~= nil, pipeMsg)
+local ok6, err6 = Poster.PostOnce(pipeMsg, "YELL")
+check("posting a pipe-separated message succeeds", ok6 == true, tostring(err6))
+check("sent message has pipes escaped for SendChatMessage",
+    chSent[1] and chSent[1].msg:find("||", 1, true) ~= nil, chSent[1] and chSent[1].msg or "none")
+local afterSendStatus = Poster.GetStatus()
+check("internal/UI status message keeps a single clean pipe (not doubled)",
+    afterSendStatus.message:find("||", 1, true) == nil and afterSendStatus.message:find("|", 1, true) ~= nil,
+    afterSendStatus.message)
+
 io.write(string.format("poster tests: %d passed, %d failed\n", passed, failed))
 if failed > 0 then
     os.exit(1)
