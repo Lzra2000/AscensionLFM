@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.4.33
+
+- **Fix: unresolved channel name silently posted to YELL instead.**
+  Reported live: "buggy, findet die channels nicht" — a channel post
+  configured with a name/number the addon couldn't resolve (e.g. "1."
+  copy-pasted from the chat tab label "1. General") would silently
+  switch to YELL and post there instead, with only an easy-to-miss chat
+  print explaining why. YELL has a tiny radius compared to a real
+  channel, so the LFM looked like it posted fine while actually reaching
+  almost nobody. `Poster.PostOnce()` no longer falls back to YELL on a
+  channel resolution failure — it fails loudly instead (clear Print
+  message + `lastStatus` now shows "post failed: bad channel" so the
+  Post tab's own status line reflects it, not just a chat message that
+  can scroll past).
+  Also: `GetChannelName()` is now called through `pcall` — an
+  unrecognized name should mean "not found", not risk an uncaught error
+  silently breaking the whole resolution. And a copy-pasted "N." prefix
+  like "1." (from how channels are labeled in the chat tab) now resolves
+  via the numeric fallback even when the string-name lookup can't match
+  it.
+  Regression tests added to test_poster.lua: "1." resolves correctly,
+  a genuinely bad channel name fails without any YELL fallback and with
+  status reflecting it, and a `GetChannelName` that errors outright gets
+  caught instead of propagating.
+
 ## 0.4.32
 
 - **Fix: manually-picked "My host role" (v0.4.22) ignored being disabled

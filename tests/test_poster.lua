@@ -213,6 +213,48 @@ local disabledStatus = Poster.GetStatus()
 check("GetStatus message also filtered", disabledStatus.message:find("Healers", 1, true) == nil,
     disabledStatus.message)
 
+--------------------------------------------------------------------
+-- Channel resolution: no silent YELL fallback on failure (was posting to
+-- a completely different, much shorter-range channel without the host
+-- realizing why their LFM "wasn't finding people").
+--------------------------------------------------------------------
+db.postChannel = "CHANNEL"
+db.roles = { tank = true, healer = true, aura = true, dps = true }
+db.slotMax = { tank = 2, healer = 3, aura = 3, dps = 7 }
+Slots.ClearAll()
+
+-- "1." (copy-pasted from the chat-tab label "1. General") resolves via
+-- the numeric fallback even when GetChannelName can't match it by name.
+local chSent = {}
+_G.SendChatMessage = function(msg, chatType, lang, target)
+    table.insert(chSent, { msg = msg, chatType = chatType, target = target })
+end
+_G.GetChannelName = function() return 0 end -- name lookup finds nothing
+local ok1, err1 = Poster.PostOnce("test", "CHANNEL", "1.")
+check("channel '1.' resolves via numeric fallback", ok1 == true, tostring(err1))
+check("sent to channel index 1", chSent[1] and chSent[1].chatType == "CHANNEL" and chSent[1].target == 1,
+    chSent[1] and string.format("%s/%s", tostring(chSent[1].chatType), tostring(chSent[1].target)) or "none")
+
+-- A genuinely unresolvable channel name must fail loudly, NOT silently
+-- post to YELL instead.
+chSent = {}
+local ok2, err2 = Poster.PostOnce("test", "CHANNEL", "NotARealChannelXYZ")
+check("unresolvable channel fails", ok2 == false)
+check("unresolvable channel error mentions the name", tostring(err2):find("NotARealChannelXYZ", 1, true) ~= nil,
+    tostring(err2))
+check("did NOT silently fall back to YELL", #chSent == 0, tostring(#chSent))
+
+local failStatus = Poster.GetStatus()
+check("status reflects channel failure", failStatus.status:find("bad channel", 1, true) ~= nil, failStatus.status)
+
+-- A GetChannelName that errors outright must be caught, not propagate —
+-- still resolves via the numeric fallback afterward.
+chSent = {}
+_G.GetChannelName = function() error("simulated client quirk") end
+local ok3, err3 = Poster.PostOnce("test", "CHANNEL", "1")
+check("GetChannelName error is caught, numeric fallback still works", ok3 == true, tostring(err3))
+_G.GetChannelName = function() return 0 end
+
 io.write(string.format("poster tests: %d passed, %d failed\n", passed, failed))
 if failed > 0 then
     os.exit(1)

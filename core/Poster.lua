@@ -147,17 +147,21 @@ local function ResolveChannelIndex(name)
     if name == "" then
         return nil
     end
-    if type(GetChannelName) ~= "function" then
-        return nil
+    if type(GetChannelName) == "function" then
+        -- GetChannelName(name) → id, name, ...  (3.3.5a). Guard with pcall:
+        -- an unrecognized/malformed name should just mean "not found", not
+        -- an uncaught error that silently breaks the whole resolution.
+        local ok, id = pcall(GetChannelName, name)
+        if ok then
+            id = tonumber(id)
+            if id and id > 0 then
+                return id
+            end
+        end
     end
-    -- GetChannelName(name) → id, name, ...  (3.3.5a)
-    local id = GetChannelName(name)
-    id = tonumber(id)
-    if id and id > 0 then
-        return id
-    end
-    -- Numeric channel id typed directly
-    local asNum = tonumber(name)
+    -- Numeric channel id typed directly — also accept a copy-pasted "N."
+    -- prefix like the channel tab shows ("1. General"), e.g. "1." -> 1.
+    local asNum = tonumber(name) or tonumber(name:match("^(%d+)%."))
     if asNum and asNum > 0 then
         return asNum
     end
@@ -257,14 +261,21 @@ function Poster.PostOnce(msg, channel, channelName, nowOverride)
     if channel == "CHANNEL" then
         local id = ResolveChannelIndex(channelName)
         if not id then
+            -- Do NOT silently fall back to YELL — that's a completely
+            -- different, much shorter-range broadcast than the configured
+            -- channel, and posting there instead without the host
+            -- realizing means the LFM silently reaches almost nobody
+            -- while looking like it worked. Fail loudly instead so the
+            -- host notices and fixes the channel name/number.
+            local reason = "channel not found: " .. tostring(channelName)
+            lastStatus = "post failed: bad channel"
             if AscensionLFM.Print then
-                AscensionLFM.Print("bad channel name — falling back to YELL")
+                AscensionLFM.Print("Post failed — " .. reason
+                    .. ". Check the Channel name field (try the number shown in your chat tab, e.g. \"1\").")
             end
-            channel = "YELL"
-            ok, err = pcall(SendChatMessage, msg, "YELL")
-        else
-            ok, err = pcall(SendChatMessage, msg, "CHANNEL", nil, id)
+            return false, reason
         end
+        ok, err = pcall(SendChatMessage, msg, "CHANNEL", nil, id)
     else
         ok, err = pcall(SendChatMessage, msg, channel)
     end
