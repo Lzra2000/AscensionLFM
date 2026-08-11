@@ -168,6 +168,29 @@ local function ResolveChannelIndex(name)
     return nil
 end
 
+--- Whether the resolved channel id is one the player has actually joined.
+-- SendChatMessage to a CHANNEL type the player hasn't joined doesn't throw
+-- a Lua error — it just silently fails client-side (a system message the
+-- addon never sees), the same "no error != it worked" trap already fixed
+-- for Kick59's UninviteUnit (v0.4.28). Defaults to true (assume joined)
+-- if GetChannelList is unavailable, errors, or returns nothing — this
+-- check should never itself become a new reason posting silently breaks.
+local function IsChannelJoined(id)
+    if type(GetChannelList) ~= "function" then
+        return true
+    end
+    local ok, results = pcall(function() return { GetChannelList() } end)
+    if not ok or type(results) ~= "table" or #results == 0 then
+        return true
+    end
+    for idx = 1, #results, 3 do
+        if tonumber(results[idx]) == id then
+            return true
+        end
+    end
+    return false
+end
+
 --- Snapshot helper that prefers live Slots.Snapshot.
 local function LiveSnapshot()
     if AscensionLFM.Slots and AscensionLFM.Slots.Snapshot then
@@ -272,6 +295,20 @@ function Poster.PostOnce(msg, channel, channelName, nowOverride)
             if AscensionLFM.Print then
                 AscensionLFM.Print("Post failed — " .. reason
                     .. ". Check the Channel name field (try the number shown in your chat tab, e.g. \"1\").")
+            end
+            return false, reason
+        end
+        if not IsChannelJoined(id) then
+            -- Same fail-loud philosophy: resolving to a real channel id
+            -- that the player hasn't joined (e.g. "3.Zone" unchecked in
+            -- the channel config) would otherwise post nothing while
+            -- looking successful, since SendChatMessage doesn't error for
+            -- this case either.
+            local reason = "channel " .. tostring(id) .. " not joined"
+            lastStatus = "post failed: channel not joined"
+            if AscensionLFM.Print then
+                AscensionLFM.Print("Post failed — you haven't joined channel " .. tostring(id)
+                    .. ". Right-click a chat tab → Channels to join it, or check the number in the Post tab.")
             end
             return false, reason
         end

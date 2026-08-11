@@ -255,6 +255,32 @@ local ok3, err3 = Poster.PostOnce("test", "CHANNEL", "1")
 check("GetChannelName error is caught, numeric fallback still works", ok3 == true, tostring(err3))
 _G.GetChannelName = function() return 0 end
 
+-- Regression: resolving to a real channel id the player hasn't joined
+-- (e.g. "3.Zone" unchecked in the channel config, per a live report) must
+-- fail loudly too — SendChatMessage doesn't error for this case either,
+-- so without this check the post would silently reach nobody while
+-- PostOnce reported success.
+_G.GetChannelList = function()
+    -- Joined: 1=Ascension, 2=Newcomers, 4=Trade, 5=LookingForGroup.
+    -- NOT joined: 3=Zone.
+    return 1, "Ascension", false, 2, "Newcomers", false, 4, "Trade", false, 5, "LookingForGroup", false
+end
+chSent = {}
+local ok4, err4 = Poster.PostOnce("test", "CHANNEL", "3")
+check("unjoined channel fails", ok4 == false)
+check("unjoined channel error mentions the id", tostring(err4):find("3", 1, true) ~= nil, tostring(err4))
+check("did NOT post to an unjoined channel", #chSent == 0, tostring(#chSent))
+local unjoinedStatus = Poster.GetStatus()
+check("status reflects not-joined failure", unjoinedStatus.status:find("not joined", 1, true) ~= nil,
+    unjoinedStatus.status)
+
+-- A joined channel (e.g. 4=Trade) still posts normally.
+chSent = {}
+local ok5, err5 = Poster.PostOnce("test", "CHANNEL", "4")
+check("joined channel still posts", ok5 == true, tostring(err5))
+check("sent to channel 4", chSent[1] and chSent[1].target == 4, chSent[1] and tostring(chSent[1].target) or "none")
+_G.GetChannelList = nil
+
 io.write(string.format("poster tests: %d passed, %d failed\n", passed, failed))
 if failed > 0 then
     os.exit(1)

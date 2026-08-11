@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.4.34
+
+- **Fix: posting to a channel index you haven't joined silently reached
+  nobody.** Follow-up to v0.4.33, prompted by a screenshot of the actual
+  channel config: on this server channel 1 is "Ascension" (not
+  General/Trade — Trade is 4), and "3.Zone" was shown unchecked
+  (not joined). Even with a channel id that resolves successfully,
+  `SendChatMessage` to a channel you haven't joined doesn't throw a Lua
+  error — it silently fails client-side, the same "no error != it
+  worked" trap already fixed for Kick59's `UninviteUnit` (v0.4.28).
+  `Poster.PostOnce()` now checks `GetChannelList()` (the player's actual
+  joined channels) before sending, and fails loudly with a clear message
+  if the resolved channel isn't one of them — same "fail loud, don't
+  silently do the wrong thing" philosophy as v0.4.33. Defaults to
+  allowing the post if the check itself can't be verified, so this can
+  never become a new reason a previously-working setup stops posting.
+  Regression tests added to test_poster.lua using the exact channel
+  layout from the report (1=Ascension, 2=Newcomers, 3=Zone unjoined,
+  4=Trade, 5=LookingForGroup): posting to unjoined channel 3 fails
+  loudly, posting to joined channel 4 works normally.
+
 ## 0.4.33
 
 - **Fix: unresolved channel name silently posted to YELL instead.**
