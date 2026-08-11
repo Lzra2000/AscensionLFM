@@ -353,6 +353,14 @@ followSent = {}
 AscensionLFM.Scanner._HandleWhisper("RandomStranger", "What level are you?")
 check("seeking: no reply to someone we never applied to", #followSent == 0, tostring(#followSent))
 
+-- Regression: the bot's own CONFIRMATION message ("Registered as DPS -
+-- Aura: Yes. Waiting for invite.") contains "Aura" as a whole word too —
+-- must NOT trigger another unsolicited auto-reply back at it. Only real
+-- questions (contain "?" or "please") should ever trigger a reply.
+followSent = {}
+AscensionLFM.Scanner._HandleWhisper("Suriana", "Registered as DPS - Aura: Yes. Waiting for invite.")
+check("seeking: no reply to bot's own confirmation message", #followSent == 0, tostring(#followSent))
+
 io.write(string.format("test_v040_auto: %d passed, %d failed\n", passed, failed))
 if failed > 0 then
     os.exit(1)

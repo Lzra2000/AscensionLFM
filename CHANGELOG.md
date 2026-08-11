@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.31
+
+- **Fix: v0.4.30's follow-up auto-reply fired on the bot's own
+  confirmation message, not just its questions.** Caught by testing
+  against the exact Suriana example from the original report: "Registered
+  as DPS - Aura: Yes. Waiting for invite." contains "Aura" as a whole
+  word too, so the new feature would have fired ANOTHER unsolicited
+  "aura yes" reply right back at the bot that had just confirmed us —
+  the same shape of bug already fixed once on the hosting side (v0.4.20).
+  `DetectFollowUpKind` now requires the message to actually look like a
+  question (contains "?" or "please") before matching level/role/aura
+  keywords at all. Regression test added: the confirmation message from
+  the original screenshot now correctly gets no reply.
+
 ## 0.4.30
 
 - **New: Seeking mode auto-replies to a host's own follow-up questions.**

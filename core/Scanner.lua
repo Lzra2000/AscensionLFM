@@ -353,6 +353,16 @@ local FOLLOWUP_WINDOW = 300 -- 5 min: only reply to hosts we recently applied to
 
 local function DetectFollowUpKind(text)
     local lower = tostring(text or ""):lower()
+    -- Require the message to actually look like a question/request, not a
+    -- status update — e.g. a bot's own confirmation "Registered as DPS -
+    -- Aura: Yes. Waiting for invite." contains "aura" as a whole word too,
+    -- and without this gate we'd fire ANOTHER unsolicited reply to that,
+    -- right back at the bot that just confirmed us.
+    local looksLikeQuestion = lower:find("?", 1, true) ~= nil
+        or lower:find("%f[%w]please%f[%W]") ~= nil
+    if not looksLikeQuestion then
+        return nil
+    end
     local hasLevel = lower:find("%f[%w]level%f[%W]") ~= nil
     local hasRole = lower:find("%f[%w]role%f[%W]") ~= nil
     local hasAura = lower:find("%f[%w]aura%f[%W]") ~= nil
