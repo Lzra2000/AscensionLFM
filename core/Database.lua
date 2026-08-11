@@ -100,6 +100,8 @@ local DEFAULTS = {
     roleCheckAutoResync = true,
     lastRoleCheckAt = 0,
     autoMoveAura = true, -- at most one aura player per raid subgroup; auto SetRaidSubgroup
+    autoMoveTank = true, -- at most one tank per raid subgroup, filling group 1/2 first
+    autoMoveHealer = true, -- at most one healer per raid subgroup
     -- Presets / queue / activity
     presets = {},
     applicantQueue = {},

@@ -493,6 +493,12 @@ local function SyncWidgetsFromDB()
         end
         widgets.repostInterval:SetText(tostring(n))
     end
+    if widgets.autoMoveTank and widgets.autoMoveTank.SetChecked then
+        widgets.autoMoveTank:SetChecked(db.autoMoveTank ~= false)
+    end
+    if widgets.autoMoveHealer and widgets.autoMoveHealer.SetChecked then
+        widgets.autoMoveHealer:SetChecked(db.autoMoveHealer ~= false)
+    end
     if widgets.autoMoveAura and widgets.autoMoveAura.SetChecked then
         widgets.autoMoveAura:SetChecked(db.autoMoveAura ~= false)
     end
@@ -1136,7 +1142,7 @@ function MainWindow.Init()
     --------------------------------------------------------------------
     -- Hosting
     --------------------------------------------------------------------
-    local hosting = BuildCategoryPage(pageHost, CAT_HOSTING, 1120)
+    local hosting = BuildCategoryPage(pageHost, CAT_HOSTING, 1260)
     CreateSectionLabel(hosting, "Full Auto", -4)
     widgets.fullAuto = CreateToggleRow(hosting, -22,
         "Full Auto Hosting (master)",
@@ -1400,17 +1406,37 @@ function MainWindow.Init()
 
     local rcY = slotsY - 72
     CreateSectionLabel(hosting, "Role Check", rcY)
-    widgets.autoMoveAura = CreateToggleRow(hosting, rcY - 18,
+    widgets.autoMoveTank = CreateToggleRow(hosting, rcY - 18,
+        "Auto-move Tanks (1 per raid group, fills g1/g2 first)",
+        "Keep at most one Tank in each raid group (1–8), filling the lowest-numbered empty group first. Default ON.",
+        false,
+        function(on)
+            AscensionLFM.Database.Get().autoMoveTank = on and true or false
+            if on and AscensionLFM.AuraBalance and AscensionLFM.AuraBalance.BalanceAll then
+                AscensionLFM.AuraBalance.BalanceAll()
+            end
+        end)
+    widgets.autoMoveHealer = CreateToggleRow(hosting, rcY - 18 - TOGGLE_STEP,
+        "Auto-move Healers (1 per raid group)",
+        "Keep at most one Healer in each raid group. Won't displace a placed Tank unless a full group leaves no other choice. Default ON.",
+        false,
+        function(on)
+            AscensionLFM.Database.Get().autoMoveHealer = on and true or false
+            if on and AscensionLFM.AuraBalance and AscensionLFM.AuraBalance.BalanceAll then
+                AscensionLFM.AuraBalance.BalanceAll()
+            end
+        end)
+    widgets.autoMoveAura = CreateToggleRow(hosting, rcY - 18 - TOGGLE_STEP * 2,
         "Auto-move Auras (1 per raid group)",
         "Keep at most one Aura player in each raid group (1–8). Extra Auras are moved to empty groups. Default ON.",
         false,
         function(on)
             AscensionLFM.Database.Get().autoMoveAura = on and true or false
-            if on and AscensionLFM.AuraBalance and AscensionLFM.AuraBalance.Balance then
-                AscensionLFM.AuraBalance.Balance()
+            if on and AscensionLFM.AuraBalance and AscensionLFM.AuraBalance.BalanceAll then
+                AscensionLFM.AuraBalance.BalanceAll()
             end
         end)
-    widgets.roleCheckAutoResync = CreateToggleRow(hosting, rcY - 18 - TOGGLE_STEP,
+    widgets.roleCheckAutoResync = CreateToggleRow(hosting, rcY - 18 - TOGGLE_STEP * 3,
         "Auto-resync after listening window",
         "When the window ends: remove leavers, apply whispered roles, refresh filled counts. Default ON.",
         false,
@@ -1418,7 +1444,7 @@ function MainWindow.Init()
             AscensionLFM.Database.Get().roleCheckAutoResync = on and true or false
         end)
 
-    local rcFieldsY = rcY - 18 - TOGGLE_STEP - TOGGLE_ROW_H - 12
+    local rcFieldsY = rcY - 18 - TOGGLE_STEP * 3 - TOGGLE_ROW_H - 12
     local rcMsgLbl = hosting:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     rcMsgLbl:SetPoint("TOPLEFT", 4, rcFieldsY)
     rcMsgLbl:SetText("RW message")

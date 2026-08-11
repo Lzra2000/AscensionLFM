@@ -421,13 +421,15 @@ function RoleCheck.Resync()
     end
 
     local moved = 0
-    if AscensionLFM.AuraBalance and AscensionLFM.AuraBalance.Balance then
+    if AscensionLFM.AuraBalance and AscensionLFM.AuraBalance.BalanceAll then
+        moved = AscensionLFM.AuraBalance.BalanceAll() or 0
+    elseif AscensionLFM.AuraBalance and AscensionLFM.AuraBalance.Balance then
         moved = AscensionLFM.AuraBalance.Balance() or 0
     end
 
     lastResponseCount = RoleCheck.ResponseCount()
     local line = string.format(
-        "roles resynced (pruned %d, applied %d, aura moves %d, replies %d)",
+        "roles resynced (pruned %d, applied %d, role moves %d, replies %d)",
         removed, applied, moved, lastResponseCount
     )
     if AscensionLFM.Activity and AscensionLFM.Activity.Push then

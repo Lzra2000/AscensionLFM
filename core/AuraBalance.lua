@@ -49,14 +49,34 @@ local function CopyMember(m)
         index = m.index,
         subgroup = m.subgroup,
         isAura = m.isAura and true or false,
+        role = m.role,
     }
 end
 
---- Pure: plan moves so each subgroup has at most one aura.
+--- Pure: plan moves so each subgroup has at most one member with role==roleKey.
 -- Respects 5-player group cap: uses kind="set" or kind="swap".
--- @param members { {name=, index=, subgroup=, isAura=}, ... }
--- @return moves { {name=, from=, to=, kind=, swapName?=}, ... }
-function AuraBalance.PlanMoves(members)
+-- @param members { {name=, index=, subgroup=, isAura=, role=}, ... }
+-- @param roleKey which role to balance ("aura" default, or "tank"/"healer")
+-- @param opts { protectRoles={...} — never swap-displace these roles unless
+--   no other choice exists; sortByGroupNumber=true — fill lowest-numbered
+--   empty groups first (tank) instead of emptiest-group-first (aura/healer) }
+-- @return moves { {name=, from=, to=, kind=, roleKey=, swapName?=}, ... }
+function AuraBalance.PlanRoleMoves(members, roleKey, opts)
+    roleKey = roleKey or "aura"
+    opts = opts or {}
+    local protect = {}
+    if type(opts.protectRoles) == "table" then
+        for _, r in ipairs(opts.protectRoles) do
+            protect[r] = true
+        end
+    end
+    local hasRole = function(m)
+        if roleKey == "aura" then
+            return m.isAura and true or false
+        end
+        return m.role == roleKey
+    end
+
     local moves = {}
     if type(members) ~= "table" then
         return moves
@@ -64,7 +84,7 @@ function AuraBalance.PlanMoves(members)
 
     local byGroup = {}
     for g = 1, 8 do
-        byGroup[g] = { auras = {}, people = {} }
+        byGroup[g] = { matches = {}, people = {} }
     end
 
     for _, raw in ipairs(members) do
@@ -75,23 +95,23 @@ function AuraBalance.PlanMoves(members)
             if g > 8 then g = 8 end
             m.subgroup = g
             table.insert(byGroup[g].people, m)
-            if m.isAura then
-                table.insert(byGroup[g].auras, m)
+            if hasRole(m) then
+                table.insert(byGroup[g].matches, m)
             end
         end
     end
 
     local excess = {}
     for g = 1, 8 do
-        local auras = byGroup[g].auras
-        if #auras > 1 then
-            table.sort(auras, function(a, b)
+        local matches = byGroup[g].matches
+        if #matches > 1 then
+            table.sort(matches, function(a, b)
                 return (tonumber(a.index) or 0) < (tonumber(b.index) or 0)
             end)
-            for i = 2, #auras do
-                table.insert(excess, auras[i])
+            for i = 2, #matches do
+                table.insert(excess, matches[i])
             end
-            byGroup[g].auras = { auras[1] }
+            byGroup[g].matches = { matches[1] }
         end
     end
 
@@ -102,10 +122,10 @@ function AuraBalance.PlanMoves(members)
                 table.remove(people, i)
             end
         end
-        local auras = byGroup[g].auras
-        for i = #auras, 1, -1 do
-            if LowerName(auras[i].name) == LowerName(name) then
-                table.remove(auras, i)
+        local matches = byGroup[g].matches
+        for i = #matches, 1, -1 do
+            if LowerName(matches[i].name) == LowerName(name) then
+                table.remove(matches, i)
             end
         end
     end
@@ -113,46 +133,58 @@ function AuraBalance.PlanMoves(members)
     local function addPerson(g, m)
         m.subgroup = g
         table.insert(byGroup[g].people, m)
-        if m.isAura then
-            table.insert(byGroup[g].auras, m)
+        if hasRole(m) then
+            table.insert(byGroup[g].matches, m)
         end
     end
 
-    local function groupsWithoutAura()
+    local function groupsWithoutMatch()
         local out = {}
         for g = 1, 8 do
-            if #byGroup[g].auras == 0 then
+            if #byGroup[g].matches == 0 then
                 table.insert(out, g)
             end
         end
         return out
     end
 
+    -- Prefer a swap victim that isn't protected (e.g. don't undo an
+    -- already-correct tank placement while balancing healers); only fall
+    -- back to a protected member if the group has no other option.
     local function pickSwapVictim(g)
+        local fallback = nil
         for _, p in ipairs(byGroup[g].people) do
-            if not p.isAura then
-                return p
+            if not hasRole(p) then
+                if not protect[p.role] then
+                    return p
+                elseif not fallback then
+                    fallback = p
+                end
             end
         end
-        return nil
+        return fallback
     end
 
     for _, m in ipairs(excess) do
         local from = tonumber(m.subgroup) or 1
-        local targets = groupsWithoutAura()
-        table.sort(targets, function(a, b)
-            local ca = #byGroup[a].people
-            local cb = #byGroup[b].people
-            if ca == cb then
-                return a < b
-            end
-            return ca < cb
-        end)
+        local targets = groupsWithoutMatch()
+        if opts.sortByGroupNumber then
+            table.sort(targets, function(a, b) return a < b end)
+        else
+            table.sort(targets, function(a, b)
+                local ca = #byGroup[a].people
+                local cb = #byGroup[b].people
+                if ca == cb then
+                    return a < b
+                end
+                return ca < cb
+            end)
+        end
 
         local placed = false
         for _, to in ipairs(targets) do
             if to == from then
-                -- already counted as no-aura somehow; skip
+                -- already counted as no-match somehow; skip
             elseif #byGroup[to].people < GROUP_CAP then
                 table.insert(moves, {
                     name = m.name,
@@ -160,6 +192,7 @@ function AuraBalance.PlanMoves(members)
                     from = from,
                     to = to,
                     kind = "set",
+                    roleKey = roleKey,
                 })
                 removePerson(from, m.name)
                 addPerson(to, m)
@@ -174,13 +207,16 @@ function AuraBalance.PlanMoves(members)
                         from = from,
                         to = to,
                         kind = "swap",
+                        roleKey = roleKey,
                         swapName = victim.name,
                         swapIndex = victim.index,
                     })
                     removePerson(from, m.name)
                     removePerson(to, victim.name)
                     addPerson(to, m)
-                    victim.isAura = false
+                    if roleKey == "aura" then
+                        victim.isAura = false
+                    end
                     addPerson(from, victim)
                     placed = true
                     break
@@ -193,6 +229,14 @@ function AuraBalance.PlanMoves(members)
     end
 
     return moves
+end
+
+--- Pure: plan moves so each subgroup has at most one aura. Back-compat
+-- wrapper around PlanRoleMoves("aura") — unchanged behavior/signature.
+-- @param members { {name=, index=, subgroup=, isAura=}, ... }
+-- @return moves { {name=, from=, to=, kind=, swapName?=}, ... }
+function AuraBalance.PlanMoves(members)
+    return AuraBalance.PlanRoleMoves(members, "aura", {})
 end
 
 local function CollectRaidMembers()
@@ -213,6 +257,7 @@ local function CollectRaidMembers()
                 index = i,
                 subgroup = tonumber(subgroup) or 1,
                 isAura = role == "aura",
+                role = role,
             })
         end
     end
@@ -241,15 +286,17 @@ local function Fingerprint(members)
 end
 
 local function LogMove(mv, detail)
+    local roleKey = (type(mv) == "table" and mv.roleKey) or "aura"
     local msg = detail or string.format(
         "moved %s to raid group %d (was %d)",
         tostring(mv.name), tonumber(mv.to) or 0, tonumber(mv.from) or 0
     )
     if AscensionLFM.Activity and AscensionLFM.Activity.Push then
-        AscensionLFM.Activity.Push("aura", msg, { name = mv.name })
+        AscensionLFM.Activity.Push(roleKey, msg, { name = mv.name })
     end
     if AscensionLFM.Print then
-        AscensionLFM.Print("Aura: " .. msg)
+        local label = roleKey:sub(1, 1):upper() .. roleKey:sub(2)
+        AscensionLFM.Print(label .. ": " .. msg)
     end
 end
 
@@ -258,6 +305,13 @@ end
 function AuraBalance.ApplyOne(mv, members)
     if type(mv) ~= "table" or type(mv.name) ~= "string" then
         return false
+    end
+    local roleKey = mv.roleKey or "aura"
+    local matches = function(m)
+        if roleKey == "aura" then
+            return m.isAura and true or false
+        end
+        return m.role == roleKey
     end
     members = members or CollectRaidMembers()
     local me = FindByName(members, mv.name)
@@ -284,8 +338,8 @@ function AuraBalance.ApplyOne(mv, members)
         local ok = pcall(SwapRaidSubgroup, me.index, other.index)
         if ok then
             LogMove(mv, string.format(
-                "swapped %s ↔ %s (aura → g%d)",
-                tostring(mv.name), tostring(mv.swapName), to
+                "swapped %s ↔ %s (%s → g%d)",
+                tostring(mv.name), tostring(mv.swapName), roleKey, to
             ))
         end
         return ok and true or false
@@ -294,13 +348,14 @@ function AuraBalance.ApplyOne(mv, members)
     if type(SetRaidSubgroup) ~= "function" then
         return false
     end
-    -- Target may have filled since plan — fall back to swap with a non-aura there.
+    -- Target may have filled since plan — fall back to swap with a
+    -- non-matching-role member there.
     local targetCount = 0
     local victim = nil
     for _, m in ipairs(members) do
         if tonumber(m.subgroup) == to then
             targetCount = targetCount + 1
-            if not m.isAura and not victim then
+            if not matches(m) and not victim then
                 victim = m
             end
         end
@@ -310,8 +365,8 @@ function AuraBalance.ApplyOne(mv, members)
             local ok = pcall(SwapRaidSubgroup, me.index, victim.index)
             if ok then
                 LogMove(mv, string.format(
-                    "swapped %s ↔ %s (aura → g%d, group was full)",
-                    tostring(mv.name), tostring(victim.name), to
+                    "swapped %s ↔ %s (%s → g%d, group was full)",
+                    tostring(mv.name), tostring(victim.name), roleKey, to
                 ))
             end
             return ok and true or false
@@ -394,6 +449,71 @@ function AuraBalance.Balance()
         return 1, #plan
     end
     return 0, #plan
+end
+
+--- Auto-move Tank, Healer, and Aura (in that priority order) so each
+-- subgroup has at most one of each — same one-move-per-call + roster
+-- settle-wait design as Balance(), just covering all three roles in one
+-- shared queue. Tank fills the lowest-numbered empty groups first (so 2
+-- tanks land in groups 1 and 2, matching how hosts read their raid frame);
+-- Healer and Aura fill the emptiest group first, same rule Balance()
+-- always used for Aura. Healer/Aura balancing never displaces an
+-- already-placed Tank unless a full group leaves no other choice.
+-- Each role respects its own toggle (autoMoveTank/autoMoveHealer/
+-- autoMoveAura, all default ON) independently.
+function AuraBalance.BalanceAll()
+    local db = DB()
+    if not CanMoveRaid() then
+        return 0, 0
+    end
+
+    local members = CollectRaidMembers()
+    if #members == 0 then
+        ClearWait()
+        return 0, 0
+    end
+
+    if waitingFor then
+        local m = FindByName(members, waitingFor.name)
+        if m and tonumber(m.subgroup) == tonumber(waitingFor.to) then
+            ClearWait()
+        elseif (Now() - (waitingFor.t0 or 0)) > SETTLE_TIMEOUT then
+            ClearWait()
+        else
+            return 0, 0
+        end
+    end
+
+    local specs = {
+        { key = "tank", enabled = "autoMoveTank", protect = {}, sortByGroupNumber = true },
+        { key = "healer", enabled = "autoMoveHealer", protect = { "tank" }, sortByGroupNumber = false },
+        { key = "aura", enabled = "autoMoveAura", protect = { "tank", "healer" }, sortByGroupNumber = false },
+    }
+
+    for _, spec in ipairs(specs) do
+        if not (db and db[spec.enabled] == false) then
+            local plan = AuraBalance.PlanRoleMoves(members, spec.key, {
+                protectRoles = spec.protect,
+                sortByGroupNumber = spec.sortByGroupNumber,
+            })
+            if #plan > 0 then
+                local first = plan[1]
+                local ok = AuraBalance.ApplyOne(first, members)
+                if ok then
+                    waitingFor = {
+                        name = first.name,
+                        to = first.to,
+                        kind = first.kind or "set",
+                        t0 = Now(),
+                    }
+                    return 1, #plan
+                end
+            end
+        end
+    end
+
+    ClearWait()
+    return 0, 0
 end
 
 --- True if subgroup already has an assigned aura (for invite gating helpers).

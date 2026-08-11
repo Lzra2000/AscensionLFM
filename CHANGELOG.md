@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.4.35
+
+- **New: Auto-move Tanks and Healers to one-per-raid-group (extends the
+  existing Aura balancing).** Requested: tanks should end up in groups 1
+  and 2, healers spread one per group, automatically — same rule Aura
+  already followed. Generalized `AuraBalance.PlanMoves` into
+  `PlanRoleMoves(members, roleKey, opts)`, reusable for any role:
+  - **Tank** fills the lowest-numbered empty group first (2 tanks land in
+    groups 1 and 2, matching how a raid frame reads).
+  - **Healer** (and Aura, unchanged) fills the emptiest group first, same
+    rule as before.
+  - Healer/Aura balancing never displaces an already-placed Tank via swap
+    unless a completely full group leaves no other choice.
+  New `AuraBalance.BalanceAll()` runs Tank → Healer → Aura in that
+  priority order, one move per call (same careful roster-settle-wait
+  design as the original `Balance()`), wired into `RoleCheck.Resync` so
+  it runs automatically on every role-check resync, matching Aura's
+  existing trigger. Two new toggles in the Hosting tab (default ON):
+  "Auto-move Tanks" and "Auto-move Healers".
+  Extensive regression tests added to test_aura_rolecheck.lua: tank
+  fills lowest empty group, already-balanced tanks aren't moved
+  needlessly, healer swap never picks a tank as victim (verified with a
+  full 8-group raid), and the full BalanceAll priority order across
+  sequential calls.
+
 ## 0.4.34
 
 - **Fix: posting to a channel index you haven't joined silently reached
