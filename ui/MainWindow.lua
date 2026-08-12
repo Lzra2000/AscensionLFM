@@ -1947,8 +1947,11 @@ function MainWindow.Init()
             MainWindow.RefreshPost()
         end)
 
+    local postToggleBottom = -268 - TOGGLE_STEP * 2 - TOGGLE_ROW_H -- bottom of postShowAllRoles row
+    local intY = postToggleBottom - 12
+
     local intLbl = post:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    intLbl:SetPoint("TOPLEFT", 4, -474)
+    intLbl:SetPoint("TOPLEFT", 4, intY)
     intLbl:SetText("Interval (sec, min 30)")
     SetInk(intLbl, INK)
 
@@ -1984,13 +1987,13 @@ function MainWindow.Init()
     widgets.repostInterval = intEdit
 
     postStatusFS = post:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    postStatusFS:SetPoint("TOPLEFT", 4, -502)
+    postStatusFS:SetPoint("TOPLEFT", 4, intY - 28)
     postStatusFS:SetPoint("RIGHT", -4, 0)
     postStatusFS:SetJustifyH("LEFT")
     SetInk(postStatusFS, MUTED)
 
     local postHint = post:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    postHint:SetPoint("TOPLEFT", 4, -524)
+    postHint:SetPoint("TOPLEFT", 4, intY - 50)
     postHint:SetPoint("RIGHT", -4, 0)
     postHint:SetJustifyH("LEFT")
     postHint:SetText("Example: LFM MS | 2/3 Healers | 1/3 Aura - full roles omitted, filled from Hosting slots + Scan.")

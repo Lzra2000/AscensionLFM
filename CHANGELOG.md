@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.4.72
+
+- **Fix: v0.4.70's Post tab overlap fix was itself wrong.** Reported live
+  via screenshot - still overlapping after the "fix". Root cause: my own
+  pixel-math error, not anything in the external code. I verified every
+  Hosting/Post tab layout change this session against `TOGGLE_ROW_H = 58`
+  and `TOGGLE_STEP = 68` - but the actual constants in this codebase are
+  `TOGGLE_ROW_H = 66` and `TOGGLE_STEP = 74`. v0.4.70's hardcoded fix
+  (`intLbl` at literal `-474` etc.) was computed externally with the
+  wrong numbers, leaving only a 4px gap in reality instead of the
+  intended 12px - visually indistinguishable from no gap at all.
+  Fixed properly this time: replaced the hardcoded literals with a real
+  relative calculation (`postToggleBottom = -268 - TOGGLE_STEP*2 -
+  TOGGLE_ROW_H`, then `intY = postToggleBottom - 12`, with
+  `postStatusFS`/`postHint` positioned relative to `intY`) using the
+  actual Lua constants directly rather than numbers computed by hand
+  outside the file - this eliminates the whole bug class for this
+  section permanently, since it can never drift out of sync with
+  `TOGGLE_ROW_H`/`TOGGLE_STEP` again even if those change later.
+  Audited the rest of this session's toggle-stacking work (v0.4.22/24/
+  35/37/43/71's Hosting tab insertions) for the same mistake: all of it
+  already referenced `TOGGLE_ROW_H`/`TOGGLE_STEP` symbolically rather
+  than hardcoding computed numbers, so it was correct at runtime the
+  whole time despite my verification scripts having used the wrong
+  constants - only the Post tab used literal hardcoded numbers, and
+  that's now fixed the same permanent way.
+  `contentHeight` re-verified against the real constants (needs >=614,
+  already at 620 - no change needed). Full suite green (no test changes
+  needed - this class of bug isn't visible to the Lua unit test harness,
+  which doesn't render layout; caught only by an actual screenshot).
+
 ## 0.4.71
 
 - **New: pause the complete hosting automation while inside the
