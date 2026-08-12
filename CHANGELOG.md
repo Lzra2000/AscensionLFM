@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.4.70
+
+- **Fix: real overlap bug in the Post tab, found via screenshot.** The
+  v0.4.66/69 reconciliation brought in a new "LFM shows filled roles too"
+  toggle (`postShowAllRoles`) in `ui/MainWindow.lua`, inserted as a third
+  toggle row in the Auto-repost section — but everything below it
+  (Interval field, role-check status line, the example hint text) was
+  still hardcoded at its old Y position, landing squarely inside the new
+  toggle's row. This is exactly the class of bug this session has hit
+  and fixed several times before (v0.4.22/24/35/37/43 in the Hosting
+  tab) — but this time it slipped through because the large 478-line
+  `MainWindow.lua` diff from the v0.4.66 upload was accepted based on
+  the UI otherwise looking coherent, without the same per-row pixel-math
+  verification given to every toggle insertion done directly in this
+  session. Recomputed the full Post-tab layout below the toggle section
+  (same method as every prior overlap fix — precise top/bottom pixel
+  accounting, verified zero negative gaps) and shifted the Interval
+  field, `postStatusFS`, and the example hint down by one toggle row
+  height; bumped the tab's `contentHeight` 560 -> 620 for real scroll
+  headroom.
+  Also verified `postShowAllRoles`'s actual behavior while looking at
+  this: correctly implemented as an opt-in `BuildMessage(snapshot,
+  showAll)` second argument, defaulting falsy so the v0.4.29 "only show
+  open roles" behavior is unchanged unless a host explicitly turns it
+  on — no functional regression, just the missing test coverage and the
+  layout bug. Regression tests added to test_poster.lua (default/
+  showAll=false/showAll=true, and disabled roles staying hidden even
+  with showAll=true).
+
 ## 0.4.69
 
 - **Reconciliation pass 2: merged a smaller external "stability-ui"

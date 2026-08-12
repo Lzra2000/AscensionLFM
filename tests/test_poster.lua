@@ -68,6 +68,36 @@ local allFullSnap = {
 msg = Poster.BuildMessage(allFullSnap)
 check("all full fallback text", msg == "LFM MS - full", msg)
 
+--------------------------------------------------------------------
+-- postShowAllRoles opt-in: default behavior (v0.4.29) is unchanged —
+-- only the second BuildMessage argument, when truthy, includes filled
+-- roles too.
+--------------------------------------------------------------------
+local mixedSnap = {
+    tank = { filled = 2, max = 2 },
+    healer = { filled = 1, max = 3 },
+    aura = { filled = 3, max = 3 },
+    dps = { filled = 4, max = 7 },
+}
+check("default (no 2nd arg) still omits full roles",
+    Poster.BuildMessage(mixedSnap) == "LFM MS | 1/3 Healers | 4/7 DPS", Poster.BuildMessage(mixedSnap))
+check("showAll=false explicitly still omits full roles",
+    Poster.BuildMessage(mixedSnap, false) == "LFM MS | 1/3 Healers | 4/7 DPS", Poster.BuildMessage(mixedSnap, false))
+check("showAll=true includes filled roles too",
+    Poster.BuildMessage(mixedSnap, true) == "LFM MS | 2/2 Tanks | 1/3 Healers | 3/3 Aura | 4/7 DPS",
+    Poster.BuildMessage(mixedSnap, true))
+
+-- Disabled roles (max<=0) are never shown even with showAll=true.
+local withDisabled = {
+    tank = { filled = 2, max = 2 },
+    healer = { filled = 0, max = 0 }, -- disabled
+    aura = { filled = 1, max = 3 },
+    dps = { filled = 4, max = 7 },
+}
+check("showAll=true still omits disabled (max<=0) roles",
+    Poster.BuildMessage(withDisabled, true):find("Healers", 1, true) == nil,
+    Poster.BuildMessage(withDisabled, true))
+
 check("nil snapshot still builds", type(Poster.BuildMessage(nil)) == "string")
 
 -- IsFull

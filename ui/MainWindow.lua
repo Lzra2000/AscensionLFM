@@ -1714,7 +1714,7 @@ function MainWindow.Init()
     --------------------------------------------------------------------
     -- Post (LFM compose / scan / repost)
     --------------------------------------------------------------------
-    local post = BuildCategoryPage(pageHost, CAT_POST, 560)
+    local post = BuildCategoryPage(pageHost, CAT_POST, 620)
     CreateSectionLabel(post, "LFM message", -4)
 
     local previewBox = CreateFrame("Frame", nil, post)
@@ -1926,7 +1926,7 @@ function MainWindow.Init()
         end)
 
     local intLbl = post:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    intLbl:SetPoint("TOPLEFT", 4, -406)
+    intLbl:SetPoint("TOPLEFT", 4, -474)
     intLbl:SetText("Interval (sec, min 30)")
     SetInk(intLbl, INK)
 
@@ -1962,13 +1962,13 @@ function MainWindow.Init()
     widgets.repostInterval = intEdit
 
     postStatusFS = post:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    postStatusFS:SetPoint("TOPLEFT", 4, -434)
+    postStatusFS:SetPoint("TOPLEFT", 4, -502)
     postStatusFS:SetPoint("RIGHT", -4, 0)
     postStatusFS:SetJustifyH("LEFT")
     SetInk(postStatusFS, MUTED)
 
     local postHint = post:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    postHint:SetPoint("TOPLEFT", 4, -456)
+    postHint:SetPoint("TOPLEFT", 4, -524)
     postHint:SetPoint("RIGHT", -4, 0)
     postHint:SetJustifyH("LEFT")
     postHint:SetText("Example: LFM MS | 2/3 Healers | 1/3 Aura - full roles omitted, filled from Hosting slots + Scan.")
