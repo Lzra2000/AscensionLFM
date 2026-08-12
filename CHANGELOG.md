@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.4.43
+
+- **UI: Queue tab now shows a role icon per applicant** (step 1 of an
+  incremental "all tabs" layout pass inspired by a competing addon's
+  public "Waiting players" table — concept/layout only, our own parchment
+  styling and implementation kept, no code viewed or copied). Each queue
+  row now shows a 28x28 role icon (tank/healer/aura/dps, with a question
+  mark for an unparsed/unknown role) next to the applicant name instead
+  of plain `[dps]` text, giving a quicker visual scan. Row height/spacing
+  adjusted slightly to fit the icon comfortably.
+  Fixed a test-mock gap along the way: the UI smoke test's `CreateTexture`
+  mock was missing `SetSize` (real WoW Texture objects have it) — added,
+  plus `SetTexture`/`GetTexture` capture so icon assignment can actually
+  be exercised by tests, not just silently no-op'd.
+  Regression test added to test_ui_smoke.lua covering all five role
+  states (tank/healer/aura/dps/unknown) rendering without error.
+  Deliberately scoped to one tab per pass rather than a single large
+  "redesign everything" change — each tab needs its own careful layout
+  verification (as every prior Hosting-tab overlap fix this session
+  showed), and there's no way to visually preview WoW FrameXML changes
+  before they're actually loaded in-game.
+
 ## 0.4.42
 
 - **New: per-message delivery routing (Message Studio-style).** Inspired

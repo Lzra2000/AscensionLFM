@@ -72,11 +72,14 @@ local function NewFrame()
             return function(self) return self._text or "" end
         elseif key == "CreateTexture" then
             return function()
-                return {
-                    SetAllPoints = Noop, SetPoint = Noop, SetTexture = Noop,
+                local tex = {
+                    SetAllPoints = Noop, SetPoint = Noop,
                     SetTexCoord = Noop, SetWidth = Noop, SetHeight = Noop,
-                    Show = Noop, Hide = Noop, SetVertexColor = Noop,
+                    SetSize = Noop, Show = Noop, Hide = Noop, SetVertexColor = Noop,
                 }
+                tex.SetTexture = function(self, path) self._texture = path end
+                tex.GetTexture = function(self) return self._texture end
+                return tex
             end
         elseif key == "CreateFontString" then
             return function()
@@ -235,6 +238,22 @@ MW.SelectCategory("queue")
 check("queue category active", MW.GetActiveCategory() == "queue")
 check("RefreshQueue exists", type(MW.RefreshQueue) == "function")
 MW.RefreshQueue()
+
+-- Regression: queue rows now show a role icon texture (v0.4.43) — must
+-- not error for any role value, including nil (unknown/unparsed role).
+AscensionLFM.Queue = {
+    Recent = function()
+        return {
+            { name = "Alice", role = "tank", status = "pending", message = "tank pls" },
+            { name = "Bob", role = "healer", status = "pending", message = "heal pls" },
+            { name = "Cira", role = "aura", status = "pending", message = "aura pls" },
+            { name = "Dex", role = "dps", status = "pending", message = "dps pls" },
+            { name = "Evan", role = nil, status = "pending", message = "?" },
+        }
+    end,
+}
+local okQ = pcall(MW.RefreshQueue)
+check("RefreshQueue with all role icon types doesn't error", okQ == true)
 check("RefreshActivity exists", type(MW.RefreshActivity) == "function")
 MW.RefreshActivity()
 

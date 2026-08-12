@@ -403,10 +403,14 @@ function MainWindow.RefreshQueue()
         if row then
             local q = list[i]
             if q then
-                local role = q.role and tostring(q.role) or "?"
+                local role = q.role and tostring(q.role) or nil
                 local st = tostring(q.status or "pending")
                 row.label:SetText(string.format("|cff4a3010%s|r  |cff5a4a30[%s]|r  %s\n%s",
-                    tostring(q.name or "?"), role, st, tostring(q.message or ""):sub(1, 60)))
+                    tostring(q.name or "?"), role or "?", st, tostring(q.message or ""):sub(1, 60)))
+                if row.icon then
+                    local path = role and row.ROLE_ICONS and row.ROLE_ICONS[role]
+                    row.icon:SetTexture(path or row.ROLE_ICON_UNKNOWN)
+                end
                 row.name = q.name
                 row:Show()
                 if row.inviteBtn then row.inviteBtn:Show() end
@@ -414,6 +418,9 @@ function MainWindow.RefreshQueue()
             else
                 row.name = nil
                 row.label:SetText(i == 1 and "|cff5a4a30No applicants yet.|r" or "")
+                if row.icon then
+                    row.icon:SetTexture(i == 1 and row.ROLE_ICON_UNKNOWN or nil)
+                end
                 if i == 1 then row:Show() else row:Hide() end
                 if row.inviteBtn then row.inviteBtn:Hide() end
                 if row.rejectBtn then row.rejectBtn:Hide() end
@@ -1809,18 +1816,32 @@ function MainWindow.Init()
     SetInk(qHint, MUTED)
 
     local qy = -44
+    local ROLE_ICONS = {
+        tank = "Interface\\Icons\\Ability_Warrior_DefensiveStance",
+        healer = "Interface\\Icons\\Spell_Holy_Heal",
+        aura = "Interface\\Icons\\Spell_Holy_AuraOfLight",
+        dps = "Interface\\Icons\\Ability_DualWield",
+    }
+    local ROLE_ICON_UNKNOWN = "Interface\\Icons\\INV_Misc_QuestionMark"
     for i = 1, 5 do
         local row = CreateFrame("Frame", nil, queue)
         row:SetPoint("TOPLEFT", 0, qy)
         row:SetPoint("TOPRIGHT", 0, qy)
-        row:SetHeight(48)
+        row:SetHeight(52)
         ApplyInset(row)
+        local icon = row:CreateTexture(nil, "ARTWORK")
+        icon:SetSize(28, 28)
+        icon:SetPoint("TOPLEFT", 8, -10)
+        icon:SetTexCoord(0.08, 0.92, 0.08, 0.92) -- trim the default icon border
+        row.icon = icon
         local lbl = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        lbl:SetPoint("TOPLEFT", 8, -6)
+        lbl:SetPoint("TOPLEFT", icon, "TOPRIGHT", 8, 4)
         lbl:SetPoint("RIGHT", row, "RIGHT", -150, 0)
         lbl:SetJustifyH("LEFT")
         SetInk(lbl, INK)
         row.label = lbl
+        row.ROLE_ICONS = ROLE_ICONS
+        row.ROLE_ICON_UNKNOWN = ROLE_ICON_UNKNOWN
         local inv = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
         inv:SetSize(64, 20)
         inv:SetPoint("TOPRIGHT", -8, -6)
@@ -1845,7 +1866,7 @@ function MainWindow.Init()
         row.rejectBtn = rej
         row:Hide()
         queueRows[i] = row
-        qy = qy - 54
+        qy = qy - 58
     end
 
     --------------------------------------------------------------------
