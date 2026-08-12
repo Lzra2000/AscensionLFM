@@ -334,6 +334,40 @@ check("convert: no-op once already a raid", convertCalled == 0, tostring(convert
 _G.GetNumRaidMembers = function() return 0 end
 _G.GetNumPartyMembers = function() return 2 end
 
+--------------------------------------------------------------------
+-- New: whisper-invite path (TryHostInvite) now pauses while the host is
+-- inside the instance too, same as the LFG-scan path already did (v0.4.27)
+-- - a fresh invite can't meaningfully join a run already underway.
+-- db.pauseInviteInInstance (default true) lets a host opt back in.
+--------------------------------------------------------------------
+Invite._ResetCooldowns()
+db.roles = { tank = true, healer = true, aura = true, dps = true }
+db.slotMax = { tank = 2, healer = 3, aura = 3, dps = 7 }
+Slots.ClearAll()
+_G.IsInInstance = function() return true, "party" end
+invited = {}
+ok, reason = Invite.TryHostInvite("InsideApplicant", "dps")
+check("whisper invite paused while host is in instance", ok == false and reason == "in instance",
+    tostring(reason))
+check("no invite sent while in instance", #invited == 0)
+
+-- Toggle off: host explicitly wants whisper invites to keep working
+-- inside the instance.
+db.pauseInviteInInstance = false
+Invite._ResetCooldowns()
+invited = {}
+ok, reason = Invite.TryHostInvite("InsideApplicant2", "dps")
+check("toggle off allows whisper invite even in instance", ok == true, tostring(reason))
+db.pauseInviteInInstance = true
+
+-- Outside the instance again: works normally.
+_G.IsInInstance = function() return false, "none" end
+Invite._ResetCooldowns()
+invited = {}
+ok, reason = Invite.TryHostInvite("OutsideApplicant", "dps")
+check("whisper invite works normally outside instance", ok == true, tostring(reason))
+_G.IsInInstance = nil
+
 io.write(string.format("invite tests: %d passed, %d failed\n", passed, failed))
 if failed > 0 then
     os.exit(1)

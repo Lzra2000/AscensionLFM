@@ -594,6 +594,12 @@ local function SyncWidgetsFromDB()
     if widgets.rejectRewhisper and widgets.rejectRewhisper.SetChecked then
         widgets.rejectRewhisper:SetChecked(db.rejectRewhisper and true or false)
     end
+    if widgets.pauseInviteInInstance and widgets.pauseInviteInInstance.SetChecked then
+        widgets.pauseInviteInInstance:SetChecked(db.pauseInviteInInstance ~= false)
+    end
+    if widgets.pauseRepostInInstance and widgets.pauseRepostInInstance.SetChecked then
+        widgets.pauseRepostInInstance:SetChecked(db.pauseRepostInInstance ~= false)
+    end
     if widgets.announceFull and widgets.announceFull.SetChecked then
         widgets.announceFull:SetChecked(db.announceFull and true or false)
     end
@@ -1310,7 +1316,7 @@ function MainWindow.Init()
     --------------------------------------------------------------------
     -- Hosting
     --------------------------------------------------------------------
-    local hosting = BuildCategoryPage(pageHost, CAT_HOSTING, 1330)
+    local hosting = BuildCategoryPage(pageHost, CAT_HOSTING, 1510)
     CreateSectionLabel(hosting, "Full Auto", -4)
     widgets.fullAuto = CreateToggleRow(hosting, -22,
         "Full Auto Hosting (master)",
@@ -1445,6 +1451,22 @@ function MainWindow.Init()
         false,
         function(on)
             AscensionLFM.Database.Get().rejectRewhisper = on and true or false
+        end)
+    hy = hy - TOGGLE_STEP
+    widgets.pauseInviteInInstance = CreateToggleRow(hosting, hy,
+        "Pause auto-invite while inside the instance",
+        "A fresh invite can't join a run already underway. Covers whisper + LFG-chat invites. Default ON.",
+        false,
+        function(on)
+            AscensionLFM.Database.Get().pauseInviteInInstance = on and true or false
+        end)
+    hy = hy - TOGGLE_STEP
+    widgets.pauseRepostInInstance = CreateToggleRow(hosting, hy,
+        "Pause LFM auto-repost while inside the instance",
+        "No point re-advertising a run you're already deep into. Default ON.",
+        false,
+        function(on)
+            AscensionLFM.Database.Get().pauseRepostInInstance = on and true or false
         end)
 
     local rtY = hy - TOGGLE_ROW_H - 12

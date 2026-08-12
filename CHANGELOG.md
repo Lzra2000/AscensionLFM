@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.4.71
+
+- **New: pause the complete hosting automation while inside the
+  instance** (not just the LFG-chat scan, as v0.4.27 did). A fresh
+  invite can't meaningfully join a Manastorm run already underway, and
+  re-advertising an LFM you're already deep into doesn't help anyone —
+  so both `Invite.TryHostInvite` (direct whisper applications) and
+  `Poster.Tick` (LFM auto-repost) now pause while `IsInInstance()`
+  reports true. This broadens v0.4.27's original decision, which
+  deliberately left whisper invites unaffected — reconsidered because a
+  whisper invite mid-run has limited practical value anyway.
+  Two new toggles (both default ON, in the Hosting tab's "Invite +
+  reject" section): "Pause auto-invite while inside the instance" and
+  "Pause LFM auto-repost while inside the instance" — a host who
+  genuinely wants either to keep working mid-run can opt back in.
+  Paused applicants are still queued (reason "host in instance") so the
+  host can see and manually invite them via the Queue tab once back in
+  town. Kick59, AuraScan, and RoleCheck are deliberately unaffected —
+  those manage the existing raid regardless of whether new applicants
+  can join.
+  Layout note: inserted using this section's existing running-offset
+  (`hy = hy - TOGGLE_STEP`) pattern rather than hardcoded Y positions,
+  so everything below cascaded correctly without a manual per-element
+  recalculation — verified anyway by hand-tracing the full chain down to
+  the deepest element (needs >=1428px, set to 1510 for real headroom),
+  given the exact class of bug just fixed in v0.4.70.
+  Regression tests added to test_invite.lua (whisper invite paused in
+  instance, toggle-off override, normal operation outside) and
+  test_poster.lua (repost paused in instance, toggle-off override,
+  normal operation outside).
+
 ## 0.4.70
 
 - **Fix: real overlap bug in the Post tab, found via screenshot.** The

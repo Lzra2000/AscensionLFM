@@ -404,7 +404,21 @@ function Poster.Tick(now)
         db.mode,
         full
     )
+    if ok and db.pauseRepostInInstance ~= false and type(IsInInstance) == "function" then
+        local okCall, inInstance = pcall(IsInInstance)
+        if okCall and inInstance then
+            ok = false
+            reason = "in instance"
+        end
+    end
     if not ok then
+        if reason == "in instance" then
+            lastStatus = "paused: in instance"
+            if AscensionLFM.MainWindow and AscensionLFM.MainWindow.RefreshPost then
+                AscensionLFM.MainWindow.RefreshPost()
+            end
+            return lastStatus
+        end
         if reason == "full" and fullReason == "unassigned" then
             lastStatus = "need RW (unassigned)"
             return lastStatus

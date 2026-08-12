@@ -30,6 +30,21 @@ local function LowerName(name)
     return tostring(name or ""):lower():gsub("%-.*$", "")
 end
 
+-- Once the host is actually inside the Manastorm instance, continuing to
+-- auto-invite doesn't accomplish much - a fresh invite can't meaningfully
+-- join a run already underway (they'd just sit outside waiting to be
+-- summoned, if that's even possible). Both invite paths (direct whisper
+-- and public LFG-chat scan) pause here by default; db.pauseInviteInInstance
+-- lets a host explicitly opt back in if they genuinely want mid-run
+-- whisper invites to keep working.
+local function IsHostInsideInstance()
+    if type(IsInInstance) ~= "function" then
+        return false
+    end
+    local ok, inInstance = pcall(IsInInstance)
+    return ok and inInstance and true or false
+end
+
 local function IsIgnoredName(name)
     if type(IsIgnored) == "function" then
         local ok, result = pcall(IsIgnored, name)
@@ -362,6 +377,12 @@ function Invite.TryHostInvite(sender, message, retryAttempts)
         end
         return false, "disabled"
     end
+    if db.pauseInviteInInstance ~= false and IsHostInsideInstance() then
+        if AscensionLFM.Queue and AscensionLFM.Queue.Push then
+            AscensionLFM.Queue.Push(sender, role, message, "pending", "host in instance")
+        end
+        return false, "in instance"
+    end
 
     -- Bare re-inv / inv with no role: reuse last known role from this session
     -- (player left and wants back in without re-stating the role).
@@ -481,14 +502,12 @@ function Invite.TryLfgInvite(leader, message, parsed, retryAttempts)
     -- OTHER unrelated players' own "LFG MS" posts (for entirely different
     -- groups) and this used to auto-reply to them ("Sorry, tank is full")
     -- as if they had applied to you - confusing strangers who never
-    -- whispered you at all. Direct whispers (TryHostInvite) are unaffected
-    -- - those are always a genuine, intentional application regardless of
-    -- where you are.
-    if type(IsInInstance) == "function" then
-        local ok, inInstance = pcall(IsInInstance)
-        if ok and inInstance then
-            return false, "in instance"
-        end
+    -- whispered you at all.
+    -- Direct whispers (TryHostInvite) pause here too now, by the same
+    -- db.pauseInviteInInstance toggle - a fresh invite while deep inside a
+    -- run already underway can't meaningfully be joined anyway.
+    if db.pauseInviteInInstance ~= false and IsHostInsideInstance() then
+        return false, "in instance"
     end
     if type(leader) ~= "string" or leader == "" then
         return false, "bad name"

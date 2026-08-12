@@ -2,7 +2,7 @@
 ## Title: AscensionLFM
 ## Notes: Manastorm LFM host helper for Ascension.gg
 ## Author: Lazra
-## Version: 0.4.70
+## Version: 0.4.71
 ## SavedVariables: AscensionLFMDB
 ## DefaultState: enabled
 ## X-Website: https://ascension.gg

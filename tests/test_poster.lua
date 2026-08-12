@@ -211,6 +211,42 @@ status = Poster.Tick(2010)
 check("tick waits inside interval", status == "waiting", status)
 check("still one message", #sent == 1)
 
+--------------------------------------------------------------------
+-- New: auto-repost pauses while the host is inside the instance,
+-- resumes normally once outside again. db.pauseRepostInInstance
+-- (default true) lets a host opt back in.
+--------------------------------------------------------------------
+Poster._ResetForTests()
+db.autoRepost = true
+db.mode = "hosting"
+Slots.ClearAll()
+Slots.SetMax("tank", 2)
+Slots.SetMax("healer", 3)
+Slots.SetMax("aura", 3)
+Slots.SetMax("dps", 7)
+sent = {}
+_G.IsInInstance = function() return true, "party" end
+status = Poster.Tick(3000)
+check("tick pauses while in instance", status == "paused: in instance", status)
+check("no message sent while in instance", #sent == 0)
+
+-- Toggle off: host wants repost to keep working even inside the instance.
+db.pauseRepostInInstance = false
+status = Poster.Tick(3000)
+check("toggle off allows repost even in instance", status == "reposted", status)
+check("message sent once toggled off", #sent == 1)
+db.pauseRepostInInstance = true
+
+-- Outside again: resumes normally.
+Poster._ResetForTests()
+db.autoRepost = true
+sent = {}
+_G.IsInInstance = function() return false, "none" end
+status = Poster.Tick(4000)
+check("tick posts normally outside instance", status == "reposted", status)
+check("message sent outside instance", #sent == 1)
+_G.IsInInstance = nil
+
 -- Defaults: autoRepost off
 local defs = AscensionLFM.Database.Defaults()
 check("default autoRepost off", defs.autoRepost == false)

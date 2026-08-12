@@ -51,6 +51,8 @@ local DEFAULTS = {
     dedupeSeconds = 45,
     whisperCooldown = 30,
     inviteCooldown = 3,
+    pauseInviteInInstance = true, -- pause auto-invite (both whisper and LFG-scan) while the host is inside the instance
+    pauseRepostInInstance = true, -- pause LFM auto-repost while the host is inside the instance
     -- Dangerous: opt-in level-59 auto-kick + raid warning
     autoKickLevel59 = false,
     kickLevel = 59,
