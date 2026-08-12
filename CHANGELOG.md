@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.4.42
+
+- **New: per-message delivery routing (Message Studio-style).** Inspired
+  by a competing addon's public release notes (concept only — no code
+  viewed or copied; own independent implementation) offering per-message
+  Raid/Raid Warning/local/disabled delivery. AscensionLFM already matched
+  two of its other highlighted features (strict combined MS+LF/LFG chat
+  scanning, and auto-recruitment fully independent of posting) — this
+  adds the one genuinely new capability: `db.messageRouting[kind]` now
+  lets you override how each broadcast-style message is delivered,
+  independent of the existing smart-cascade default:
+  - `"auto"` (default/unset) — unchanged: RAID_WARNING if privileged in a
+    raid, else raid/party chat, else yell.
+  - `"raidwarning"` — force RW only; fails outright (no fallback) if not
+    privileged, rather than silently landing somewhere else.
+  - `"raid"` — force raid/party chat, skipping RW even when privileged.
+  - `"local"` — don't broadcast at all, just note it in your own chat.
+  - `"disabled"` — send nothing for that message kind.
+  Covers the Role Check RW trigger (`"rw"`), Wipe, Shield, Regroup, Full,
+  and Need announcements — all the group-wide broadcasts that funnel
+  through `MiniHUD`'s shared `SendGroupAnnounce`, now `SendGroupAnnounce
+  (msg, kind)`.
+  UI for picking routes per message kind not built yet (this pass adds
+  the backend + full test coverage) — usable today by setting
+  `db.messageRouting.wipe = "raid"` etc. directly; a follow-up will add
+  the in-game picker.
+  Regression tests added to test_mini_hud.lua covering all four override
+  modes plus confirming an override on one kind doesn't affect others.
+
 ## 0.4.41
 
 - **CRITICAL FIX: a freshly-invited applicant's role could be wiped

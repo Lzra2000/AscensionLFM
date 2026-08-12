@@ -174,7 +174,7 @@ local function CanRaidWarn()
     return false, "none"
 end
 
-local function SendGroupAnnounce(msg)
+local function AutoGroupAnnounce(msg)
     if type(SendChatMessage) ~= "function" or not msg or msg == "" then
         return false, "no chat"
     end
@@ -211,6 +211,58 @@ local function SendGroupAnnounce(msg)
         return true, "YELL"
     end
     return false, "send failed"
+end
+
+--- Route a group-wide announcement (Wipe/Shield/Regroup/RW-trigger) per the
+-- host's configured delivery for this message `kind` — "auto" (default)
+-- uses the existing smart cascade (RAID_WARNING if privileged, else raid/
+-- party chat, else yell); "raidwarning" forces RW only (fails if not
+-- privileged, rather than silently falling back to a different channel);
+-- "raid" forces raid/party chat, skipping RW even when privileged;
+-- "local" doesn't broadcast at all, just notes it in the host's own chat;
+-- "disabled" sends nothing for that message kind.
+local function SendGroupAnnounce(msg, kind)
+    local db = DB()
+    local route = kind and db and type(db.messageRouting) == "table" and db.messageRouting[kind]
+    if route == "disabled" then
+        return false, "disabled"
+    end
+    if route == "local" then
+        if AscensionLFM.Print then
+            AscensionLFM.Print("(local only) " .. tostring(msg))
+        end
+        return true, "LOCAL"
+    end
+    if route == "raidwarning" then
+        if type(SendChatMessage) ~= "function" or not msg or msg == "" then
+            return false, "no chat"
+        end
+        local can, groupKind = CanRaidWarn()
+        if groupKind == "raid" and can then
+            local ok = pcall(SendChatMessage, msg, "RAID_WARNING")
+            if ok then
+                return true, "RAID_WARNING"
+            end
+        end
+        return false, "no privilege"
+    end
+    if route == "raid" then
+        if type(SendChatMessage) ~= "function" or not msg or msg == "" then
+            return false, "no chat"
+        end
+        local _, groupKind = CanRaidWarn()
+        local chatType = groupKind == "party" and "PARTY" or "RAID"
+        local ok = pcall(SendChatMessage, msg, chatType)
+        if ok then
+            return true, chatType
+        end
+        ok = pcall(SendChatMessage, msg, "YELL")
+        if ok then
+            return true, "YELL"
+        end
+        return false, "send failed"
+    end
+    return AutoGroupAnnounce(msg)
 end
 
 -- Solo can InviteUnit (forms a party). In a group, need lead/assist.
@@ -318,7 +370,7 @@ function MiniHUD.ActionRoleCheck()
                 Print("RW rate limited — wait a moment")
                 return false, "rate limited"
             end
-            local sent, ch = SendGroupAnnounce(msg)
+            local sent, ch = SendGroupAnnounce(msg, "rw")
             if sent then
                 RateStamp("rw")
                 Print("RW (re-warn) → " .. tostring(ch))
@@ -340,7 +392,7 @@ function MiniHUD.ActionRoleCheck()
         Print("RW rate limited — wait a moment")
         return false, "rate limited"
     end
-    local sent, ch = SendGroupAnnounce(msg)
+    local sent, ch = SendGroupAnnounce(msg, "rw")
     if sent then
         RateStamp("rw")
         Print("RW → " .. tostring(ch) .. ": " .. msg)
@@ -386,7 +438,7 @@ function MiniHUD.ActionWipe()
     end
     local db = DB()
     local msg = MiniHUD.BuildWipeMessage(db and db.wipeAnnounceMessage)
-    local ok, ch = SendGroupAnnounce(msg)
+    local ok, ch = SendGroupAnnounce(msg, "wipe")
     if ok then
         RateStamp("wipe")
         Print("Wipe → " .. tostring(ch) .. ": " .. msg)
@@ -406,7 +458,7 @@ function MiniHUD.ActionShield()
     end
     local db = DB()
     local msg = MiniHUD.BuildShieldMessage(db and db.shieldAnnounceMessage)
-    local ok, ch = SendGroupAnnounce(msg)
+    local ok, ch = SendGroupAnnounce(msg, "shield")
     if ok then
         RateStamp("shield")
         Print("Mobs → " .. tostring(ch) .. ": " .. msg)
@@ -542,7 +594,7 @@ function MiniHUD.ActionRegroup()
     MiniHUD.RememberPresent()
     local db = DB()
     local msg = MiniHUD.BuildRegroupMessage(db and db.regroupAnnounceMessage)
-    local ok, ch = SendGroupAnnounce(msg)
+    local ok, ch = SendGroupAnnounce(msg, "regroup")
     if ok then
         RateStamp("regroup")
         Print("Regroup → " .. tostring(ch) .. ": " .. msg)
@@ -628,7 +680,7 @@ function MiniHUD.ActionFull()
         end
         return sent, err or channel
     end
-    local sent, ch = SendGroupAnnounce(msg)
+    local sent, ch = SendGroupAnnounce(msg, "full")
     if sent then
         RateStamp("full")
         Print("FULL → " .. tostring(ch) .. ": " .. msg)
@@ -660,7 +712,7 @@ function MiniHUD.ActionNeed(role)
         end
         return sent, err or channel
     end
-    local sent, ch = SendGroupAnnounce(msg)
+    local sent, ch = SendGroupAnnounce(msg, "need")
     if sent then
         RateStamp(kind)
         Print("Need → " .. tostring(ch) .. ": " .. msg)

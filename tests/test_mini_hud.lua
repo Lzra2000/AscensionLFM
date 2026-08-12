@@ -268,6 +268,57 @@ check("hide works", MiniHUD.IsShown() == false)
 MiniHUD.SetShown(true)
 check("show works", MiniHUD.IsShown() == true)
 
+--------------------------------------------------------------------
+-- New: per-message routing (Message Studio style). db.messageRouting[kind]
+-- overrides the default smart-cascade delivery for that message kind.
+--------------------------------------------------------------------
+AscensionLFM.RoleCheck.CanRaidWarn = function() return true, "raid" end
+local db = AscensionLFM.Database.Get()
+db.messageRouting = {}
+
+-- "auto"/unset: unchanged smart cascade (RW since privileged+raid).
+_G._chats = {}
+local sentA, chA = MiniHUD._SendGroupAnnounce("hello", "wipe")
+check("auto route uses smart cascade (RW)", sentA == true and chA == "RAID_WARNING", tostring(chA))
+
+-- "raidwarning": forces RW; fails (no fallback) if not privileged.
+db.messageRouting.wipe = "raidwarning"
+_G._chats = {}
+local sentB, chB = MiniHUD._SendGroupAnnounce("hello", "wipe")
+check("raidwarning route forces RW when privileged", sentB == true and chB == "RAID_WARNING", tostring(chB))
+
+AscensionLFM.RoleCheck.CanRaidWarn = function() return false, "raid" end
+_G._chats = {}
+local sentB2, chB2 = MiniHUD._SendGroupAnnounce("hello", "wipe")
+check("raidwarning route fails (no fallback) without privilege", sentB2 == false, tostring(sentB2))
+check("raidwarning route sends nothing without privilege", #_G._chats == 0, tostring(#_G._chats))
+
+-- "raid": forces raid/party chat, skipping RW even when privileged.
+AscensionLFM.RoleCheck.CanRaidWarn = function() return true, "raid" end
+db.messageRouting.wipe = "raid"
+_G._chats = {}
+local sentC, chC = MiniHUD._SendGroupAnnounce("hello", "wipe")
+check("raid route skips RW even when privileged", sentC == true and chC == "RAID", tostring(chC))
+
+-- "local": never broadcasts, just a local note; other message kinds
+-- (unset) are unaffected by this override.
+db.messageRouting.wipe = "local"
+_G._chats = {}
+local sentD, chD = MiniHUD._SendGroupAnnounce("hello", "wipe")
+check("local route sends no chat message", #_G._chats == 0, tostring(#_G._chats))
+check("local route still reports success", sentD == true and chD == "LOCAL", tostring(chD))
+local sentD2, chD2 = MiniHUD._SendGroupAnnounce("hello", "shield")
+check("other kinds unaffected by wipe's override", sentD2 == true and chD2 == "RAID_WARNING", tostring(chD2))
+
+-- "disabled": sends nothing at all, reports failure.
+db.messageRouting.wipe = "disabled"
+_G._chats = {}
+local sentE, chE = MiniHUD._SendGroupAnnounce("hello", "wipe")
+check("disabled route sends nothing", sentE == false and chE == "disabled" and #_G._chats == 0,
+    tostring(sentE) .. "/" .. tostring(chE))
+
+db.messageRouting = {}
+
 io.write(string.format("mini_hud tests: %d passed, %d failed\n", passed, failed))
 if failed > 0 then
     os.exit(1)

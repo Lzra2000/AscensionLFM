@@ -66,6 +66,13 @@ local DEFAULTS = {
     wipeAnnounceMessage = "WIPE",
     shieldAnnounceMessage = "KILL MOBS — boss shield still up!",
     regroupAnnounceMessage = "REGROUP — accept invite",
+    -- Per-message delivery override (Message Studio style routing). Keys:
+    -- "rw" (Role Check trigger), "wipe", "shield", "regroup", "full",
+    -- "need". Values: "auto" (default smart cascade), "raidwarning"
+    -- (RW only), "raid" (raid/party chat, skip RW), "local" (don't
+    -- broadcast, just note it locally), "disabled" (send nothing).
+    -- Absent/nil key == "auto".
+    messageRouting = {},
     regroupRoster = {}, -- display names remembered for regroup re-invite
     regroupDisplay = {}, -- [nameLower] = displayName for InviteUnit casing
     -- Mini Quick HUD (floating bar — no /alfm needed)
