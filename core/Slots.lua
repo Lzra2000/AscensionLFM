@@ -95,6 +95,9 @@ function Slots.SetMax(role, n)
 end
 
 --- Count assigned players currently tracked for a role.
+-- Only counts names present in the live roster OR assigned within the
+-- invite grace window. Stale leaver entries used to inflate counts
+-- (live reject: "tank is full (3/2)" with max 2).
 function Slots.CountFilled(role)
     local db = DB()
     EnsureDBSlots(db)
@@ -102,10 +105,49 @@ function Slots.CountFilled(role)
     if db and type(db.assignedRoles) == "table" then
         map = db.assignedRoles
     end
+    -- Inline present-set (CollectPresentNames is defined later as a local).
+    local present = {}
+    local groupSize = 0
+    local raid = (type(GetNumRaidMembers) == "function" and GetNumRaidMembers()) or 0
+    if raid and raid > 0 then
+        for i = 1, raid do
+            local name
+            if type(GetRaidRosterInfo) == "function" then
+                name = GetRaidRosterInfo(i)
+            end
+            if (type(name) ~= "string" or name == "") and type(UnitName) == "function" then
+                name = UnitName("raid" .. i)
+            end
+            if type(name) == "string" and name ~= "" then
+                present[LowerName(name)] = true
+                groupSize = groupSize + 1
+            end
+        end
+    else
+        if type(UnitName) == "function" then
+            local me = UnitName("player")
+            if type(me) == "string" and me ~= "" then
+                present[LowerName(me)] = true
+                groupSize = groupSize + 1
+            end
+        end
+        local party = (type(GetNumPartyMembers) == "function" and GetNumPartyMembers()) or 0
+        for i = 1, party do
+            local name = type(UnitName) == "function" and UnitName("party" .. i) or nil
+            if type(name) == "string" and name ~= "" then
+                present[LowerName(name)] = true
+                groupSize = groupSize + 1
+            end
+        end
+    end
     local n = 0
-    for _, r in pairs(map) do
+    for key, r in pairs(map) do
         if r == role then
-            n = n + 1
+            if groupSize == 0 then
+                n = n + 1 -- tests / loading: count all
+            elseif present[key] or Slots.RecentlyAssigned(key) then
+                n = n + 1
+            end
         end
     end
     return n
@@ -134,7 +176,7 @@ end
 
 --- Whether name was (re)assigned within the last graceSeconds. Used to
 -- protect a just-invited applicant's role from being pruned by a resync
--- that races ahead of them actually appearing in the live roster —
+-- that races ahead of them actually appearing in the live roster -
 -- InviteUnit succeeding doesn't mean they've joined yet; there's a real
 -- gap between "invited" and "X has joined the raid group", and a resync
 -- landing in that gap would otherwise see "assigned but not present" and
@@ -160,6 +202,9 @@ function Slots.Assign(name, role)
     EnsureDBSlots(db)
     if db then
         db.assignedRoles[key] = role
+    end
+    if AscensionLFM.Invite and AscensionLFM.Invite.RememberRole then
+        AscensionLFM.Invite.RememberRole(name, role)
     end
     -- Keep proper casing for Mini HUD regroup re-invites
     if AscensionLFM.MiniHUD and AscensionLFM.MiniHUD.RememberPlayer then
@@ -207,7 +252,7 @@ end
 -- @param presentSet { [nameLower]=true }
 -- @return newMap, removedCount
 --- @param protectedNames optional set of lowered names to never prune even
---   if not currently present — see Slots.RecentlyAssigned / the same
+--   if not currently present - see Slots.RecentlyAssigned / the same
 --   protection RoleCheck.ResyncAssigned applies.
 function Slots.ReconcileAssigned(assignedMap, presentSet, protectedNames)
     local out = {}
@@ -319,7 +364,7 @@ function Slots.EnsureHostAssigned()
         role = nil
     end
     -- A manually-picked host role (v0.4.22) that's since been disabled via
-    -- Accept Roles must not still be trusted — fall through to auto-pick
+    -- Accept Roles must not still be trusted - fall through to auto-pick
     -- instead of assigning the host to a role they no longer accept. Same
     -- "don't trust a stale role selection" pattern as v0.4.17/21/26.
     if role and db and type(db.roles) == "table" and not db.roles[role] then
@@ -358,7 +403,7 @@ function Slots.SyncFromRoster()
         groupSize = groupSize + 1
     end
     if groupSize == 0 then
-        -- No roster info (tests / loading) — leave assignments alone.
+        -- No roster info (tests / loading) - leave assignments alone.
         return 0
     end
     local protectedNames = {}

@@ -1,5 +1,5 @@
 -- AscensionLFM: core/AuraBalance.lua
--- Keep at most one "aura" role per raid subgroup (1–8); auto-move extras.
+-- Keep at most one "aura" role per raid subgroup (1-8); auto-move extras.
 -- Uses SetRaidSubgroup when the target has room, SwapRaidSubgroup when full.
 -- Applies ONE move at a time and waits for roster settle (indices reshuffle).
 
@@ -57,8 +57,8 @@ end
 -- Respects 5-player group cap: uses kind="set" or kind="swap".
 -- @param members { {name=, index=, subgroup=, isAura=, role=}, ... }
 -- @param roleKey which role to balance ("aura" default, or "tank"/"healer")
--- @param opts { protectRoles={...} — never swap-displace these roles unless
---   no other choice exists; sortByGroupNumber=true — fill lowest-numbered
+-- @param opts { protectRoles={...} - never swap-displace these roles unless
+--   no other choice exists; sortByGroupNumber=true - fill lowest-numbered
 --   empty groups first (tank) instead of emptiest-group-first (aura/healer) }
 -- @return moves { {name=, from=, to=, kind=, roleKey=, swapName?=}, ... }
 function AuraBalance.PlanRoleMoves(members, roleKey, opts)
@@ -232,7 +232,7 @@ function AuraBalance.PlanRoleMoves(members, roleKey, opts)
 end
 
 --- Pure: plan moves so each subgroup has at most one aura. Back-compat
--- wrapper around PlanRoleMoves("aura") — unchanged behavior/signature.
+-- wrapper around PlanRoleMoves("aura") - unchanged behavior/signature.
 -- @param members { {name=, index=, subgroup=, isAura=}, ... }
 -- @return moves { {name=, from=, to=, kind=, swapName?=}, ... }
 function AuraBalance.PlanMoves(members)
@@ -338,7 +338,7 @@ function AuraBalance.ApplyOne(mv, members)
         local ok = pcall(SwapRaidSubgroup, me.index, other.index)
         if ok then
             LogMove(mv, string.format(
-                "swapped %s ↔ %s (%s → g%d)",
+                "swapped %s ? %s (%s -> g%d)",
                 tostring(mv.name), tostring(mv.swapName), roleKey, to
             ))
         end
@@ -348,7 +348,7 @@ function AuraBalance.ApplyOne(mv, members)
     if type(SetRaidSubgroup) ~= "function" then
         return false
     end
-    -- Target may have filled since plan — fall back to swap with a
+    -- Target may have filled since plan - fall back to swap with a
     -- non-matching-role member there.
     local targetCount = 0
     local victim = nil
@@ -365,7 +365,7 @@ function AuraBalance.ApplyOne(mv, members)
             local ok = pcall(SwapRaidSubgroup, me.index, victim.index)
             if ok then
                 LogMove(mv, string.format(
-                    "swapped %s ↔ %s (%s → g%d, group was full)",
+                    "swapped %s ? %s (%s -> g%d, group was full)",
                     tostring(mv.name), tostring(victim.name), roleKey, to
                 ))
             end
@@ -381,7 +381,7 @@ function AuraBalance.ApplyOne(mv, members)
     return ok and true or false
 end
 
---- Apply all moves in sequence (tests only — live path uses one-at-a-time).
+--- Apply all moves in sequence (tests only - live path uses one-at-a-time).
 function AuraBalance.ApplyMoves(moves)
     moves = moves or {}
     local n = 0
@@ -398,7 +398,7 @@ local function ClearWait()
     waitingFor = nil
 end
 
---- Scan roster + assignedRoles and auto-move so each subgroup has ≤1 aura.
+--- Scan roster + assignedRoles and auto-move so each subgroup has <=1 aura.
 -- Applies at most one Set/Swap per call; waits for roster settle before the next.
 -- @return movedCount, plannedCount
 function AuraBalance.Balance()
@@ -452,7 +452,7 @@ function AuraBalance.Balance()
 end
 
 --- Auto-move Tank, Healer, and Aura (in that priority order) so each
--- subgroup has at most one of each — same one-move-per-call + roster
+-- subgroup has at most one of each - same one-move-per-call + roster
 -- settle-wait design as Balance(), just covering all three roles in one
 -- shared queue. Tank fills the lowest-numbered empty groups first (so 2
 -- tanks land in groups 1 and 2, matching how hosts read their raid frame);

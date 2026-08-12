@@ -13,14 +13,19 @@ AscensionLFM.Reject = Reject
 
 local lastRejectAt = {} -- [nameLower] = GetTime()
 local sessionIgnore = {} -- [nameLower] = true (session: do not re-whisper again)
+local lastGlobalRejectAt = 0 -- gap between any two reject whispers (anti-flood)
+local slotFullWindow = {} -- [role] = { startAt=, count= } quiet after N slot-full rejects
+local SLOT_FULL_MAX = 2 -- whispers per role per window
+local SLOT_FULL_WINDOW = 60 -- seconds
+local GLOBAL_GAP = 2.5 -- min seconds between any reject whispers
 
 local DEFAULT_TEMPLATES = {
     ["slot full"] = "Sorry, {role} is full ({filled}/{max}).",
-    full = "Group is full — thanks!",
+    full = "Group is full - thanks!",
     ["no role"] = "Please whisper a role: tank / heal / aura / dps.",
     ["no parse"] = "Please whisper a role: tank / heal / aura / dps.",
-    ["role filtered"] = "Not looking for {role} right now — thanks!",
-    ["prefer support seat"] = "Saving the last couple seats for tank/heal/aura — try again if one opens up!",
+    ["role filtered"] = "Not looking for {role} right now - thanks!",
+    ["prefer support seat"] = "Saving the last couple seats for tank/heal/aura - try again if one opens up!",
 }
 
 local REJECTABLE = {
@@ -147,6 +152,25 @@ function Reject.TryRewhisper(name, reason, role)
     if last and (Now() - last) < cd then
         return false, "cooldown"
     end
+    local now = Now()
+    -- Global gap: avoid reject whisper floods when 10 people apply at once
+    if (now - lastGlobalRejectAt) < GLOBAL_GAP then
+        return false, "global gap"
+    end
+    -- Slot-full: after SLOT_FULL_MAX whispers for the same role in the window,
+    -- stay quiet (still queues via Invite) until the window expires.
+    reason = tostring(reason or "")
+    if reason == "slot full" then
+        local rkey = tostring(role or "role")
+        local w = slotFullWindow[rkey]
+        if not w or (now - (w.startAt or 0)) >= SLOT_FULL_WINDOW then
+            w = { startAt = now, count = 0 }
+            slotFullWindow[rkey] = w
+        end
+        if (w.count or 0) >= SLOT_FULL_MAX then
+            return false, "slot full quiet"
+        end
+    end
     if type(SendChatMessage) ~= "function" then
         return false, "SendChatMessage missing"
     end
@@ -158,20 +182,28 @@ function Reject.TryRewhisper(name, reason, role)
     if not ok then
         return false, tostring(err)
     end
-    lastRejectAt[key] = Now()
+    lastRejectAt[key] = now
+    lastGlobalRejectAt = now
+    if reason == "slot full" then
+        local rkey = tostring(role or "role")
+        local w = slotFullWindow[rkey]
+        if w then
+            w.count = (w.count or 0) + 1
+        end
+    end
     -- Optional: add to session ignore so we do not spam the same applicant
     if db.rejectSessionIgnore ~= false then
         sessionIgnore[key] = true
     end
     if AscensionLFM.Activity and AscensionLFM.Activity.Push then
-        AscensionLFM.Activity.Push("reject", name .. " · " .. tostring(reason) .. " · " .. msg, {
+        AscensionLFM.Activity.Push("reject", name .. " * " .. tostring(reason) .. " * " .. msg, {
             name = name,
             role = role,
             detail = reason,
         })
     end
     if AscensionLFM.Print then
-        AscensionLFM.Print("reject → " .. tostring(name) .. ": " .. msg)
+        AscensionLFM.Print("reject -> " .. tostring(name) .. ": " .. msg)
     end
     return true
 end
@@ -210,6 +242,8 @@ end
 function Reject._ResetForTests()
     lastRejectAt = {}
     sessionIgnore = {}
+    lastGlobalRejectAt = 0
+    slotFullWindow = {}
 end
 
 function Reject._SessionIgnoreForTests()

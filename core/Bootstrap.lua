@@ -8,7 +8,7 @@ if type(AscensionLFM) ~= "table" then
     _G.AscensionLFM = AscensionLFM
 end
 
-AscensionLFM.VERSION = "0.4.43"
+AscensionLFM.VERSION = "0.4.69"
 AscensionLFM.ADDON_NAME = "AscensionLFM"
 
 local function Print(msg)
@@ -36,37 +36,48 @@ end
 local function PrintStatus()
     local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
     if not db then
-        Print("Database not ready — is the addon enabled and /reload done?")
+        Print("Database not ready - is the addon enabled and /reload done?")
         return
     end
     local mode = db.mode or "notify"
-    Print("v" .. AscensionLFM.VERSION .. " · mode=" .. ModeLabel(mode))
-    Print(string.format("Full Auto Hosting=%s · autoInvite=%s · autoRepost=%s · rejectRewhisper=%s",
+    Print("v" .. AscensionLFM.VERSION .. " * mode=" .. ModeLabel(mode))
+    Print(string.format("Full Auto Hosting=%s * autoInvite=%s * autoRepost=%s * rejectRewhisper=%s",
         OnOff(db.fullAutoHosting), OnOff(db.autoInvite), OnOff(db.autoRepost), OnOff(db.rejectRewhisper)))
-    Print(string.format("autoWhisper=%s · variants=%s · Kick59=%s · announceFull=%s",
+    Print(string.format("autoWhisper=%s * variants=%s * Kick59=%s * announceFull=%s",
         OnOff(db.autoWhisper), OnOff(db.useWhisperVariants ~= false),
         OnOff(db.autoKickLevel59), OnOff(db.announceFull)))
     if AscensionLFM.Invite and AscensionLFM.Invite._GetPendingRetries then
         local pr = AscensionLFM.Invite._GetPendingRetries()
-        Print(string.format("invite: cooldown=%ss · pending retries=%d",
+        Print(string.format("invite: cooldown=%ss * pending retries=%d",
             tostring(db.inviteCooldown or 3), pr and #pr or 0))
     end
     if AscensionLFM.Kick and AscensionLFM.Kick.GetStatus then
         local ks = AscensionLFM.Kick.GetStatus()
         if ks then
-            Print(string.format("kick: last=%s · can=%s · group=%s · pending=%s · hosting=%s · gaveUp=%d",
+            Print(string.format("kick: last=%s * can=%s * group=%s * pending=%s * hosting=%s * gaveUp=%d * ignore=%d * combat=%s",
                 tostring(ks.last or "?"),
                 OnOff(ks.canKick),
                 tostring(ks.group or "?"),
                 tostring(ks.pending or 0),
                 OnOff(ks.hosting),
-                tonumber(ks.gaveUp) or 0))
+                tonumber(ks.gaveUp) or 0,
+                tonumber(ks.sessionIgnore) or 0,
+                OnOff(ks.inCombat)))
+        end
+    end
+    if AscensionLFM.AuraScan and AscensionLFM.AuraScan.GetStatus then
+        local as = AscensionLFM.AuraScan.GetStatus()
+        if as then
+            Print(string.format("auraScan: enabled=%s * autoKick=%s * last=%s * liars=%s * withBuff=%s * seeOthers=%s * spell=%s",
+                OnOff(as.enabled), OnOff(as.autoKick), tostring(as.last or "?"),
+                tostring(as.liars or 0), tostring(as.withBuff or 0),
+                OnOff(as.canSeeOnOthers), tostring(as.spellId or "?")))
         end
     end
     if AscensionLFM.RoleCheck and AscensionLFM.RoleCheck.GetStatus then
         local okRc, rc = pcall(AscensionLFM.RoleCheck.GetStatus)
         if okRc and rc then
-            Print(string.format("roleCheck: %s · window=%ss · autoResync=%s · autoMove T/H/A=%s/%s/%s · passiveDetect=%s",
+            Print(string.format("roleCheck: %s * window=%ss * autoResync=%s * autoMove T/H/A=%s/%s/%s * passiveDetect=%s",
                 tostring(rc.status or "idle"),
                 tostring(db.roleCheckWindow or db.roleCheckDuration or 60),
                 OnOff(db.roleCheckAutoResync ~= false),
@@ -74,19 +85,19 @@ local function PrintStatus()
                 OnOff(db.autoMoveHealer ~= false),
                 OnOff(db.autoMoveAura ~= false),
                 OnOff(db.passiveRoleDetect ~= false)))
-            Print(string.format("roleCheck: canWarn=%s · group=%s · hosting=%s · lastStart=%s · replies=%s",
+            Print(string.format("roleCheck: canWarn=%s * group=%s * hosting=%s * lastStart=%s * replies=%s",
                 OnOff(rc.canWarn),
                 tostring(rc.group or "?"),
                 OnOff(rc.hosting),
                 tostring(rc.lastStart or "?"),
                 tostring(rc.responses or 0)))
         else
-            Print("roleCheck: GetStatus failed — " .. tostring(rc))
+            Print("roleCheck: GetStatus failed - " .. tostring(rc))
         end
     else
-        Print("roleCheck: MODULE MISSING — reinstall AscensionLFM.zip (RoleCheck.lua)")
+        Print("roleCheck: MODULE MISSING - reinstall AscensionLFM.zip (RoleCheck.lua)")
     end
-    Print(string.format("sounds: match=%s applicant=%s · channel=%s interval=%ss",
+    Print(string.format("sounds: match=%s applicant=%s * channel=%s interval=%ss",
         OnOff(db.soundOnMatch), OnOff(db.soundOnApplicant),
         tostring(db.postChannel or "YELL"),
         tostring(db.repostInterval or 60)))
@@ -104,8 +115,8 @@ local function PrintStatus()
         if AscensionLFM.Slots.UnassignedMembers then
             unNames, unN = AscensionLFM.Slots.UnassignedMembers()
         end
-        Print("slots: " .. table.concat(bits, " · ") .. " · group " .. tostring(gsz) .. "/" .. tostring(db.maxPartySize or 15)
-            .. " · unassigned=" .. tostring(unN or 0))
+        Print("slots: " .. table.concat(bits, " * ") .. " * group " .. tostring(gsz) .. "/" .. tostring(db.maxPartySize or 15)
+            .. " * unassigned=" .. tostring(unN or 0))
         if unN and unN > 0 then
             local show = {}
             for i = 1, math.min(5, #unNames) do
@@ -113,17 +124,17 @@ local function PrintStatus()
             end
             Print("unassigned: " .. table.concat(show, ", ")
                 .. (unN > 5 and (" +" .. tostring(unN - 5) .. " more") or "")
-                .. " — click Mini HUD RW, have them reply T/H/A/D")
+                .. " - click Mini HUD RW, have them reply T/H/A/D")
         end
     end
     local q = (type(db.applicantQueue) == "table" and #db.applicantQueue) or 0
     local act = (type(db.activityLog) == "table" and #db.activityLog) or 0
     local matches = (type(db.matchHistory) == "table" and #db.matchHistory) or 0
-    Print(string.format("queue=%d · activity=%d · matches=%d", q, act, matches))
+    Print(string.format("queue=%d * activity=%d * matches=%d", q, act, matches))
     if AscensionLFM.Poster and AscensionLFM.Poster.GetStatus then
         local st = AscensionLFM.Poster.GetStatus()
         if st then
-            Print(string.format("repost: %s · status=%s · full=%s · countdown=%ss",
+            Print(string.format("repost: %s * status=%s * full=%s * countdown=%ss",
                 OnOff(st.enabled), tostring(st.status or "?"),
                 tostring(st.isFull), tostring(st.countdown or 0)))
         end
@@ -132,20 +143,20 @@ local function PrintStatus()
         local mh = AscensionLFM.MiniHUD.GetDebugStatus()
         if mh then
             Print(string.format(
-                "miniHUD: show=%s · expand=%s · mode=%s · host=%s · canWarn=%s · group=%s · canInvite=%s · watch=%d · post=%s",
+                "miniHUD: show=%s * expand=%s * mode=%s * host=%s * canWarn=%s * group=%s * canInvite=%s * watch=%d * post=%s",
                 OnOff(mh.shown), OnOff(mh.expanded), tostring(mh.mode),
                 OnOff(mh.hosting), OnOff(mh.canWarn), tostring(mh.group),
                 OnOff(mh.canInvite), tonumber(mh.watch) or 0, tostring(mh.postChannel)
             ))
         end
     end
-    Print("slash OK — /alfm UI · /alfm test")
+    Print("slash OK - /alfm UI * /alfm test")
 end
 
 local function InjectTestMatch()
     local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
     if not db then
-        Print("Database not ready — is the addon enabled and /reload done?")
+        Print("Database not ready - is the addon enabled and /reload done?")
         return
     end
     local sample = "LFM MS 0/2 Tanks 0/3 Healers 0/3 Aura 0/7 DPS"
@@ -159,12 +170,12 @@ local function InjectTestMatch()
         t = time and time() or 0,
     })
     if AscensionLFM.Activity and AscensionLFM.Activity.Push then
-        AscensionLFM.Activity.Push("match", "TestLeader — MS test (test)")
+        AscensionLFM.Activity.Push("match", "TestLeader - MS test (test)")
     end
     if AscensionLFM.MainWindow and AscensionLFM.MainWindow.RefreshMatches then
         pcall(AscensionLFM.MainWindow.RefreshMatches)
     end
-    Print("injected test match into Log — /alfm → Log")
+    Print("injected test match into Log - /alfm -> Log")
 end
 
 local function SafeStart(name, fn)
@@ -183,62 +194,123 @@ local function RegisterSlash()
     SLASH_ASCENSIONLFM2 = "/mslfm"
     SLASH_ASCENSIONLFM3 = "/ascensionlfm"
     SLASH_ASCENSIONLFM4 = "/alfmshow"
+    SlashCmdList = SlashCmdList or {}
     SlashCmdList["ASCENSIONLFM"] = function(msg)
         msg = tostring(msg or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
         if msg == "status" then
             PrintStatus()
             return
         end
+        if msg == "diag" or msg == "debug" then
+            Print("diag v" .. tostring(AscensionLFM.VERSION))
+            local mods = {
+                "Database", "Parser", "Slots", "SpecRole", "Queue", "Reject",
+                "Invite", "Kick", "AuraScan", "RoleCheck", "Poster", "Scanner",
+                "MainWindow", "MiniHUD", "RosterPanel",
+            }
+            for _, m in ipairs(mods) do
+                Print("  " .. m .. " = " .. (AscensionLFM[m] and "OK" or "MISSING"))
+            end
+            local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
+            Print("  db = " .. (db and "OK" or "nil"))
+            return
+        end
         if msg == "test" then
             InjectTestMatch()
             return
         end
+        if msg == "applyspec" or msg == "specrole" then
+            if AscensionLFM.SpecRole and AscensionLFM.SpecRole.ApplyToSelf then
+                AscensionLFM.SpecRole.ApplyToSelf()
+            else
+                Print("SpecRole module missing")
+            end
+            return
+        end
+        if msg == "aurascan" or msg == "aura" then
+            if AscensionLFM.AuraScan and AscensionLFM.AuraScan.ScanNow then
+                AscensionLFM.AuraScan.ScanNow()
+            else
+                Print("AuraScan module missing - reinstall zip")
+            end
+            return
+        end
         if msg == "help" then
-            Print("/alfm | /mslfm — toggle UI")
-            Print("/alfm status | test | help")
-            Print("Full Auto Hosting: /alfm → Hosting → master toggle (default OFF)")
+            Print("/alfm | /mslfm - toggle UI")
+            Print("/alfm status | diag | test | aurascan | applyspec | help")
+            Print("Full Auto Hosting: /alfm -> Hosting -> master toggle (default OFF)")
             return
         end
         if AscensionLFM.MainWindow and AscensionLFM.MainWindow.Toggle then
             local ok, err = pcall(AscensionLFM.MainWindow.Toggle)
             if not ok then
                 Print("UI error: " .. tostring(err))
-                Print("Slash still works — /alfm status · /alfm test")
+                Print("Try /alfm diag * /alfm status")
             end
         else
-            Print("UI module missing — check AddOns list (AscensionLFM enabled?) then /reload")
+            Print("UI module missing - folder must be Interface/AddOns/AscensionLFM/")
+            Print("Then /reload. Use /alfm diag")
         end
     end
 end
 
+
 RegisterSlash()
+
+
+local bootDone = false
+
+local function StartModules()
+    if bootDone then
+        return
+    end
+    bootDone = true
+    RegisterSlash()
+    SafeStart("Database.Init", AscensionLFM.Database and AscensionLFM.Database.Init)
+    SafeStart("Scanner.Start", AscensionLFM.Scanner and AscensionLFM.Scanner.Start)
+    SafeStart("Invite.Start", AscensionLFM.Invite and AscensionLFM.Invite.Start)
+    SafeStart("Kick.Start", AscensionLFM.Kick and AscensionLFM.Kick.Start)
+    if AscensionLFM.AuraScan and AscensionLFM.AuraScan.Start then
+        SafeStart("AuraScan.Start", AscensionLFM.AuraScan.Start)
+    end
+    SafeStart("Poster.Start", AscensionLFM.Poster and AscensionLFM.Poster.Start)
+    SafeStart("RoleCheck.EnsureTicker", AscensionLFM.RoleCheck and AscensionLFM.RoleCheck.EnsureTicker)
+    SafeStart("MainWindow.Init", AscensionLFM.MainWindow and AscensionLFM.MainWindow.Init)
+    SafeStart("MiniHUD.Start", AscensionLFM.MiniHUD and AscensionLFM.MiniHUD.Start)
+    SafeStart("RosterPanel.Start", AscensionLFM.RosterPanel and AscensionLFM.RosterPanel.Start)
+    local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
+    local mode = (db and db.mode) or "notify"
+    Print("v" .. tostring(AscensionLFM.VERSION) .. " - mode=" .. ModeLabel(mode))
+    Print("/alfm * /mslfm * /alfm status * /alfm diag")
+    Print("Mini HUD ON by default * Full Auto OFF * Kick59 opt-in OFF")
+end
 
 local bootFrame = CreateFrame("Frame")
 bootFrame:RegisterEvent("ADDON_LOADED")
 bootFrame:RegisterEvent("PLAYER_LOGIN")
+bootFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 bootFrame:SetScript("OnEvent", function(self, event, arg1)
     if event == "ADDON_LOADED" and arg1 == AscensionLFM.ADDON_NAME then
         SafeStart("Database.Init", AscensionLFM.Database and AscensionLFM.Database.Init)
         RegisterSlash()
-        self:UnregisterEvent("ADDON_LOADED")
-    elseif event == "PLAYER_LOGIN" then
-        -- Late-join /reload: ADDON_LOADED may have already fired before this file loaded.
-        if AscensionLFM.Database and AscensionLFM.Database.Init then
-            SafeStart("Database.Init", AscensionLFM.Database.Init)
+        return
+    end
+    if event == "PLAYER_LOGIN" or event == "PLAYER_ENTERING_WORLD" then
+        StartModules()
+        if event == "PLAYER_LOGIN" then
+            self:UnregisterEvent("PLAYER_LOGIN")
         end
-        RegisterSlash()
-        SafeStart("Scanner.Start", AscensionLFM.Scanner and AscensionLFM.Scanner.Start)
-        SafeStart("Invite.Start", AscensionLFM.Invite and AscensionLFM.Invite.Start)
-        SafeStart("Kick.Start", AscensionLFM.Kick and AscensionLFM.Kick.Start)
-        SafeStart("Poster.Start", AscensionLFM.Poster and AscensionLFM.Poster.Start)
-        SafeStart("RoleCheck.EnsureTicker", AscensionLFM.RoleCheck and AscensionLFM.RoleCheck.EnsureTicker)
-        SafeStart("MainWindow.Init", AscensionLFM.MainWindow and AscensionLFM.MainWindow.Init)
-        SafeStart("MiniHUD.Start", AscensionLFM.MiniHUD and AscensionLFM.MiniHUD.Start)
-        local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
-        local mode = (db and db.mode) or "notify"
-        Print("v" .. AscensionLFM.VERSION .. " — mode=" .. ModeLabel(mode))
-        Print("/alfm · /mslfm · /alfm status · /alfm test")
-        Print("Mini HUD ON by default · Full Auto OFF · Kick59 opt-in OFF")
-        self:UnregisterEvent("PLAYER_LOGIN")
+        -- keep PEW once more for late /reload edge cases then drop
+        if event == "PLAYER_ENTERING_WORLD" and bootDone then
+            self:UnregisterEvent("PLAYER_ENTERING_WORLD")
+        end
     end
 end)
+
+-- If this file loads after login (rare), still boot.
+if type(IsLoggedIn) == "function" then
+    local ok, logged = pcall(IsLoggedIn)
+    if ok and logged then
+        StartModules()
+    end
+end

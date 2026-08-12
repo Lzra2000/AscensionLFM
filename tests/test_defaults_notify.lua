@@ -29,7 +29,7 @@ Database.Init()
 local db = Database.Get()
 
 check("default mode is notify", db.mode == "notify")
-check("defaultsRev is 5", tonumber(db.defaultsRev) == 5)
+check("defaultsRev is 6", tonumber(db.defaultsRev) == 6)
 check("autoKick still off", db.autoKickLevel59 == false)
 check("autoWhisper still off", db.autoWhisper == false)
 check("autoRepost still off", db.autoRepost == false)
@@ -52,7 +52,7 @@ _G.AscensionLFMDB = {
 }
 Database.Init()
 check("migrate off→notify", Database.Get().mode == "notify")
-check("migrate sets defaultsRev 5", tonumber(Database.Get().defaultsRev) == 5)
+check("migrate sets defaultsRev 6", tonumber(Database.Get().defaultsRev) == 6)
 
 -- Do not re-flip after user sets Off post-migration
 Database.SetMode("off")
@@ -89,7 +89,7 @@ _G.AscensionLFMDB = {
 }
 Database.Init()
 local migrated = Database.Get()
-check("full auto migrate rev 5", tonumber(migrated.defaultsRev) == 5)
+check("full auto migrate rev 6", tonumber(migrated.defaultsRev) == 6)
 check("full auto migrate healer on", migrated.roles.healer == true)
 check("full auto migrate aura on", migrated.roles.aura == true)
 
@@ -133,6 +133,25 @@ Database.SetMode("off")
 local countBefore = #hist
 Scanner._HandlePublicListing("Ignored", samples[1], "CHAT_MSG_CHANNEL")
 check("off ignores public listing", #Database.Get().matchHistory == countBefore)
+
+--------------------------------------------------------------------
+-- Regression: the rev<5 stock-RW-message migration must recognize a
+-- pre-ASCII-normalization em-dash variant too, not just the current
+-- hyphen version — real upgrading users' SavedVariables still contain
+-- whichever variant was the default when they last saved.
+--------------------------------------------------------------------
+_G.AscensionLFMDB = {
+    mode = "notify",
+    defaultsRev = 2,
+    roleCheckMessage = "ROLE CHECK \226\128\148 whisper me tank / heal / aura / dps to sync MS slots",
+}
+Database.Init()
+check("em-dash stock RW message still migrates", Database.Get().roleCheckMessage == Database.Get().roleCheckMessage
+    and Database.Get().roleCheckMessage:find("T/H/A/D", 1, true) ~= nil,
+    Database.Get().roleCheckMessage)
+check("em-dash migration lands on current stock default",
+    Database.Get().roleCheckMessage == "ROLE CHECK - whisper or party: tank/heal/aura/dps (T/H/A/D)",
+    Database.Get().roleCheckMessage)
 
 io.write(string.format("test_defaults_notify: %d passed, %d failed\n", passed, failed))
 if failed > 0 then

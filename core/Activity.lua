@@ -48,7 +48,7 @@ end
 --- Push an activity line.
 -- @param kind "post"|"invite"|"reject"|"match"|"full"|"preset"
 -- @param text short description
--- @param meta optional table (name, role, …)
+-- @param meta optional table (name, role, ...)
 function Activity.Push(kind, text, meta)
     local db = DB()
     local log = Ensure(db)

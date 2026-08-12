@@ -259,6 +259,51 @@ check("retry-regress: second now invited automatically", invited[1] == "Second",
 check("retry-regress: queue drained", #Invite._GetPendingRetries() == 0)
 
 --------------------------------------------------------------------
+-- New: retry queue gives up after MAX_RETRY_ATTEMPTS (3) instead of
+-- retrying forever, and de-duplicates a CHAT_MSG event firing twice for
+-- the same applicant before the first retry has executed.
+--------------------------------------------------------------------
+Invite._ResetForTests()
+Invite._ResetCooldowns()
+db.roles = { tank = true, healer = true, aura = true, dps = true }
+db.slotMax = { tank = 2, healer = 3, aura = 3, dps = 7 }
+db.inviteCooldown = 3
+Slots.ClearAll()
+_G.GetTime = function() return 30000 end
+invited = {}
+
+ok, reason = Invite.TryHostInvite("First", "tank")
+check("retry-cap: first invite succeeds", ok == true, tostring(reason))
+invited = {}
+ok, reason = Invite.TryHostInvite("Persistent", "heal")
+check("retry-cap: second hits global cooldown, queued", ok == false and reason == "global cooldown",
+    tostring(reason))
+check("retry-cap: queued once", #Invite._GetPendingRetries() == 1)
+
+-- Duplicate CHAT_MSG for the same applicant before the first retry has
+-- fired must not add a second queued entry.
+ok, reason = Invite.TryHostInvite("Persistent", "heal")
+check("retry-cap: duplicate whisper does not double-queue", #Invite._GetPendingRetries() == 1,
+    tostring(#Invite._GetPendingRetries()))
+
+-- Keep re-triggering the same cooldown-blocked scenario on every retry
+-- (simulate: Host keeps inviting someone else right before each retry
+-- fires, so Persistent's retry itself always re-hits the cooldown) up to
+-- the cap, then confirm it gives up rather than retrying a 4th time.
+local now = 30000
+for i = 1, 3 do
+    now = now + 3.3
+    _G.GetTime = function() return now end
+    -- Re-arm the global cooldown right before Persistent's retry fires,
+    -- so this retry attempt also fails and gets re-queued (or gives up).
+    Invite.TryHostInvite("Blocker" .. i, "dps")
+    Invite.Tick(now)
+end
+check("retry-cap: gives up after MAX_RETRY_ATTEMPTS, not queued forever",
+    #Invite._GetPendingRetries() == 0, tostring(#Invite._GetPendingRetries()))
+check("retry-cap: Persistent never actually got invited", invited[1] ~= "Persistent")
+
+--------------------------------------------------------------------
 -- New: auto-convert party->raid when about to grow past 5, so inviting
 -- a 6th person while still a plain party (which WoW rejects client-side)
 -- doesn't silently cap group size below the addon's own slotMax total.

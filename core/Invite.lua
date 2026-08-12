@@ -11,12 +11,16 @@ end
 local Invite = {}
 AscensionLFM.Invite = Invite
 
+-- Session memory: last assigned role per player (survives leave for re-inv).
+local lastKnownRoles = {} -- [nameLower] = role
+
 local lastInviteAt = {} -- [nameLower] = GetTime()
 local lastInviteGlobal = 0
--- { sender=, message=, retryAt= } — cooldown-blocked applicants to retry
+-- { sender=, message=, retryAt= } - cooldown-blocked applicants to retry
 -- once the (global or per-name) invite cooldown has passed.
 local pendingRetries = {}
 local RETRY_STAGGER = 0.4
+local MAX_RETRY_ATTEMPTS = 3
 
 local function Now()
     return (type(GetTime) == "function" and GetTime()) or os.clock()
@@ -123,6 +127,12 @@ local function EnsureRaidIfNeeded()
     end
 end
 
+function Invite.RememberRole(name, role)
+    if type(name) == "string" and name ~= "" and type(role) == "string" and role ~= "" then
+        lastKnownRoles[LowerName(name)] = role
+    end
+end
+
 function Invite.InvitePlayer(name, role)
     local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
     local ok, reason = CanInvite(name, db)
@@ -142,6 +152,9 @@ function Invite.InvitePlayer(name, role)
     if role and AscensionLFM.Slots and AscensionLFM.Slots.Assign then
         AscensionLFM.Slots.Assign(name, role)
     end
+    if role then
+        lastKnownRoles[LowerName(name)] = role
+    end
     if AscensionLFM.Activity and AscensionLFM.Activity.Push then
         AscensionLFM.Activity.Push("invite", tostring(name) .. (role and (" as " .. role) or ""), {
             name = name,
@@ -159,8 +172,8 @@ function Invite.InvitePlayer(name, role)
 end
 
 -- "no role"/"no parse" means Parser found NO role-related content at all in
--- the message — that alone doesn't tell us whether this was a failed
--- application ("inv ms please" — clearly trying to apply, just forgot a
+-- the message - that alone doesn't tell us whether this was a failed
+-- application ("inv ms please" - clearly trying to apply, just forgot a
 -- role, a clarifying reply is genuinely useful) or an unrelated whisper
 -- (trade, a question, someone complaining) where an automatic "please
 -- whisper a role" reply reads as a bizarre unprompted message and can
@@ -168,7 +181,7 @@ end
 -- triggers another auto-reply...). So for these two reasons specifically,
 -- only auto-reply if the message itself has some minimal ms/invite signal.
 -- Genuine detected-but-unfulfillable requests ("slot full"/"full"/
--- "role filtered") always get the automatic reply — a role WAS recognized
+-- "role filtered") always get the automatic reply - a role WAS recognized
 -- there, so we're already confident it was a real application. The host can
 -- still manually Reject+whisper any queued entry regardless of reason.
 local NO_AUTO_REJECT_REASONS = {
@@ -205,7 +218,7 @@ end
 
 -- Moved above TryHostInvite (Lua locals aren't visible before their
 -- declaration) so both TryHostInvite and TryLfgInvite can share the same
--- "save the last seats for support roles" policy — this used to only exist
+-- "save the last seats for support roles" policy - this used to only exist
 -- in TryLfgInvite, so a whisper applicant asking for dps in the last 1-2
 -- raid seats got auto-invited immediately while an LFG-chat dps applicant
 -- in the exact same situation got held back. Same policy, same code path now.
@@ -234,9 +247,31 @@ local function SeatsLeft(db)
     return maxSize - size, maxSize, size
 end
 
---- True when the applicant asked for DPS, only 1-2 raid seats remain, and an
--- accepted support role (tank/heal/aura) still has room — in that case the
--- seat should be held for support rather than burned on another DPS.
+--- True when the applicant asked for DPS, only 1-2 raid seats remain, an
+-- accepted support role still has room, AND a support applicant is already
+-- waiting in the queue (otherwise empty seats were wasted while nobody was
+-- actually applying as tank/heal/aura).
+local function QueueHasPendingSupport()
+    if not (AscensionLFM.Queue and AscensionLFM.Queue.Recent) then
+        return false
+    end
+    local list = AscensionLFM.Queue.Recent(12) or {}
+    for _, q in ipairs(list) do
+        local st = tostring(q.status or "")
+        if st == "pending" or st == "blocked" then
+            local r = q.role
+            if r == "tank" or r == "healer" or r == "aura" then
+                return true
+            end
+            local lab = tostring(q.roleLabel or "")
+            if lab:find("tank", 1, true) or lab:find("heal", 1, true) or lab:find("aura", 1, true) then
+                return true
+            end
+        end
+    end
+    return false
+end
+
 local function ShouldPreferSupportOverDps(db, role)
     if role ~= "dps" then
         return false
@@ -245,19 +280,39 @@ local function ShouldPreferSupportOverDps(db, role)
     if left > 2 then
         return false
     end
-    return FirstOpenHostRole(db, true) ~= nil
+    if not FirstOpenHostRole(db, true) then
+        return false
+    end
+    return QueueHasPendingSupport()
 end
 
 -- Reported live: a busy hosting session has many applicants whispering
 -- within the same few seconds; the per-name/global invite cooldown
 -- (CanInvite, default 3s) then silently swallows a genuinely acceptable
--- role request — "global cooldown"/"per-name cooldown" are deliberately
+-- role request - "global cooldown"/"per-name cooldown" are deliberately
 -- NOT in Reject.REJECTABLE (a cooldown isn't a real rejection, replying
 -- would be misleading), so the applicant got zero feedback and had to
 -- notice nothing happened and re-whisper themselves. Auto-retry instead:
 -- once the cooldown window has passed, re-attempt the exact same
 -- application automatically.
-local function ScheduleRetry(kind, sender, message, now)
+local function ScheduleRetry(kind, sender, message, now, previousAttempts)
+    local attempts = (tonumber(previousAttempts) or 0) + 1
+    if attempts > MAX_RETRY_ATTEMPTS then
+        if AscensionLFM.Print then
+            AscensionLFM.Print("invite retry gave up for " .. tostring(sender) .. " after " .. MAX_RETRY_ATTEMPTS .. " attempts")
+        end
+        return false
+    end
+
+    -- CHAT_MSG events can be duplicated before the first retry executes.
+    -- Keep one deferred attempt per applicant/path to prevent double invites
+    -- and an ever-growing retry queue.
+    local key = LowerName(sender)
+    for _, pending in ipairs(pendingRetries) do
+        if pending.kind == kind and LowerName(pending.sender) == key then
+            return false
+        end
+    end
     local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
     local cd = tonumber(db and db.inviteCooldown) or 3
     -- Stagger multiple queued retries so a burst of cooldown-blocked
@@ -269,14 +324,28 @@ local function ScheduleRetry(kind, sender, message, now)
             retryAt = p.retryAt + RETRY_STAGGER
         end
     end
-    table.insert(pendingRetries, { kind = kind, sender = sender, message = message, retryAt = retryAt })
+    table.insert(pendingRetries, {
+        kind = kind,
+        sender = sender,
+        message = message,
+        retryAt = retryAt,
+        attempts = attempts,
+    })
+    return true
 end
 
 --- Hosting path: parse whisper for a role we accept + open slot, then invite.
-function Invite.TryHostInvite(sender, message)
+function Invite.TryHostInvite(sender, message, retryAttempts)
     local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
     if not db or db.mode ~= "hosting" then
         return false, "disabled"
+    end
+    if AscensionLFM.Kick and AscensionLFM.Kick.IsSessionIgnored
+        and AscensionLFM.Kick.IsSessionIgnored(sender) then
+        if AscensionLFM.Queue and AscensionLFM.Queue.Push then
+            AscensionLFM.Queue.Push(sender, nil, message, "blocked", "session ignore (kicked 59)")
+        end
+        return false, "session ignore"
     end
     -- Queue + sound even when auto-invite is off (manual Queue actions)
     local parsed = AscensionLFM.Parser.Parse(message)
@@ -294,6 +363,20 @@ function Invite.TryHostInvite(sender, message)
         return false, "disabled"
     end
 
+    -- Bare re-inv / inv with no role: reuse last known role from this session
+    -- (player left and wants back in without re-stating the role).
+    if not role then
+        local bare = tostring(message or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
+        bare = bare:gsub("[!%?%.%,%;%:]+$", "")
+        if bare == "inv" or bare == "invite" or bare == "re-inv" or bare == "reinv"
+            or bare == "re inv" or bare == "inv me" or bare == "invite me" then
+            local remembered = lastKnownRoles[LowerName(sender)]
+            if remembered then
+                role = remembered
+            end
+        end
+    end
+
     if not role then
         local why = parsed and "no role" or "no parse"
         if db.requireRoleWhisper ~= false then
@@ -303,8 +386,8 @@ function Invite.TryHostInvite(sender, message)
         AfterHostResult(sender, message, nil, false, why)
         return false, why
     end
-    -- Last 1–2 seats: do not burn them on DPS while tank/heal/aura still
-    -- open — same policy TryLfgInvite already applies to LFG-chat applicants.
+    -- Last 1-2 seats: do not burn them on DPS while tank/heal/aura still
+    -- open - same policy TryLfgInvite already applies to LFG-chat applicants.
     if ShouldPreferSupportOverDps(db, role) then
         AfterHostResult(sender, message, role, false, "prefer support seat")
         return false, "prefer support seat"
@@ -315,8 +398,29 @@ function Invite.TryHostInvite(sender, message)
     end
     if AscensionLFM.Slots and AscensionLFM.Slots.HasOpenSlot then
         if not AscensionLFM.Slots.HasOpenSlot(role) then
-            AfterHostResult(sender, message, role, false, "slot full")
-            return false, "slot full"
+            -- Dual-role fallback: "dps with aura" / "got aura dps" when DPS is
+            -- full but an offered support role still has a seat.
+            local alt = nil
+            local offered = AscensionLFM.Parser and AscensionLFM.Parser.OfferedRoles
+                and AscensionLFM.Parser.OfferedRoles(message) or {}
+            for _, r in ipairs({ "tank", "healer", "aura", "dps" }) do
+                if r ~= role and offered[r] and db.roles and db.roles[r]
+                    and AscensionLFM.Slots.HasOpenSlot(r) then
+                    alt = r
+                    break
+                end
+            end
+            if alt then
+                if AscensionLFM.Print then
+                    AscensionLFM.Print(string.format(
+                        "%s: %s full - inviting as %s (also offered)",
+                        tostring(sender), role, alt))
+                end
+                role = alt
+            else
+                AfterHostResult(sender, message, role, false, "slot full")
+                return false, "slot full"
+            end
         end
     end
     -- NOTE: this used to compute a "msHint" (ms/manastorm/inv keywords, or
@@ -326,13 +430,13 @@ function Invite.TryHostInvite(sender, message)
     -- true and the "not ms-related" branch was unreachable dead code.
     -- Actually enforcing that filter would reject plain role whispers like
     -- "tank" that don't mention ms/manastorm/inv, which is the accepted,
-    -- tested hosting flow (a private reply to your LFM) — so the correct fix
+    -- tested hosting flow (a private reply to your LFM) - so the correct fix
     -- is to drop the dead gate rather than start enforcing it. Any recognized
     -- role is accepted here, matching the behavior this always actually had.
     local ok, reason = Invite.InvitePlayer(sender, role)
     AfterHostResult(sender, message, role, ok, reason)
     if not ok and (reason == "global cooldown" or reason == "per-name cooldown") then
-        ScheduleRetry("whisper", sender, message, Now())
+        ScheduleRetry("whisper", sender, message, Now(), retryAttempts)
     end
     return ok, reason
 end
@@ -357,8 +461,12 @@ local function FirstOpenAcceptedRole(db, parsed)
     return nil
 end
 
---- Hosting: public LFG MS poster → InviteUnit if role matches an open accepted slot.
-function Invite.TryLfgInvite(leader, message, parsed)
+--- Hosting: public LFG MS poster -> InviteUnit if role matches an open accepted slot.
+function Invite.TryLfgInvite(leader, message, parsed, retryAttempts)
+    if AscensionLFM.Kick and AscensionLFM.Kick.IsSessionIgnored
+        and AscensionLFM.Kick.IsSessionIgnored(leader) then
+        return false, "session ignore"
+    end
     local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
     if not db or db.mode ~= "hosting" then
         return false, "disabled"
@@ -367,14 +475,14 @@ function Invite.TryLfgInvite(leader, message, parsed)
         return false, "lfg invite off"
     end
     -- Public LFG-chat scan reaches out to whoever posted "LFG MS ..." even
-    -- though they never whispered/applied to YOU specifically — that's fine
+    -- though they never whispered/applied to YOU specifically - that's fine
     -- while actively recruiting in the open world, but once you're already
     -- inside your own Manastorm instance, General/Trade chat still relays
     -- OTHER unrelated players' own "LFG MS" posts (for entirely different
     -- groups) and this used to auto-reply to them ("Sorry, tank is full")
-    -- as if they had applied to you — confusing strangers who never
+    -- as if they had applied to you - confusing strangers who never
     -- whispered you at all. Direct whispers (TryHostInvite) are unaffected
-    -- — those are always a genuine, intentional application regardless of
+    -- - those are always a genuine, intentional application regardless of
     -- where you are.
     if type(IsInInstance) == "function" then
         local ok, inInstance = pcall(IsInInstance)
@@ -441,7 +549,7 @@ function Invite.TryLfgInvite(leader, message, parsed)
         return false, "no role"
     end
 
-    -- Last 1–2 seats: do not burn them on DPS while tank/heal/aura still open
+    -- Last 1-2 seats: do not burn them on DPS while tank/heal/aura still open
     -- (shared with TryHostInvite via ShouldPreferSupportOverDps)
     if ShouldPreferSupportOverDps(db, role) then
         AfterHostResult(leader, message, role, false, "prefer support seat")
@@ -454,8 +562,22 @@ function Invite.TryLfgInvite(leader, message, parsed)
     end
     if AscensionLFM.Slots and AscensionLFM.Slots.HasOpenSlot then
         if not AscensionLFM.Slots.HasOpenSlot(role) then
-            AfterHostResult(leader, message, role, false, "slot full")
-            return false, "slot full"
+            local alt = nil
+            local offered = AscensionLFM.Parser and AscensionLFM.Parser.OfferedRoles
+                and AscensionLFM.Parser.OfferedRoles(message) or {}
+            for _, r in ipairs({ "tank", "healer", "aura", "dps" }) do
+                if r ~= role and offered[r] and db.roles and db.roles[r]
+                    and AscensionLFM.Slots.HasOpenSlot(r) then
+                    alt = r
+                    break
+                end
+            end
+            if alt then
+                role = alt
+            else
+                AfterHostResult(leader, message, role, false, "slot full")
+                return false, "slot full"
+            end
         end
     end
 
@@ -463,7 +585,7 @@ function Invite.TryLfgInvite(leader, message, parsed)
     local ok, reason = Invite.InvitePlayer(leader, role)
     AfterHostResult(leader, message, role, ok, reason)
     if not ok and (reason == "global cooldown" or reason == "per-name cooldown") then
-        ScheduleRetry("lfg", leader, message, Now())
+        ScheduleRetry("lfg", leader, message, Now(), retryAttempts)
     end
     if ok and AscensionLFM.Print then
         AscensionLFM.Print("LFG auto-invite " .. tostring(leader) .. " as " .. role)
@@ -493,9 +615,9 @@ function Invite.Tick(now)
         if now >= (tonumber(p.retryAt) or 0) then
             table.remove(pendingRetries, i)
             if p.kind == "lfg" then
-                Invite.TryLfgInvite(p.sender, p.message)
+                Invite.TryLfgInvite(p.sender, p.message, nil, p.attempts)
             else
-                Invite.TryHostInvite(p.sender, p.message)
+                Invite.TryHostInvite(p.sender, p.message, p.attempts)
             end
             processed = processed + 1
         else
@@ -529,6 +651,9 @@ function Invite._GetPendingRetries()
 end
 
 function Invite._ResetForTests()
+    lastInviteAt = {}
+    lastInviteGlobal = 0
     pendingRetries = {}
+    lastKnownRoles = {}
     lastTickAt = 0
 end

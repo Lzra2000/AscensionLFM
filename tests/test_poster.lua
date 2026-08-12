@@ -66,7 +66,7 @@ local allFullSnap = {
     dps = { filled = 7, max = 7 },
 }
 msg = Poster.BuildMessage(allFullSnap)
-check("all full fallback text", msg == "LFM MS — full", msg)
+check("all full fallback text", msg == "LFM MS - full", msg)
 
 check("nil snapshot still builds", type(Poster.BuildMessage(nil)) == "string")
 

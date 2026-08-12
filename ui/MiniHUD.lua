@@ -13,9 +13,10 @@ AscensionLFM.MiniHUD = MiniHUD
 
 local FRAME_NAME = "AscensionLFMMiniHUD"
 local DEFAULT_WIPE = "WIPE"
-local DEFAULT_SHIELD = "KILL MOBS — boss shield still up!"
-local DEFAULT_REGROUP = "REGROUP — accept invite"
+local DEFAULT_SHIELD = "KILL MOBS - boss shield still up!"
+local DEFAULT_REGROUP = "REGROUP - accept invite"
 local ANNOUNCE_GAP = 2
+local RW_ANNOUNCE_GAP = 15 -- Role Check re-warn; was 2s and got spam-clicked mid-run
 local REGROUP_MAX = 40
 local REGROUP_INVITE_CAP = 15
 
@@ -214,7 +215,7 @@ local function AutoGroupAnnounce(msg)
 end
 
 --- Route a group-wide announcement (Wipe/Shield/Regroup/RW-trigger) per the
--- host's configured delivery for this message `kind` — "auto" (default)
+-- host's configured delivery for this message `kind` - "auto" (default)
 -- uses the existing smart cascade (RAID_WARNING if privileged, else raid/
 -- party chat, else yell); "raidwarning" forces RW only (fails if not
 -- privileged, rather than silently falling back to a different channel);
@@ -282,7 +283,11 @@ local function RateBlocked(kind)
     kind = tostring(kind or "default")
     local now = Now()
     local last = tonumber(lastAnnounceAt[kind]) or 0
-    return (now - last) < ANNOUNCE_GAP
+    local gap = ANNOUNCE_GAP
+    if kind == "rw" then
+        gap = RW_ANNOUNCE_GAP
+    end
+    return (now - last) < gap
 end
 
 local function RateStamp(kind)
@@ -317,6 +322,28 @@ end
 -- Actions
 --------------------------------------------------------------------
 
+function MiniHUD.ActionRoster()
+    if AscensionLFM.MainWindow and AscensionLFM.MainWindow.Show then
+        AscensionLFM.MainWindow.Show()
+    end
+    if AscensionLFM.MainWindow and AscensionLFM.MainWindow.SelectCategory then
+        AscensionLFM.MainWindow.SelectCategory("roster")
+    end
+    return true, "roster"
+end
+
+function MiniHUD.ActionReadyCheck()
+    if AscensionLFM.RosterPanel and AscensionLFM.RosterPanel.DoReadyCheck then
+        AscensionLFM.RosterPanel.DoReadyCheck()
+        return true, "ready"
+    end
+    if type(DoReadyCheck) == "function" then
+        pcall(DoReadyCheck)
+        return true, "ready"
+    end
+    return false, "no ready API"
+end
+
 function MiniHUD.ActionOpenSettings()
     if AscensionLFM.MainWindow and AscensionLFM.MainWindow.Toggle then
         local ok, err = pcall(AscensionLFM.MainWindow.Toggle)
@@ -326,7 +353,7 @@ function MiniHUD.ActionOpenSettings()
         end
         return true
     end
-    Print("settings UI missing — /alfm")
+    Print("settings UI missing - /alfm")
     return false, "no ui"
 end
 
@@ -353,7 +380,7 @@ function MiniHUD.ActionRoleCheck()
     if AscensionLFM.RoleCheck and AscensionLFM.RoleCheck.BuildMessage then
         msg = AscensionLFM.RoleCheck.BuildMessage(db and db.roleCheckMessage)
     else
-        msg = "ROLE CHECK — whisper or party: tank/heal/aura/dps (T/H/A/D)"
+        msg = "ROLE CHECK - whisper or party: tank/heal/aura/dps (T/H/A/D)"
     end
 
     -- Full listen-window when Hosting / Full Auto
@@ -361,19 +388,20 @@ function MiniHUD.ActionRoleCheck()
     if hosting and AscensionLFM.RoleCheck and AscensionLFM.RoleCheck.StartCheck then
         local ok, reason = AscensionLFM.RoleCheck.StartCheck()
         if ok then
+            RateStamp("rw") -- share MiniHUD gap with StartCheck so spam-clicks stop
             return true, reason
         end
         -- Fall through: still yell/party the RW text (same as Wipe/Mobs UX)
         if reason == "rate limited" then
             -- Re-announce only; keep existing listen window
             if RateBlocked("rw") then
-                Print("RW rate limited — wait a moment")
+                Print("RW rate limited - wait a moment")
                 return false, "rate limited"
             end
             local sent, ch = SendGroupAnnounce(msg, "rw")
             if sent then
                 RateStamp("rw")
-                Print("RW (re-warn) → " .. tostring(ch))
+                Print("RW (re-warn) -> " .. tostring(ch))
             else
                 Print("RW re-warn failed: " .. tostring(ch))
             end
@@ -389,15 +417,15 @@ function MiniHUD.ActionRoleCheck()
 
     -- Not hosting, or StartCheck blocked: still send the warn like Wipe does
     if RateBlocked("rw") then
-        Print("RW rate limited — wait a moment")
+        Print("RW rate limited - wait a moment")
         return false, "rate limited"
     end
     local sent, ch = SendGroupAnnounce(msg, "rw")
     if sent then
         RateStamp("rw")
-        Print("RW → " .. tostring(ch) .. ": " .. msg)
+        Print("RW -> " .. tostring(ch) .. ": " .. msg)
         if not hosting then
-            Print("RW listen window needs Hosting / Full Auto — warn sent anyway")
+            Print("RW listen window needs Hosting / Full Auto - warn sent anyway")
         end
         if AscensionLFM.Activity and AscensionLFM.Activity.Push then
             AscensionLFM.Activity.Push("rolecheck", "RW announce (" .. tostring(ch) .. ")")
@@ -414,7 +442,7 @@ function MiniHUD.ActionResync()
         if AscensionLFM.Slots and AscensionLFM.Slots.UnassignedMembers then
             local names, n = AscensionLFM.Slots.UnassignedMembers()
             if n and n > 0 then
-                Print(string.format("Sync: %d without role — click RW (e.g. %s)", n, tostring(names[1])))
+                Print(string.format("Sync: %d without role - click RW (e.g. %s)", n, tostring(names[1])))
             end
         end
         return ok
@@ -423,7 +451,7 @@ function MiniHUD.ActionResync()
         local _, _, unassigned = AscensionLFM.Slots.ScanRaid()
         Print("Sync: scanned raid/party roster")
         if unassigned and unassigned > 0 then
-            Print(string.format("Sync: %d without role — click RW so they reply T/H/A/D", unassigned))
+            Print(string.format("Sync: %d without role - click RW so they reply T/H/A/D", unassigned))
         end
         return true
     end
@@ -433,7 +461,7 @@ end
 
 function MiniHUD.ActionWipe()
     if RateBlocked("wipe") then
-        Print("Wipe rate limited — wait a moment")
+        Print("Wipe rate limited - wait a moment")
         return false, "rate limited"
     end
     local db = DB()
@@ -441,7 +469,7 @@ function MiniHUD.ActionWipe()
     local ok, ch = SendGroupAnnounce(msg, "wipe")
     if ok then
         RateStamp("wipe")
-        Print("Wipe → " .. tostring(ch) .. ": " .. msg)
+        Print("Wipe -> " .. tostring(ch) .. ": " .. msg)
         if AscensionLFM.Activity and AscensionLFM.Activity.Push then
             AscensionLFM.Activity.Push("wipe", msg)
         end
@@ -453,7 +481,7 @@ end
 
 function MiniHUD.ActionShield()
     if RateBlocked("shield") then
-        Print("Mobs rate limited — wait a moment")
+        Print("Mobs rate limited - wait a moment")
         return false, "rate limited"
     end
     local db = DB()
@@ -461,7 +489,7 @@ function MiniHUD.ActionShield()
     local ok, ch = SendGroupAnnounce(msg, "shield")
     if ok then
         RateStamp("shield")
-        Print("Mobs → " .. tostring(ch) .. ": " .. msg)
+        Print("Mobs -> " .. tostring(ch) .. ": " .. msg)
         if AscensionLFM.Activity and AscensionLFM.Activity.Push then
             AscensionLFM.Activity.Push("shield", msg)
         end
@@ -512,7 +540,7 @@ local function CollectPresentSet()
     return present
 end
 
---- regroupDisplay (case-preserving name lookup) has no cap of its own — it's
+--- regroupDisplay (case-preserving name lookup) has no cap of its own - it's
 -- meant to mirror regroupRoster, which IS capped (FIFO evicted) at
 -- REGROUP_MAX. Without pruning, every name ever seen present stays in
 -- regroupDisplay forever even after RememberName evicts it from the roster
@@ -588,7 +616,7 @@ end
 
 function MiniHUD.ActionRegroup()
     if RateBlocked("regroup") then
-        Print("Regrp rate limited — wait a moment")
+        Print("Regrp rate limited - wait a moment")
         return false, "rate limited"
     end
     MiniHUD.RememberPresent()
@@ -597,7 +625,7 @@ function MiniHUD.ActionRegroup()
     local ok, ch = SendGroupAnnounce(msg, "regroup")
     if ok then
         RateStamp("regroup")
-        Print("Regroup → " .. tostring(ch) .. ": " .. msg)
+        Print("Regroup -> " .. tostring(ch) .. ": " .. msg)
         if AscensionLFM.Activity and AscensionLFM.Activity.Push then
             AscensionLFM.Activity.Push("regroup", msg)
         end
@@ -649,7 +677,7 @@ function MiniHUD.ActionRegroup()
     elseif #missing == 0 then
         local watch = (db and type(db.regroupRoster) == "table" and #db.regroupRoster) or 0
         if watch == 0 then
-            Print("Regroup: watch list empty — group up first so names are remembered")
+            Print("Regroup: watch list empty - group up first so names are remembered")
         else
             Print("Regroup: everyone on the watch list is already here")
         end
@@ -665,11 +693,11 @@ end
 
 function MiniHUD.ActionFull()
     if RateBlocked("full") then
-        Print("FULL rate limited — wait a moment")
+        Print("FULL rate limited - wait a moment")
         return false, "rate limited"
     end
     local db = DB()
-    local msg = tostring((db and db.fullAnnounceMessage) or "LFM MS FULL — thanks!")
+    local msg = tostring((db and db.fullAnnounceMessage) or "LFM MS FULL - thanks!")
     local channel = (db and db.postChannel) or "YELL"
     if AscensionLFM.Poster and AscensionLFM.Poster.PostOnce then
         local sent, err = AscensionLFM.Poster.PostOnce(msg, channel, db and db.postChannelName)
@@ -683,7 +711,7 @@ function MiniHUD.ActionFull()
     local sent, ch = SendGroupAnnounce(msg, "full")
     if sent then
         RateStamp("full")
-        Print("FULL → " .. tostring(ch) .. ": " .. msg)
+        Print("FULL -> " .. tostring(ch) .. ": " .. msg)
     else
         Print("FULL failed: " .. tostring(ch))
     end
@@ -693,7 +721,7 @@ end
 function MiniHUD.ActionNeed(role)
     local kind = "need:" .. tostring(role or "")
     if RateBlocked(kind) then
-        Print("Need rate limited — wait a moment")
+        Print("Need rate limited - wait a moment")
         return false, "rate limited"
     end
     local msg = MiniHUD.BuildNeedMessage(role)
@@ -715,7 +743,7 @@ function MiniHUD.ActionNeed(role)
     local sent, ch = SendGroupAnnounce(msg, "need")
     if sent then
         RateStamp(kind)
-        Print("Need → " .. tostring(ch) .. ": " .. msg)
+        Print("Need -> " .. tostring(ch) .. ": " .. msg)
     else
         Print("Need failed: " .. tostring(ch))
     end
@@ -779,8 +807,8 @@ local function SetExpanded(on)
         return
     end
     if expanded then
-        frame:SetWidth(380)
-        frame:SetHeight(72)
+        frame:SetWidth(440)
+        frame:SetHeight(86)
         if frame.titleFS then
             frame.titleFS:SetText("AscensionLFM")
         end
@@ -790,7 +818,7 @@ local function SetExpanded(on)
             end
         end
         if frame.collapseBtn then
-            frame.collapseBtn:SetText("×")
+            frame.collapseBtn:SetText("x")
             frame.collapseBtn:Show()
         end
         if statusFS then
@@ -854,8 +882,8 @@ local function BuildFrame()
     end
     local f = CreateFrame("Frame", FRAME_NAME, UIParent)
     f:SetFrameStrata("HIGH")
-    f:SetWidth(380)
-    f:SetHeight(72)
+    f:SetWidth(440)
+    f:SetHeight(86)
     f:SetMovable(true)
     f:EnableMouse(true)
     f:RegisterForDrag("LeftButton")
@@ -891,7 +919,7 @@ local function BuildFrame()
     chip:SetTextColor(0.85, 0.75, 0.4)
     f.chipFS = chip
 
-    -- Click brand / collapsed chip → settings (expanded) or expand (collapsed)
+    -- Click brand / collapsed chip -> settings (expanded) or expand (collapsed)
     local hit = CreateFrame("Button", nil, f)
     hit:SetPoint("TOPLEFT", 4, -2)
     hit:SetSize(120, 18)
@@ -906,54 +934,54 @@ local function BuildFrame()
     local collapse = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
     collapse:SetSize(20, 18)
     collapse:SetPoint("TOPRIGHT", -4, -4)
-    collapse:SetText("×")
+    collapse:SetText("x")
     collapse:SetScript("OnClick", function()
         SetExpanded(false)
     end)
     f.collapseBtn = collapse
 
-    local y = -26
+    local y = -28
     local x = 6
     local function place(btn)
         btn:SetPoint("TOPLEFT", x, y)
-        x = x + (btn:GetWidth() or 40) + 3
+        x = x + (btn:GetWidth() or 40) + 4
     end
     local function newRow()
-        y = y - 22
+        y = y - 25
         x = 6
     end
 
-    buttons.lfm = MakeBtn(f, "LFM", 40, function()
+    buttons.lfm = MakeBtn(f, "LFM", 42, function()
         return MiniHUD.ActionPostLfm()
     end)
     place(buttons.lfm)
 
-    buttons.rw = MakeBtn(f, "RW", 34, function()
+    buttons.rw = MakeBtn(f, "RW", 36, function()
         return MiniHUD.ActionRoleCheck()
     end)
     place(buttons.rw)
 
-    buttons.sync = MakeBtn(f, "Sync", 40, function()
+    buttons.sync = MakeBtn(f, "Sync", 42, function()
         return MiniHUD.ActionResync()
     end)
     place(buttons.sync)
 
-    buttons.wipe = MakeBtn(f, "Wipe", 40, function()
+    buttons.wipe = MakeBtn(f, "Wipe", 44, function()
         return MiniHUD.ActionWipe()
     end, true)
     place(buttons.wipe)
 
-    buttons.mobs = MakeBtn(f, "Mobs", 44, function()
+    buttons.mobs = MakeBtn(f, "Mobs", 50, function()
         return MiniHUD.ActionShield()
     end, true)
     place(buttons.mobs)
 
-    buttons.full = MakeBtn(f, "FULL", 42, function()
+    buttons.full = MakeBtn(f, "FULL", 46, function()
         return MiniHUD.ActionFull()
     end)
     place(buttons.full)
 
-    buttons.regrp = MakeBtn(f, "Regrp", 44, function()
+    buttons.regrp = MakeBtn(f, "Regrp", 52, function()
         return MiniHUD.ActionRegroup()
     end)
     place(buttons.regrp)
@@ -980,11 +1008,23 @@ local function BuildFrame()
     end)
     place(buttons.d)
 
+    buttons.rost = MakeBtn(f, "Rost", 40, function()
+        return MiniHUD.ActionRoster()
+    end)
+    place(buttons.rost)
+
+    buttons.ready = MakeBtn(f, "RC", 28, function()
+        return MiniHUD.ActionReadyCheck()
+    end)
+    place(buttons.ready)
+
     statusFS = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    statusFS:SetPoint("BOTTOMLEFT", 8, 4)
-    statusFS:SetPoint("BOTTOMRIGHT", -8, 4)
+    statusFS:SetPoint("BOTTOMLEFT", 8, 5)
+    statusFS:SetPoint("BOTTOMRIGHT", -8, 5)
     statusFS:SetJustifyH("LEFT")
-    statusFS:SetText("Mobs=shield · Regrp=announce+re-invite missing")
+    if statusFS.SetHeight then statusFS:SetHeight(16) end
+    if statusFS.SetWordWrap then statusFS:SetWordWrap(false) end
+    statusFS:SetText("T-/H-/A-/D-")
     statusFS:SetTextColor(0.65, 0.58, 0.4)
 
     frame = f
@@ -992,7 +1032,44 @@ local function BuildFrame()
     local db = DB()
     local wantExpand = not (db and db.miniHudExpanded == false)
     SetExpanded(wantExpand)
+    -- Periodic slot-line refresh while visible
+    local acc = 0
+    f:SetScript("OnUpdate", function(self, elapsed)
+        acc = acc + (elapsed or 0)
+        if acc < 1.5 then
+            return
+        end
+        acc = 0
+        if expanded and statusFS then
+            MiniHUD.Refresh()
+        end
+    end)
+    MiniHUD.Refresh()
     return frame
+end
+
+--- Pure: compact slot line for the Mini HUD footer (T 2/2 H 1/3 A 2/3 D 7/7).
+function MiniHUD.BuildSlotLine(snapshot)
+    snapshot = snapshot or {}
+    local order = { "tank", "healer", "aura", "dps" }
+    local short = { tank = "T", healer = "H", aura = "A", dps = "D" }
+    local parts = {}
+    for _, role in ipairs(order) do
+        local s = snapshot[role]
+        local filled = 0
+        local max = 0
+        if type(s) == "table" then
+            filled = tonumber(s.filled) or 0
+            max = tonumber(s.max) or 0
+        end
+        if max > 0 then
+            table.insert(parts, string.format("%s %d/%d", short[role], filled, max))
+        end
+    end
+    if #parts == 0 then
+        return "slots off"
+    end
+    return table.concat(parts, "  ")
 end
 
 function MiniHUD.Refresh()
@@ -1001,6 +1078,15 @@ function MiniHUD.Refresh()
     end
     if frame.chipFS then
         frame.chipFS:SetText(HostingHint())
+    end
+    if statusFS then
+        local snap = nil
+        if AscensionLFM.Slots and AscensionLFM.Slots.Snapshot then
+            snap = AscensionLFM.Slots.Snapshot()
+        end
+        local line = MiniHUD.BuildSlotLine(snap)
+        statusFS:SetText(line)
+        statusFS:SetTextColor(0.85, 0.75, 0.45)
     end
     local db = DB()
     if db and db.miniHudShow == false then

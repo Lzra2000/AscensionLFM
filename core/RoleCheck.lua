@@ -1,5 +1,5 @@
 -- AscensionLFM: core/RoleCheck.lua
--- Raid Warning role-check → whisper roles → resync T/H/A/D slot places.
+-- Raid Warning role-check -> whisper roles -> resync T/H/A/D slot places.
 -- Pure helpers are WoW-free for unit tests.
 
 local AscensionLFM = _G.AscensionLFM
@@ -11,7 +11,7 @@ end
 local RoleCheck = {}
 AscensionLFM.RoleCheck = RoleCheck
 
-local DEFAULT_MSG = "ROLE CHECK — whisper or party: tank/heal/aura/dps (T/H/A/D)"
+local DEFAULT_MSG = "ROLE CHECK - whisper or party: tank/heal/aura/dps (T/H/A/D)"
 local DEFAULT_DURATION = 60
 local MIN_RW_GAP = 30
 local MIN_DURATION = 15
@@ -23,6 +23,7 @@ local responses = {} -- [nameLower] = role
 local lastResponseCount = 0
 local frame
 local endedResyncDone = false
+local lastResyncPrintAt = 0
 local lastStartReason = "idle"
 local lastReplyAt = 0
 
@@ -101,20 +102,34 @@ function RoleCheck.IsGroupMemberName(name, presentSet)
     return presentSet[LowerName(name)] == true
 end
 
---- Pure: strict exact-word-only role match — no substring/Parser fallback.
+--- Pure: strict exact-word-only role match - no substring/Parser fallback.
 -- Deliberately narrower than ParseWhisperRole: used for passive group-chat
 -- detection that runs continuously (not gated to an active Role Check
 -- window), so a substring match here would risk misfiring on ordinary
 -- raid banter that merely mentions a role word mid-sentence
--- ("that fight needs more heal players" must NOT match — only an exact
--- "heal" reply does).
-function RoleCheck.ParseBareRoleWord(message)
+-- ("that fight needs more heal players" must NOT match - only an exact
+-- "heal" reply does). Also accepts short phrases used in raid chat during
+-- a Role Check ("tank no aura", "im dps", "dps with aura") - still refuses
+-- long free-form sentences by requiring a leading/dominant role token.
+function RoleCheck.ParseBareRoleWord(message, allowPhrases)
     local t = tostring(message or ""):lower()
     t = t:gsub("^%s+", ""):gsub("%s+$", ""):gsub("[!%?%.%,%;%:]+$", "")
     if t == "" then
         return nil
     end
-    if t == "t" or t == "tank" or t == "tanks" or t == "ot" or t == "mt" then
+    -- Reject raid banter that only talks ABOUT aura/roles
+    if t:find("anyone", 1, true) or t:find("someone", 1, true)
+        or t:find("nobody", 1, true) or t:find("no one", 1, true)
+        or t:find("addon", 1, true) or t:find("bugged", 1, true)
+        or t:find("lying", 1, true) or t:find("group", 1, true)
+        or t:find("grp", 1, true) or t:find("?", 1, true)
+        or t:find("have aura", 1, true) or t:find("has aura", 1, true)
+        or t:find("got aura", 1, true) or t:find("got no", 1, true)
+        or t:find("no aura tho", 1, true) or t:find("working", 1, true)
+        or t:find("mean", 1, true) or t:find("why", 1, true) then
+        return nil
+    end
+    if t == "t" or t == "tank" or t == "tanks" or t == "ot" or t == "mt" or t == "tanj" or t == "tnk" then
         return "tank"
     end
     if t == "h" or t == "heal" or t == "heals" or t == "healer" or t == "healers" or t == "heiler" or t == "hps" then
@@ -126,11 +141,25 @@ function RoleCheck.ParseBareRoleWord(message)
     if t == "d" or t == "dps" or t == "dd" or t == "damage" or t == "dmg" then
         return "dps"
     end
+    -- Phrases only during active Role Check (allowPhrases), still short
+    if allowPhrases and #t <= 28 and AscensionLFM.Parser and AscensionLFM.Parser.GuessRole then
+        local role = AscensionLFM.Parser.GuessRole(t)
+        if role then
+            return role
+        end
+    end
     return nil
 end
 
---- Pure: extract role from whisper text (Parser when available).
 function RoleCheck.ParseWhisperRole(message)
+    -- GuessRole first so "dps no aura" / "tank without aura" win over the
+    -- multi-keyword path that used to prefer aura whenever the word appeared.
+    if AscensionLFM.Parser and AscensionLFM.Parser.GuessRole then
+        local role = AscensionLFM.Parser.GuessRole(message)
+        if role then
+            return role
+        end
+    end
     if AscensionLFM.Parser and AscensionLFM.Parser.Parse then
         local parsed = AscensionLFM.Parser.Parse(message)
         if parsed and AscensionLFM.Parser.RequestedRole then
@@ -140,40 +169,13 @@ function RoleCheck.ParseWhisperRole(message)
             end
         end
     end
-    if AscensionLFM.Parser and AscensionLFM.Parser.GuessRole then
-        local role = AscensionLFM.Parser.GuessRole(message)
-        if role then
-            return role
-        end
-    end
-    local t = tostring(message or ""):lower()
-    t = t:gsub("^%s+", ""):gsub("%s+$", ""):gsub("[!%?%.%,%;%:]+$", "")
-    if t == "" then
-        return nil
-    end
-    if t == "t" or t == "tank" or t == "tanks" or t == "ot" or t == "mt"
-        or t:find("tank", 1, true) or t:find("%f[%w]ot%f[%W]") or t:find("%f[%w]mt%f[%W]") then
-        return "tank"
-    end
-    if t == "h" or t == "heal" or t == "heals" or t == "healer" or t == "healers" or t == "heiler" or t == "hps"
-        or t:find("heal", 1, true) or t:find("hps", 1, true) or t:find("heiler", 1, true) then
-        return "healer"
-    end
-    if t == "a" or t == "aura" or t == "auras"
-        or t:find("aura", 1, true) or t:find("exp%s*aura") or t:find("aoe%s*aura") then
-        return "aura"
-    end
-    if t == "d" or t == "dps" or t == "dd" or t == "damage" or t == "dmg"
-        or t:find("dps", 1, true) or t:find("%f[%w]dd%f[%W]") or t:find("damage", 1, true) then
-        return "dps"
-    end
-    return nil
+    return RoleCheck.ParseBareRoleWord(message)
 end
 
 --- Pure: prune leavers then overlay role-check responses for present members.
 -- @return newMap, removedCount, appliedCount
 --- @param protectedNames optional set of lowered names to never prune even
---   if not currently present — for a just-invited applicant who hasn't had
+--   if not currently present - for a just-invited applicant who hasn't had
 --   time to actually show up in the roster yet (see Slots.RecentlyAssigned).
 function RoleCheck.ResyncAssigned(assignedMap, responseMap, presentSet, protectedNames)
     presentSet = presentSet or {}
@@ -215,14 +217,14 @@ function RoleCheck.BuildStatusText(isActive, remaining, count, autoMoveAura)
         remaining = 0
     end
     if isActive then
-        return string.format("Role check active — %ds left · %d responses", remaining, count)
+        return string.format("Role check active - %ds left * %d responses", remaining, count)
     end
     local auraBit = ""
     if autoMoveAura ~= nil then
-        auraBit = string.format(" · Aura auto-move %s", autoMoveAura and "ON" or "OFF")
+        auraBit = string.format(" * Aura auto-move %s", autoMoveAura and "ON" or "OFF")
     end
     if count > 0 then
-        return string.format("Role check idle · last window %d responses%s", count, auraBit)
+        return string.format("Role check idle * last window %d responses%s", count, auraBit)
     end
     return "Role check idle" .. auraBit
 end
@@ -482,7 +484,9 @@ function RoleCheck.Resync()
     if AscensionLFM.Activity and AscensionLFM.Activity.Push then
         AscensionLFM.Activity.Push("match", line)
     end
-    if AscensionLFM.Print then
+    local now = (type(GetTime) == "function" and GetTime()) or 0
+    if AscensionLFM.Print and (now - lastResyncPrintAt) >= 10 then
+        lastResyncPrintAt = now
         AscensionLFM.Print(line)
     end
     RefreshUI()
@@ -554,7 +558,7 @@ function RoleCheck.StartCheck(msgOrNow)
     end
     if AscensionLFM.Print then
         AscensionLFM.Print(
-            "Role Check open — whisper or party/raid chat: tank / heal / aura / dps (" .. dur .. "s)"
+            "Role Check open - whisper or party/raid chat: tank / heal / aura / dps (" .. dur .. "s)"
         )
     end
     RoleCheck.EnsureTicker()
@@ -565,6 +569,25 @@ end
 -- Back-compat: Start() begins a role check (UI buttons). Use EnsureTicker on login.
 function RoleCheck.Start(msgOverride)
     return RoleCheck.StartCheck(msgOverride)
+end
+
+-- Whisper the player so they see the addon registered their role (host-only
+-- Print is invisible to them - live complaint: "addon would actually reply").
+local lastAckAt = {} -- [nameLower] = time; rate-limit ack whispers
+local function AckRoleToPlayer(sender, role, via)
+    if type(SendChatMessage) ~= "function" or type(sender) ~= "string" or sender == "" then
+        return
+    end
+    local key = LowerName(sender)
+    local now = Now()
+    if lastAckAt[key] and (now - lastAckAt[key]) < 8 then
+        return
+    end
+    lastAckAt[key] = now
+    local msg = "Got it - you're set as " .. tostring(role)
+        .. (via and (" (" .. via .. ")") or "")
+        .. "."
+    pcall(SendChatMessage, msg, "WHISPER", nil, sender)
 end
 
 --- Accept a role reply (whisper or party/raid chat) from a group member.
@@ -578,31 +601,47 @@ function RoleCheck.HandleWhisper(sender, message)
     if not IsGroupMember(sender) then
         return false
     end
-    local role = RoleCheck.ParseWhisperRole(message)
+    local role = RoleCheck.ParseBareRoleWord(message, true)
+    if not role then
+        role = RoleCheck.ParseWhisperRole(message)
+    end
+    if role then
+        local tl = tostring(message or ""):lower()
+        if tl:find("got aura", 1, true) or tl:find("have aura", 1, true)
+            or tl:find("has aura", 1, true) or tl:find("no one", 1, true)
+            or tl:find("anyone", 1, true) or tl:find("addon", 1, true)
+            or tl:find("bugged", 1, true) or tl:find("?", 1, true)
+            or tl:find("group", 1, true) then
+            role = nil
+        end
+    end
     if not role then
         return false
     end
+    local prev = responses[LowerName(sender)]
     responses[LowerName(sender)] = role
     lastReplyAt = Now()
     if AscensionLFM.Slots and AscensionLFM.Slots.Assign then
         AscensionLFM.Slots.Assign(sender, role)
     end
     if AscensionLFM.Print then
-        AscensionLFM.Print("Role Check: " .. tostring(sender) .. " → " .. role)
+        AscensionLFM.Print("Role Check: " .. tostring(sender) .. " -> " .. role)
+    end
+    -- Only ack when role is new or changed so we don't spam on repeats.
+    if prev ~= role then
+        AckRoleToPlayer(sender, role, nil)
     end
     RefreshUI()
     return true, role
 end
 RoleCheck.OnWhisper = RoleCheck.HandleWhisper
 
---- Passive role detection for GROUP chat (party/raid) — unlike
+--- Passive role detection for GROUP chat (party/raid) - unlike
 -- HandleWhisper, does NOT require an active formal Role Check. Reported
 -- live: players often just type "heal"/"dps" in raid chat whenever it
 -- occurs to them, not necessarily right after an RW prompt, and won't
--- bother whispering. Uses ONLY ParseBareRoleWord's exact-word matching
--- (never the broader substring/Parser fallback ParseWhisperRole uses),
--- since this fires continuously while hosting — a loose match here would
--- risk assigning a role off an unrelated sentence.
+-- bother whispering. ParseBareRoleWord now also accepts short role
+-- phrases ("tank no aura", "im dps") via GuessRole, still length-capped.
 function RoleCheck.HandlePassiveGroupChat(sender, message)
     if type(sender) ~= "string" or sender == "" then
         return false
@@ -614,13 +653,17 @@ function RoleCheck.HandlePassiveGroupChat(sender, message)
     if not role then
         return false
     end
+    local prev = responses[LowerName(sender)]
     responses[LowerName(sender)] = role
     lastReplyAt = Now()
     if AscensionLFM.Slots and AscensionLFM.Slots.Assign then
         AscensionLFM.Slots.Assign(sender, role)
     end
     if AscensionLFM.Print then
-        AscensionLFM.Print("Role Check: " .. tostring(sender) .. " → " .. role .. " (raid chat)")
+        AscensionLFM.Print("Role Check: " .. tostring(sender) .. " -> " .. role .. " (raid chat)")
+    end
+    if prev ~= role then
+        AckRoleToPlayer(sender, role, "raid chat")
     end
     RefreshUI()
     return true, role
@@ -671,7 +714,7 @@ function RoleCheck.Tick(now)
     if auto then
         RoleCheck.Resync()
         if AscensionLFM.Print then
-            AscensionLFM.Print("Role Check ended — roles resynced")
+            AscensionLFM.Print("Role Check ended - roles resynced")
         end
     end
     activeUntil = 0
@@ -708,6 +751,7 @@ function RoleCheck._ResetForTests()
     endedResyncDone = false
     lastStartReason = "idle"
     lastReplyAt = 0
+    lastAckAt = {}
 end
 
 function RoleCheck._SetLastRwAt(t)

@@ -187,17 +187,3 @@ Runs `luac5.1 -p` on all Lua files and pure Lua unit tests (parser / invite / sl
 ## License
 
 All Rights Reserved. Not affiliated with Ascension or Blizzard.
-nored players; rate-limits whispers/invites/rejects; kick RW cadence 10s; repost min interval 30s; Role Check RW min 30s.
-- Classic chat/party APIs only (`InviteUnit`, `UninviteUnit`, `SendChatMessage`, roster APIs). No `C_*`, Draft/HoF, or Rapid Rolling hooks.
-
-## Development
-
-```bash
-sh scripts/check.sh
-```
-
-Runs `luac5.1 -p` on all Lua files and pure Lua unit tests (parser / invite / slots / kick / poster / rolecheck / defaults).
-
-## License
-
-All Rights Reserved. Not affiliated with Ascension or Blizzard.

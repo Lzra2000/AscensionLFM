@@ -158,7 +158,7 @@ end
 
 -- Exact single-word role phrases for the "bare role" whisper check below.
 -- NOTE: this used to be one Lua pattern with "|" as separator, but Lua patterns
--- have no alternation operator — "|" only matches a literal pipe character, so
+-- have no alternation operator - "|" only matches a literal pipe character, so
 -- that pattern could never match anything and the whole bareRole branch was
 -- dead code. Table lookup + a couple of explicit multi-word patterns instead.
 local BARE_ROLE_WORDS = {
@@ -190,7 +190,8 @@ local function SoftRoleRequest(text, raw, ms)
     local stripped = text:gsub("[!%?%.%,%;%:]+$", ""):gsub("^%s+", ""):gsub("%s+$", "")
     local bareRole = IsBareRolePhrase(stripped) and stripped or nil
     local letterRole = stripped:match("^([thad])$")
-    local allow = bareRole or letterRole or (hasRoleWord and (ms or invish or #text <= 48))
+    -- Live whispers are often long: "53 / dps / looms / prestige 20 / ... / no aura"
+    local allow = bareRole or letterRole or (hasRoleWord and (ms or invish or #text <= 120))
     if not allow then
         return nil
     end
@@ -280,7 +281,7 @@ function Parser.Parse(message)
 
     local summary
     if #parts > 0 then
-        summary = "MS " .. table.concat(parts, " · ")
+        summary = "MS " .. table.concat(parts, " * ")
     else
         summary = kind == "lfg" and "MS LFG" or "MS LFM"
     end
@@ -342,14 +343,19 @@ end
 
 --- Detect which single role a whisper is requesting (hosting).
 -- Prefers explicit keywords; returns nil if ambiguous/none.
+-- When the original message is available on parsed.raw / parsed.message,
+-- negated roles ("no aura") are excluded. Combat roles beat pure aura
+-- when both are mentioned without negation.
 function Parser.RequestedRole(parsed)
     if type(parsed) ~= "table" or type(parsed.roles) ~= "table" then
         return nil
     end
+    local raw = parsed.raw or parsed.message or parsed.text or ""
+    local negated = (raw ~= "" and Parser.NegatedRoles(raw)) or {}
     local found = nil
     local count = 0
     for role, info in pairs(parsed.roles) do
-        if info and (info.mentioned or info.open) then
+        if info and (info.mentioned or info.open) and not negated[role] then
             count = count + 1
             found = role
         end
@@ -357,18 +363,92 @@ function Parser.RequestedRole(parsed)
     if count == 1 then
         return found
     end
-    -- Prefer tank > healer > aura > dps if multiple
-    for _, role in ipairs({ "tank", "healer", "aura", "dps" }) do
+    -- Prefer tank > healer > dps > aura if multiple (combat seats first;
+    -- "dps with aura" should land as dps, not steal an aura slot by accident).
+    for _, role in ipairs({ "tank", "healer", "dps", "aura" }) do
         local info = parsed.roles[role]
-        if info and (info.mentioned or info.open) then
+        if info and (info.mentioned or info.open) and not negated[role] then
             return role
         end
     end
     return nil
 end
 
+--- Roles explicitly negated in the message ("dps no aura", "tank without aura").
+-- Returns a set { aura=true, ... } of roles the sender does NOT want to fill.
+function Parser.NegatedRoles(message)
+    local t = Lower(message)
+    local out = {}
+    local roleSpecs = {
+        { "aura", "auras?" },
+        { "tank", "tanks?" },
+        { "healer", "healers?" },
+        { "healer", "heals?" },
+        { "healer", "heal" },
+        { "healer", "heiler" },
+        { "healer", "hps" },
+        { "dps", "dps" },
+        { "dps", "dd" },
+        { "dps", "damage" },
+        { "dps", "dmg" },
+    }
+    for _, spec in ipairs(roleSpecs) do
+        local role, pat = spec[1], spec[2]
+        if t:find("no%s+" .. pat)
+            or t:find("not%s+a?%s*" .. pat)
+            or t:find("without%s+" .. pat)
+            or t:find("w/?o%s+" .. pat)
+            or t:find("no%s*%-%s*" .. pat)
+            -- Common German applicant phrasing: "DPS ohne Aura" / "keine
+            -- Aura" / "keinen Heiler" (masculine accusative, e.g. Tank/
+            -- Heiler). Three explicit endings rather than an optional
+            -- single character, so "keinerlei" still correctly does not
+            -- match (no space directly after kein/keine/keinen there).
+            or t:find("ohne%s+" .. pat)
+            or t:find("kein%s+" .. pat)
+            or t:find("keine%s+" .. pat)
+            or t:find("keinen%s+" .. pat) then
+            out[role] = true
+        end
+    end
+    return out
+end
+
+--- All non-negated roles mentioned in a whisper (for dual-role fallback).
+-- Example: "dps with aura" -> { dps=true, aura=true }; "dps no aura" -> { dps=true }.
+function Parser.OfferedRoles(message)
+    local t = Lower(message)
+    t = t:gsub("^%s+", ""):gsub("%s+$", "")
+    if t == "" then
+        return {}
+    end
+    local negated = Parser.NegatedRoles(t)
+    local out = {}
+    if (t:find("heiler", 1, true) or t:find("healer", 1, true) or t:find("healers", 1, true)
+        or t:find("heals", 1, true) or t:find("heal", 1, true) or t:find("hps", 1, true))
+        and not negated.healer then
+        out.healer = true
+    end
+    if (t:find("tank", 1, true) or t:find("tanj", 1, true)
+        or t:find("%f[%w]ot%f[%W]") or t:find("%f[%w]mt%f[%W]"))
+        and not negated.tank then
+        out.tank = true
+    end
+    if (t:find("dps", 1, true) or t:find("damage", 1, true) or t:find("dmg", 1, true)
+        or t:find("%f[%w]dd%f[%W]"))
+        and not negated.dps then
+        out.dps = true
+    end
+    if (t:find("aura", 1, true) or t:find("arua", 1, true) or t:find("exp%s*aura") or t:find("aoe%s*aura") or t:find("arua", 1, true))
+        and not negated.aura then
+        out.aura = true
+    end
+    return out
+end
+
 --- Aggressive fallback role guess for hosting whispers / Role Check replies.
 -- Accepts T/H/A/D letters, plurals, DE "heiler", trailing punctuation, short phrases.
+-- Honors negations: "dps no aura" -> dps (not aura); "tank without aura" -> tank.
 function Parser.GuessRole(message)
     local t = Lower(message)
     t = t:gsub("^%s+", ""):gsub("%s+$", "")
@@ -377,13 +457,17 @@ function Parser.GuessRole(message)
         return nil
     end
 
-    -- Whole-message / first-token exact map
+    local negated = Parser.NegatedRoles(t)
+
+    -- Whole-message / first-token exact map (common typos included)
     local token = t:match("^(%S+)") or t
     token = token:gsub("[!%?%.%,%;%:]+$", "")
     local exact = {
         t = "tank",
         tank = "tank",
         tanks = "tank",
+        tanj = "tank", -- common typo seen live
+        tnk = "tank",
         ot = "tank",
         mt = "tank",
         h = "healer",
@@ -396,34 +480,62 @@ function Parser.GuessRole(message)
         a = "aura",
         aura = "aura",
         auras = "aura",
+        arua = "aura", -- common typo
         d = "dps",
         dps = "dps",
         dd = "dps",
         damage = "dps",
         dmg = "dps",
     }
-    if exact[t] then
+    if exact[t] and not negated[exact[t]] then
         return exact[t]
     end
-    if exact[token] then
-        return exact[token]
+    -- First-token exact only when the rest of the message does not clearly
+    -- name another role (so "aura dps" is not locked to aura by the token).
+    if exact[token] and not negated[exact[token]] then
+        local rest = t:sub(#token + 1)
+        local restHasOther = false
+        if rest ~= "" then
+            if exact[token] ~= "tank" and (rest:find("tank", 1, true) or rest:find("tanj", 1, true)) then restHasOther = true end
+            if exact[token] ~= "healer" and (rest:find("heal", 1, true) or rest:find("hps", 1, true) or rest:find("heiler", 1, true)) then restHasOther = true end
+            if exact[token] ~= "dps" and (rest:find("dps", 1, true) or rest:find("damage", 1, true) or rest:find("dmg", 1, true)) then restHasOther = true end
+            if exact[token] ~= "aura" and rest:find("aura", 1, true) and not negated.aura then restHasOther = true end
+        end
+        if not restHasOther then
+            return exact[token]
+        end
     end
 
-    -- Prefer longer / more specific keywords first
-    if t:find("heiler", 1, true) or t:find("healer", 1, true) or t:find("healers", 1, true)
-        or t:find("heals", 1, true) or t:find("heal", 1, true) or t:find("hps", 1, true) then
-        return "healer"
+    -- Detect which roles are positively mentioned (ignoring negated ones).
+    local mentioned = {}
+    if (t:find("heiler", 1, true) or t:find("healer", 1, true) or t:find("healers", 1, true)
+        or t:find("heals", 1, true) or t:find("heal", 1, true) or t:find("hps", 1, true))
+        and not negated.healer then
+        mentioned.healer = true
     end
-    if t:find("aura", 1, true) or t:find("exp%s*aura") or t:find("aoe%s*aura") then
-        return "aura"
+    if (t:find("tank", 1, true) or t:find("tanj", 1, true) or t == "ot" or t == "mt"
+        or t:find("%f[%w]ot%f[%W]") or t:find("%f[%w]mt%f[%W]"))
+        and not negated.tank then
+        mentioned.tank = true
     end
-    if t:find("tank", 1, true) or t == "ot" or t == "mt"
-        or t:find("%f[%w]ot%f[%W]") or t:find("%f[%w]mt%f[%W]") then
-        return "tank"
+    if (t:find("dps", 1, true) or t:find("damage", 1, true) or t:find("dmg", 1, true)
+        or t:find("%f[%w]dd%f[%W]") or t == "dd")
+        and not negated.dps then
+        mentioned.dps = true
     end
-    if t:find("dps", 1, true) or t:find("damage", 1, true) or t:find("dmg", 1, true)
-        or t:find("%f[%w]dd%f[%W]") or t == "dd" then
-        return "dps"
+    -- Aura only if not negated AND (only-aura message OR explicit aura offer without a combat role)
+    if (t:find("aura", 1, true) or t:find("exp%s*aura") or t:find("aoe%s*aura") or t:find("arua", 1, true))
+        and not negated.aura then
+        mentioned.aura = true
+    end
+
+    -- Prefer combat roles over pure aura when both are offered:
+    -- "dps with aura" / "aura dps" -> dps (they can still be moved to aura later if host needs it)
+    -- "aura" alone -> aura
+    for _, role in ipairs({ "tank", "healer", "dps", "aura" }) do
+        if mentioned[role] then
+            return role
+        end
     end
     return nil
 end

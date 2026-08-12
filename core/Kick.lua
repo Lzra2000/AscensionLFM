@@ -25,11 +25,12 @@ local lastStatus = "idle"
 local lastDetail = nil
 -- { targets = { {name=, level=}... }, readyAt = number }
 local pending = nil
--- { name=, level=, checkAt= } — set after a DoKick() attempt that didn't
+-- { name=, level=, checkAt= } - set after a DoKick() attempt that didn't
 -- error, to confirm the target actually left the roster before trusting it
 local pendingVerify = nil
 local failedAttempts = {} -- [nameLower] = count of failed UninviteUnit attempts
-local gaveUp = {} -- [nameLower] = true once MAX_KICK_ATTEMPTS reached — stop re-warning
+local gaveUp = {} -- [nameLower] = true once MAX_KICK_ATTEMPTS reached - stop re-warning
+local sessionIgnore = {} -- [nameLower] = true after successful Kick59 - block re-invite
 
 local function Now()
     return (type(GetTime) == "function" and GetTime()) or os.clock()
@@ -44,6 +45,25 @@ local function BareName(name)
         return nil
     end
     return name:match("^([^-]+)") or name
+end
+
+--- Ascension: UninviteUnit often silently no-ops while the host (or the
+-- target) is in combat inside Manastorm. Prefer documented APIs
+-- UnitAffectingCombat + InCombatLockdown over burning retry budget.
+local function IsInCombat()
+    if type(InCombatLockdown) == "function" then
+        local ok, v = pcall(InCombatLockdown)
+        if ok and v then
+            return true
+        end
+    end
+    if type(UnitAffectingCombat) == "function" then
+        local ok, v = pcall(UnitAffectingCombat, "player")
+        if ok and v then
+            return true
+        end
+    end
+    return false
 end
 
 local function DB()
@@ -66,7 +86,7 @@ local function SetStatus(status, detail)
 end
 
 --- Pure: pick a usable level. UnitLevel recovers when roster reports 0 (offline
---- placeholder / not-yet-cached). Never treat 0 as “known”.
+--- placeholder / not-yet-cached). Never treat 0 as "known".
 function Kick.ResolveLevel(unitLevel, rosterLevel)
     local u = tonumber(unitLevel) or 0
     local r = tonumber(rosterLevel) or 0
@@ -119,7 +139,7 @@ function Kick.ShouldWarn(now, lastAt, interval)
 end
 
 --- Pure: build raid-warning text naming targets.
--- @param attempts optional { [nameLower]=failedCount } — appends "retry N/MAX"
+-- @param attempts optional { [nameLower]=failedCount } - appends "retry N/MAX"
 --   for targets on a previous failed attempt, so the raid can see this is a
 --   retry rather than an identical-looking duplicate warning.
 function Kick.BuildWarnMessage(targets, kickLevel, attempts)
@@ -139,7 +159,7 @@ function Kick.BuildWarnMessage(targets, kickLevel, attempts)
         table.insert(names, string.format("%s (%d%s)", tostring(t.name), tonumber(t.level) or kickLevel, suffix))
     end
     return string.format(
-        "AscensionLFM: level %d — kicking: %s",
+        "AscensionLFM: level %d - kicking: %s",
         kickLevel,
         table.concat(names, ", ")
     )
@@ -234,7 +254,7 @@ local function SendWarn(msg, groupKind)
         pcall(SendChatMessage, msg, "YELL")
         return true
     end
-    -- Party: no RW channel — party chat, then yell fallback
+    -- Party: no RW channel - party chat, then yell fallback
     local ok = pcall(SendChatMessage, msg, "PARTY")
     if not ok then
         pcall(SendChatMessage, msg, "YELL")
@@ -260,6 +280,11 @@ local function LogKick(name, level)
     end
     if AscensionLFM.Print then
         AscensionLFM.Print(string.format("kicked %s at level %s", tostring(name), tostring(level)))
+    end
+    sessionIgnore[LowerName(name)] = true
+    local bare = BareName(name)
+    if bare then
+        sessionIgnore[LowerName(bare)] = true
     end
     if AscensionLFM.MainWindow and AscensionLFM.MainWindow.RefreshKicks then
         AscensionLFM.MainWindow.RefreshKicks()
@@ -305,7 +330,7 @@ local function RecordFailure(name, key, reason)
         SetStatus("gave up", name)
         if AscensionLFM.Print then
             AscensionLFM.Print(string.format(
-                "Kick59: giving up on %s after %d failed attempts (%s) — remove manually",
+                "Kick59: giving up on %s after %d failed attempts (%s) - remove manually",
                 tostring(name), failedAttempts[key], tostring(reason)))
         end
         if AscensionLFM.Activity and AscensionLFM.Activity.Push then
@@ -317,7 +342,7 @@ local function RecordFailure(name, key, reason)
     end
     SetStatus("kick failed", tostring(reason or name))
     if AscensionLFM.Print then
-        AscensionLFM.Print(string.format("kick failed for %s (%s) — attempt %d/%d",
+        AscensionLFM.Print(string.format("kick failed for %s (%s) - attempt %d/%d",
             tostring(name), tostring(reason), failedAttempts[key], MAX_KICK_ATTEMPTS))
     end
     return "kick failed"
@@ -325,7 +350,7 @@ end
 
 --- Confirm a prior DoKick() attempt actually removed the target from the
 -- roster. UninviteUnit succeeding with no Lua error is NOT reliable proof
--- of an actual removal — some servers/edge cases silently no-op the
+-- of an actual removal - some servers/edge cases silently no-op the
 -- request (e.g. a privilege check that fails without erroring the client),
 -- which previously meant the addon logged "kicked" and moved on while the
 -- player was still sitting in the raid with zero further action taken.
@@ -355,6 +380,21 @@ local function CheckVerify(now)
         gaveUp[key] = nil
         return "kicked"
     end
+    -- Still in group: if combat blocked the uninvite, re-queue without
+    -- burning an attempt so we don't RW-spam "retry 2/3" mid-pull.
+    if IsInCombat() then
+        if not pending then
+            pending = { targets = {}, readyAt = now + 1.5 }
+        end
+        table.insert(pending.targets, 1, { name = name, level = level })
+        SetStatus("in combat", name)
+        if AscensionLFM.Print then
+            AscensionLFM.Print(string.format(
+                "Kick59: %s still in group (combat) - will retry after combat",
+                tostring(name)))
+        end
+        return "in combat"
+    end
     return RecordFailure(name, key, "still in group after UninviteUnit")
 end
 
@@ -367,6 +407,13 @@ local function ProcessPending(now)
         SetStatus("pending", #pending.targets)
         return "pending"
     end
+    -- Hold kicks during combat - UninviteUnit silently no-ops in Manastorm
+    -- combat on Ascension; burning MAX_KICK_ATTEMPTS just spams RW forever.
+    if IsInCombat() then
+        SetStatus("in combat", #pending.targets)
+        pending.readyAt = now + 1.5 -- re-check soon after combat may end
+        return "in combat"
+    end
     local t = table.remove(pending.targets, 1)
     if not t then
         pending = nil
@@ -377,7 +424,7 @@ local function ProcessPending(now)
     local key = LowerName(t.name)
     local result
     if ok then
-        -- Don't trust "no Lua error" yet — verify on a later tick.
+        -- Don't trust "no Lua error" yet - verify on a later tick.
         pendingVerify = { name = t.name, level = t.level, checkAt = now + VERIFY_DELAY }
         SetStatus("verifying", t.name)
         result = "verifying"
@@ -433,6 +480,13 @@ function Kick.Tick(now)
         return "no privilege"
     end
 
+    -- Don't open a fresh warn+kick cycle while in combat - pending kicks
+    -- already hold until combat ends (ProcessPending / CheckVerify).
+    if IsInCombat() then
+        SetStatus("in combat")
+        return "in combat"
+    end
+
     local kickLevel = tonumber(db.kickLevel) or DEFAULT_LEVEL
     local interval = tonumber(db.kickWarnInterval) or DEFAULT_INTERVAL
     if not Kick.ShouldWarn(now, lastWarnAt, interval) then
@@ -461,7 +515,7 @@ function Kick.Tick(now)
 
     local rawTargets = Kick.SelectTargets(roster, kickLevel, PlayerName())
     if #rawTargets == 0 then
-        -- Distinguish “nobody high enough” from “levels still 0 / unknown”.
+        -- Distinguish "nobody high enough" from "levels still 0 / unknown".
         local unknown = 0
         local known = 0
         for _, m in ipairs(roster) do
@@ -481,7 +535,7 @@ function Kick.Tick(now)
     end
 
     -- Skip targets we've already given up on (MAX_KICK_ATTEMPTS failed
-    -- UninviteUnit attempts) — without this, a target that can't actually be
+    -- UninviteUnit attempts) - without this, a target that can't actually be
     -- kicked (e.g. UninviteUnit failing every time) gets re-warned forever,
     -- every kickWarnInterval, with no visible feedback to the raid.
     local targets = {}
@@ -508,12 +562,39 @@ function Kick.Tick(now)
     return "warned", #targets
 end
 
+function Kick.IsSessionIgnored(name)
+    if type(name) ~= "string" or name == "" then
+        return false
+    end
+    if sessionIgnore[LowerName(name)] then
+        return true
+    end
+    local bare = BareName(name)
+    return bare and sessionIgnore[LowerName(bare)] and true or false
+end
+
+function Kick.ClearSessionIgnore(name)
+    if type(name) == "string" and name ~= "" then
+        sessionIgnore[LowerName(name)] = nil
+        local bare = BareName(name)
+        if bare then
+            sessionIgnore[LowerName(bare)] = nil
+        end
+    else
+        sessionIgnore = {}
+    end
+end
+
 function Kick.GetStatus()
     local db = DB()
     local can, groupKind = Kick.CanKick()
     local gaveUpCount = 0
     for _ in pairs(gaveUp) do
         gaveUpCount = gaveUpCount + 1
+    end
+    local ignoreCount = 0
+    for _ in pairs(sessionIgnore) do
+        ignoreCount = ignoreCount + 1
     end
     return {
         enabled = db and db.autoKickLevel59 and true or false,
@@ -524,6 +605,8 @@ function Kick.GetStatus()
         group = groupKind,
         pending = pending and #pending.targets or 0,
         gaveUp = gaveUpCount,
+        sessionIgnore = ignoreCount,
+        inCombat = IsInCombat() and true or false,
     }
 end
 
@@ -555,7 +638,30 @@ function Kick.Start()
     end)
     frame:RegisterEvent("PARTY_MEMBERS_CHANGED")
     frame:RegisterEvent("RAID_ROSTER_UPDATE")
-    frame:SetScript("OnEvent", function()
+    frame:RegisterEvent("PLAYER_REGEN_ENABLED") -- combat ended
+    frame:RegisterEvent("PLAYER_REGEN_DISABLED")
+    frame:SetScript("OnEvent", function(_, event)
+        if event == "PLAYER_REGEN_ENABLED" then
+            -- Combat dropped: drain deferred kicks immediately.
+            if pending and type(pending.targets) == "table" and #pending.targets > 0 then
+                local names = {}
+                for _, t in ipairs(pending.targets) do
+                    if t and t.name then
+                        table.insert(names, tostring(t.name))
+                    end
+                end
+                if AscensionLFM.Print and #names > 0 then
+                    AscensionLFM.Print("Kick59: combat ended - removing " .. table.concat(names, ", "))
+                end
+                pending.readyAt = 0
+            end
+            Kick.Tick(Now())
+            return
+        end
+        if event == "PLAYER_REGEN_DISABLED" then
+            SetStatus("in combat")
+            return
+        end
         -- Roster changed: re-evaluate soon (pending kicks still drain via Tick)
         Kick.Tick(Now())
     end)
@@ -570,6 +676,7 @@ function Kick._ResetForTests()
     pendingVerify = nil
     failedAttempts = {}
     gaveUp = {}
+    sessionIgnore = {}
 end
 
 function Kick._SetLastWarnAt(t)

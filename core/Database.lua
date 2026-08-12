@@ -14,7 +14,7 @@ AscensionLFM.Database = Database
 -- Default "notify": Log fills from public LFM/LFG MS lines; kick/auto-invite stay off.
 local DEFAULTS = {
     mode = "notify",
-    defaultsRev = 5, -- bumped when shipping default-mode / stock-copy changes
+    defaultsRev = 6, -- bumped when shipping default-mode / stock-copy changes
     roles = {
         tank = true,
         healer = false,
@@ -42,7 +42,7 @@ local DEFAULTS = {
     },
     useWhisperVariants = true,
     whisperVariantIndex = 1,
-    leaderBlacklist = {}, -- [nameLower] = true — skip auto-whisper / seeking notify soft
+    leaderBlacklist = {}, -- [nameLower] = true - skip auto-whisper / seeking notify soft
     autoInvite = true, -- only used while mode == "hosting" (whisper applicants)
     autoInviteLfg = true, -- hosting: InviteUnit players who post LFG MS in chat
     lfgInviteWithoutRole = false, -- if LFG has no role, do not guess (default-deny)
@@ -55,17 +55,24 @@ local DEFAULTS = {
     autoKickLevel59 = false,
     kickLevel = 59,
     kickWarnInterval = 10,
+    -- Aura of Experience (spell 818059) liar scan - default OFF
+    auraScanEnabled = false, -- scan assigned-aura players for real buff
+    auraScanAutoKick = false, -- warn+kick fakes (requires auraScanEnabled)
+    auraScanInterval = 15, -- seconds between scans
+    auraScanWarnInterval = 15, -- min gap between RW/kick cycles
     -- LFM Post / auto-repost (default OFF)
     postChannel = "YELL", -- YELL | SAY | GUILD | CHANNEL
     postChannelName = "", -- used when postChannel == CHANNEL
     autoRepost = false,
+    postShowAllRoles = false, -- LFM shows filled roles too when true
+
     repostInterval = 60, -- seconds; clamped to min 30
     lastPostAt = 0, -- wall-clock unix when last post succeeded (display)
     announceFull = false, -- optional one FULL line when stop-when-full fires
-    fullAnnounceMessage = "LFM MS FULL — thanks!",
+    fullAnnounceMessage = "LFM MS FULL - thanks!",
     wipeAnnounceMessage = "WIPE",
-    shieldAnnounceMessage = "KILL MOBS — boss shield still up!",
-    regroupAnnounceMessage = "REGROUP — accept invite",
+    shieldAnnounceMessage = "KILL MOBS - boss shield still up!",
+    regroupAnnounceMessage = "REGROUP - accept invite",
     -- Per-message delivery override (Message Studio style routing). Keys:
     -- "rw" (Role Check trigger), "wipe", "shield", "regroup", "full",
     -- "need". Values: "auto" (default smart cascade), "raidwarning"
@@ -75,24 +82,24 @@ local DEFAULTS = {
     messageRouting = {},
     regroupRoster = {}, -- display names remembered for regroup re-invite
     regroupDisplay = {}, -- [nameLower] = displayName for InviteUnit casing
-    -- Mini Quick HUD (floating bar — no /alfm needed)
+    -- Mini Quick HUD (floating bar - no /alfm needed)
     miniHudShow = true,
     miniHudExpanded = true,
     miniHudPoint = "CENTER",
     miniHudRelPoint = "CENTER",
     miniHudX = 0,
     miniHudY = 180,
-    -- Full Auto Hosting master (default OFF — spam safety)
+    -- Full Auto Hosting master (default OFF - spam safety)
     fullAutoHosting = false,
     -- Reject re-whisper (default OFF; Full Auto turns on)
     rejectRewhisper = false,
     rejectTemplate = "Sorry, {role} is full ({filled}/{max}).",
     rejectTemplates = {
         ["slot full"] = "Sorry, {role} is full ({filled}/{max}).",
-        full = "Group is full — thanks!",
+        full = "Group is full - thanks!",
         ["no role"] = "Please whisper a role: tank/heal/aura/dps (or T/H/A/D).",
         ["no parse"] = "Please whisper a role: tank/heal/aura/dps (or T/H/A/D).",
-        ["role filtered"] = "Not looking for {role} right now — thanks!",
+        ["role filtered"] = "Not looking for {role} right now - thanks!",
     },
     rejectCooldown = 30,
     rejectIgnoreList = {}, -- [nameLower] = true
@@ -101,7 +108,7 @@ local DEFAULTS = {
     soundOnMatch = false,
     soundOnApplicant = false,
     -- RW Role Check + Aura 1-per-subgroup auto-move
-    roleCheckMessage = "ROLE CHECK — whisper or party: tank/heal/aura/dps (T/H/A/D)",
+    roleCheckMessage = "ROLE CHECK - whisper or party: tank/heal/aura/dps (T/H/A/D)",
     roleCheckDuration = 60,
     roleCheckWindow = 60,
     roleCheckMinInterval = 30,
@@ -148,7 +155,7 @@ function Database.Init()
         _G.AscensionLFMDB = DeepCopy(DEFAULTS)
     else
         MergeDefaults(_G.AscensionLFMDB, DEFAULTS)
-        -- v0.2.2: leftover installs still on silent Off → listen (notify) once.
+        -- v0.2.2: leftover installs still on silent Off -> listen (notify) once.
         local rev = tonumber(_G.AscensionLFMDB.defaultsRev) or 0
         if rev < 2 then
             if _G.AscensionLFMDB.mode == "off" then
@@ -159,14 +166,20 @@ function Database.Init()
         end
         -- v0.4.2/0.4.4: refresh stock Role Check raid warning if still on an old default.
         if rev < 4 then
+            -- Hyphen (current) and em-dash (pre-ASCII-normalization, what
+            -- real existing users' SavedVariables may still contain)
+            -- variants both need to match, or upgraders whose stored
+            -- message predates the em-dash removal never get migrated.
             local oldMsgs = {
-                ["ROLE CHECK — whisper me tank / heal / aura / dps to sync MS slots"] = true,
-                ["ROLE CHECK — whisper tank / heal / aura / dps"] = true,
+                ["ROLE CHECK - whisper me tank / heal / aura / dps to sync MS slots"] = true,
+                ["ROLE CHECK - whisper tank / heal / aura / dps"] = true,
+                ["ROLE CHECK \226\128\148 whisper me tank / heal / aura / dps to sync MS slots"] = true,
+                ["ROLE CHECK \226\128\148 whisper tank / heal / aura / dps"] = true,
             }
             if oldMsgs[tostring(_G.AscensionLFMDB.roleCheckMessage or "")] then
                 _G.AscensionLFMDB.roleCheckMessage = DEFAULTS.roleCheckMessage
             end
-            -- v0.4.3 saved Full Auto with healer/aura accept off → heal whispers role-filtered.
+            -- v0.4.3 saved Full Auto with healer/aura accept off -> heal whispers role-filtered.
             if _G.AscensionLFMDB.fullAutoHosting then
                 if type(_G.AscensionLFMDB.roles) ~= "table" then
                     _G.AscensionLFMDB.roles = DeepCopy(DEFAULTS.roles)
@@ -182,14 +195,23 @@ function Database.Init()
         -- v0.4.8: Role Check accepts party/raid replies; refresh stock RW copy.
         if rev < 5 then
             local oldMsgs = {
-                ["ROLE CHECK — whisper me tank / heal / aura / dps to sync MS slots"] = true,
-                ["ROLE CHECK — whisper tank / heal / aura / dps"] = true,
-                ["ROLE CHECK — whisper tank/heal/aura/dps (or T/H/A/D)"] = true,
+                ["ROLE CHECK - whisper me tank / heal / aura / dps to sync MS slots"] = true,
+                ["ROLE CHECK - whisper tank / heal / aura / dps"] = true,
+                ["ROLE CHECK - whisper tank/heal/aura/dps (or T/H/A/D)"] = true,
+                ["ROLE CHECK \226\128\148 whisper me tank / heal / aura / dps to sync MS slots"] = true,
+                ["ROLE CHECK \226\128\148 whisper tank / heal / aura / dps"] = true,
+                ["ROLE CHECK \226\128\148 whisper tank/heal/aura/dps (or T/H/A/D)"] = true,
             }
             if oldMsgs[tostring(_G.AscensionLFMDB.roleCheckMessage or "")] then
                 _G.AscensionLFMDB.roleCheckMessage = DEFAULTS.roleCheckMessage
             end
             _G.AscensionLFMDB.defaultsRev = 5
+            rev = 5
+        end
+        if rev < 6 then
+            _G.AscensionLFMDB.auraScanAutoKick = false
+            _G.AscensionLFMDB.auraScanEnabled = false
+            _G.AscensionLFMDB.defaultsRev = 6
         end
     end
 end
@@ -246,7 +268,7 @@ function Database.SetFullAutoHosting(on)
             AscensionLFM.Poster.RefreshMessage()
         end
         if AscensionLFM.Print then
-            AscensionLFM.Print("Full Auto Hosting ON — whisper+LFG invite + scan + repost + reject")
+            AscensionLFM.Print("Full Auto Hosting ON - whisper+LFG invite + scan + repost + reject")
         end
     else
         db.autoInvite = false

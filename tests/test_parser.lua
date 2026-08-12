@@ -151,6 +151,35 @@ check("heal lfg MS15 healer", p and p.roles and p.roles.healer and p.roles.heale
 p = Parser.Parse("LFG MS15 DPS")
 check("LFG MS15 DPS", p and p.isManastormLFG and p.roles.dps)
 
+--------------------------------------------------------------------
+-- NegatedRoles: explicit "I don't want/have this role/attribute"
+-- detection, English and German phrasing.
+--------------------------------------------------------------------
+check("english 'no aura'", Parser.NegatedRoles("dps no aura").aura == true)
+check("english 'without aura'", Parser.NegatedRoles("dps without aura").aura == true)
+check("english 'not a healer'", Parser.NegatedRoles("dps not a healer").healer == true)
+check("english 'w/o aura'", Parser.NegatedRoles("dps w/o aura").aura == true)
+check("english 'no-aura'", Parser.NegatedRoles("dps no-aura").aura == true)
+
+check("german 'ohne aura'", Parser.NegatedRoles("dps ohne aura").aura == true)
+check("german 'keine aura'", Parser.NegatedRoles("dps keine aura").aura == true)
+check("german 'kein tank'", Parser.NegatedRoles("dps kein tank").tank == true)
+check("german 'keinen heiler'", Parser.NegatedRoles("dps keinen heiler").healer == true)
+
+-- 'keinerlei' must NOT match (the comment's own claim: the optional
+-- kein[e]? ending shouldn't bleed into unrelated longer words).
+local negKeinerlei = Parser.NegatedRoles("dps keinerlei aura interesse")
+check("german 'keinerlei' does not false-match", negKeinerlei.aura == nil, tostring(negKeinerlei.aura))
+
+-- Multiple negated roles in one message.
+local negMulti = Parser.NegatedRoles("dps ohne aura, kein tank")
+check("multiple negated roles: aura", negMulti.aura == true)
+check("multiple negated roles: tank", negMulti.tank == true)
+
+-- No negation phrasing present: empty set, not nil.
+local negNone = Parser.NegatedRoles("dps full loom lfg ms")
+check("no negation returns empty table", type(negNone) == "table" and next(negNone) == nil)
+
 io.write(string.format("parser tests: %d passed, %d failed\n", passed, failed))
 if failed > 0 then
     os.exit(1)

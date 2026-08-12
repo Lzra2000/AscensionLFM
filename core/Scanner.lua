@@ -12,6 +12,7 @@ AscensionLFM.Scanner = Scanner
 
 local recent = {} -- [leaderLower] = { t=, fingerprint= }
 local whisperSent = {} -- [leaderLower] = lastSendTime
+local followUpSent = {} -- [leaderLower] = last automated follow-up reply
 
 local CHAT_EVENTS = {
     "CHAT_MSG_CHANNEL",
@@ -161,7 +162,7 @@ end
 
 local function NotifyMatch(leader, parsed, source)
     local kind = parsed.isManastormLFG and "LFG" or "LFM"
-    local line = string.format("%s — %s (%s)", tostring(leader), parsed.summary or ("MS " .. kind), source)
+    local line = string.format("%s - %s (%s)", tostring(leader), parsed.summary or ("MS " .. kind), source)
     if AscensionLFM.Print then
         AscensionLFM.Print(line)
     end
@@ -178,7 +179,7 @@ local function NotifyMatch(leader, parsed, source)
     local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
     if AscensionLFM.Activity and AscensionLFM.Activity.Push then
         local kind = parsed.isManastormLFG and "LFG" or "LFM"
-        AscensionLFM.Activity.Push("match", string.format("%s — %s (%s)", tostring(leader), parsed.summary or ("MS " .. kind), source), { name = leader })
+        AscensionLFM.Activity.Push("match", string.format("%s - %s (%s)", tostring(leader), parsed.summary or ("MS " .. kind), source), { name = leader })
     end
     PlayMatchSound(db)
     if AscensionLFM.MainWindow and AscensionLFM.MainWindow.RefreshMatches then
@@ -310,7 +311,7 @@ end
 
 -- Group-chat classification for role-check-reply routing. RAID_WARNING was
 -- checked here before but never registered in CHAT_EVENTS (players can't
--- reply "in raid warning" — that channel is a one-way leader/assist
+-- reply "in raid warning" - that channel is a one-way leader/assist
 -- broadcast) so the check was unreachable dead code; dropped for clarity.
 local function IsGroupChatEvent(event)
     return event == "CHAT_MSG_PARTY"
@@ -336,7 +337,7 @@ end
 -- Fallback for when no formal Role Check is active (or it didn't match):
 -- passively catch exact bare-word role replies ("heal", "tank", "dps",
 -- "aura") in party/raid chat while hosting. Deliberately exact-only via
--- RoleCheck.ParseBareRoleWord — see its comment for why.
+-- RoleCheck.ParseBareRoleWord - see its comment for why.
 local function TryPassiveGroupRoleReply(sender, message)
     local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
     if not db or db.mode ~= "hosting" then
@@ -364,15 +365,16 @@ end
 -- are you?", "Please whisper your role and aura as: Tank/Heal/DPS + Aura
 -- yes/no.") after we already whispered them via MaybeAutoWhisper. Level is
 -- unambiguous (always just a number). Role/aura phrasing varies a lot
--- between different hosts' bots, so this is inherently best-effort — it
+-- between different hosts' bots, so this is inherently best-effort - it
 -- mirrors the "{role} + aura yes/no" convention from Hasan's own manual
 -- replies, not a universal standard.
 local FOLLOWUP_WINDOW = 300 -- 5 min: only reply to hosts we recently applied to
+local FOLLOWUP_COOLDOWN = 3 -- prevent a chatty bot from causing whisper spam
 
 local function DetectFollowUpKind(text)
     local lower = tostring(text or ""):lower()
     -- Require the message to actually look like a question/request, not a
-    -- status update — e.g. a bot's own confirmation "Registered as DPS -
+    -- status update - e.g. a bot's own confirmation "Registered as DPS -
     -- Aura: Yes. Waiting for invite." contains "aura" as a whole word too,
     -- and without this gate we'd fire ANOTHER unsolicited reply to that,
     -- right back at the bot that just confirmed us.
@@ -431,7 +433,11 @@ local function TryFollowUpReply(sender, message, db)
     local key = LowerName(sender)
     local last = whisperSent[key]
     if not last or (Now() - last) > FOLLOWUP_WINDOW then
-        return false -- never applied to this host, or too long ago — don't guess
+        return false -- never applied to this host, or too long ago - don't guess
+    end
+    local lastFollowUp = followUpSent[key]
+    if lastFollowUp and (Now() - lastFollowUp) < FOLLOWUP_COOLDOWN then
+        return false
     end
     local kind = DetectFollowUpKind(message)
     if not kind then
@@ -442,6 +448,7 @@ local function TryFollowUpReply(sender, message, db)
         return false
     end
     pcall(SendChatMessage, reply, "WHISPER", nil, sender)
+    followUpSent[key] = Now()
     if AscensionLFM.Activity and AscensionLFM.Activity.Push then
         AscensionLFM.Activity.Push("match",
             string.format("auto-replied %s (%s): %s", tostring(sender), kind, reply),

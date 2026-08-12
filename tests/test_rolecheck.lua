@@ -67,7 +67,7 @@ check("carl ignored", newMap.carl == nil)
 check("applied 1", applied == 1)
 
 check("active status format",
-    RoleCheck.BuildStatusText(true, 42, 3) == "Role check active — 42s left · 3 responses")
+    RoleCheck.BuildStatusText(true, 42, 3) == "Role check active - 42s left * 3 responses")
 
 -- Live StartCheck needs hosting + privilege
 RoleCheck._ResetForTests()

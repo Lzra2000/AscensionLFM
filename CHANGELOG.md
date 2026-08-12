@@ -1,5 +1,144 @@
 # Changelog
 
+## 0.4.69
+
+- **Reconciliation pass 2: merged a smaller external "stability-ui"
+  update (v0.4.68) that continued from the *original* v0.4.66 baseline
+  (not the v0.4.67 reconciliation above), so several of that pass's
+  fixes needed re-applying on top. Diffed every file against v0.4.67
+  first — most were byte-identical, confirming the earlier reconciliation
+  was accurate.
+  - **New: German applicant phrasing recognized as role negation**
+    (`core/Parser.lua`'s `NegatedRoles`) — "DPS ohne Aura" ("without
+    Aura"), "keine Aura"/"kein Tank" ("no Aura"/"no Tank"). Found and
+    fixed a real gap while adding test coverage: the shipped pattern's
+    own comment claimed it covered "kein/keine/keinen", but the actual
+    regex only matched an optional single extra letter, missing "keinen"
+    entirely — the correct German accusative for masculine nouns like
+    "Heiler"/"Tank" (i.e. "keinen Heiler" is how a German speaker would
+    naturally phrase "no healer" as a direct object). Replaced with three
+    explicit endings (kein/keine/keinen); "keinerlei" still correctly
+    does not false-match.
+  - **Improved: `core/Invite.lua`'s cooldown-retry queue** (from this
+    project's own v0.4.38) gained a `MAX_RETRY_ATTEMPTS` cap (3, then
+    gives up loudly instead of retrying a blocked applicant forever) and
+    de-duplication (a `CHAT_MSG` event firing twice for the same sender
+    before the first retry executes no longer double-queues them) — two
+    real gaps in the original design.
+  - **Improved: `core/AuraScan.lua`'s combat-log argument-layout
+    detection** refined from further live testing against Ascension's
+    exact `COMBAT_LOG_EVENT_UNFILTERED` argument ordering (narrowed a
+    `boolean or number` type check to `boolean` only, and corrected the
+    resulting index shift), and `core/Scanner.lua`'s Seeking-mode
+    follow-up auto-reply gained a 3s per-host cooldown so a chatty/looping
+    host bot asking several questions in immediate succession can't cause
+    reply spam.
+  - **UI: `ui/MiniHUD.lua`** Quick HUD buttons and frame sizing increased
+    slightly (each button +2-8px, frame 380x72→440x86 and
+    420x78→440x86) — addresses real visual cramping, self-contained
+    widget with its own frame, no interaction with the carefully
+    pixel-verified MainWindow tab layouts.
+  - Re-applied from the v0.4.67 pass (this branch continued from before
+    it): the em-dash stock-message migration fix (this time for *both*
+    affected migration steps, rev<4 and rev<5 — the rev<4 one was missed
+    in the first pass), the `AuraScan.Start()` indentation cleanup, and
+    `SpecRole._MatchRole`'s test-only export.
+  - Test coverage added: `test_parser.lua` gained a full `NegatedRoles`
+    section (18 checks: English + German phrasing, the "keinerlei"
+    false-match guard, multiple negations in one message). `test_invite.lua`
+    gained retry-cap and duplicate-queue regression checks.
+    `test_v040_auto.lua`'s existing follow-up-reply tests needed a
+    time-advance between steps to clear the new 3s cooldown, plus a
+    dedicated regression test for the cooldown itself. Full suite green.
+
+## 0.4.67
+
+- **Reconciliation pass: merged a large batch of external work (v0.4.44-
+  v0.4.66) developed outside this session's git history back into the
+  tracked codebase, with full regression testing.** A v0.4.66 build was
+  provided as a zip with no corresponding git commits and no test suite
+  included. Rather than trust or discard it wholesale, every changed file
+  was diffed against our last tracked state (v0.4.43), our full test
+  suite was run against the new code, and every difference was
+  individually verified as either a genuine improvement, a real bug, or
+  a test that needed updating for legitimately new behavior:
+  - **New: Aura of Experience verification (`core/AuraScan.lua`).**
+    Detects who is genuinely wearing the Aura of Experience buff
+    (spell 818059, confirmed via the real 3.3.5a `UnitAura` API) versus
+    who merely claimed the "aura" role. Critically, this does **not**
+    naively trust `UnitAura` on other players — live testing found
+    Ascension often doesn't expose other players' buffs to `UnitAura`
+    at all, which would make every "no buff visible" read a false
+    positive. Detection only activates once the buff has actually been
+    *proven* visible on at least one other party/raid member this
+    session (via `UnitAura` and/or a `COMBAT_LOG_EVENT_UNFILTERED`
+    mirror for spell 818059, handling multiple observed Ascension CLEU
+    argument layouts) — otherwise it stays silently idle rather than
+    accusing anyone. When it does act: warn first, defer, then verify
+    the target actually left the roster before logging a kick (the same
+    "don't trust a successful API call as proof" lesson from Kick59's
+    v0.4.28 fix) — plus an `IsInCombat()` check deferring kicks during
+    combat, where `UninviteUnit` is unreliable on Ascension. Defaults
+    fully OFF (`auraScanEnabled`/`auraScanAutoKick`), matching Kick59's
+    safety model. New `defaultsRev` 5→6 migration sets both to `false`
+    for upgrading users.
+  - **New: spec-based role guess (`core/SpecRole.lua`).** Best-effort
+    role suggestion from the host's own active Ascension specialization
+    or (classic 3.3.5a fallback) highest-invested talent tab, as a
+    supplementary signal alongside the existing whisper self-report
+    system. Fails soft (returns nil) if neither API is available —
+    never blocks or overrides the whisper-based flow.
+  - **New: Roster panel (`ui/RosterPanel.lua`).** Card-style raid-group
+    overview (per-subgroup role icons/colors, T/H/A/D + online/total/
+    unknown summary line), a new tab in the main window.
+  - **Improved: "prefer support seat" near-full-raid logic** (originally
+    v0.4.19) now only holds a DPS applicant back when a support-role
+    applicant is *actually waiting in the queue* — previously it held
+    every near-full DPS request regardless, which could leave a seat
+    empty forever if nobody ever applied for the open support role.
+  - **Robustness: ASCII-only user-facing strings.** Em-dashes (—) and
+    middle-dots (·) throughout the codebase (chat messages, status text,
+    comments) were normalized to plain hyphens/asterisks, avoiding any
+    encoding-related risk in the WoW chat/Lua environment across
+    different editors/OSes.
+  - **`core/Kick.lua`:** added a Combat check (`IsInCombat` via
+    `InCombatLockdown`/`UnitAffectingCombat`) before attempting a kick —
+    live testing found `UninviteUnit` often silently no-ops while either
+    party is in combat inside Manastorm — and a `sessionIgnore` set
+    blocking re-invite of someone just kicked this session.
+  - Window resized 720x560 → 760x600 for the new Roster tab.
+  - `INSTALL.txt` gained a dedicated "Loaded: Incompatible" troubleshooting
+    section (diagnosed via the new `/alfm diag` command, which lists every
+    module as OK/MISSING) — merged with the existing bilingual EN/DE
+    quick-start rather than replacing it.
+
+  **Bugs found and fixed during reconciliation:**
+  - The rev<5 stock-RW-message migration's `oldMsgs` lookup only matched
+    the new hyphen variant of old stock messages, not the em-dash variant
+    real upgrading users' SavedVariables still contain from before the
+    ASCII-normalization above — meaning genuine upgraders would never get
+    migrated. Added the em-dash variants back to the lookup table.
+  - A stray indentation-only formatting slip in `AuraScan.Start()`'s
+    `RegisterEvent` calls (cosmetic, no functional effect, cleaned up).
+  - `SpecRole.lua`'s local `MatchRole` helper exposed as `SpecRole._MatchRole`
+    for direct unit testing, matching this codebase's established
+    pure-function-testability convention.
+
+  **Test coverage added/updated** (full suite green, 17 files): new
+  `test_aura_scan.lua` (33 checks: pure `SelectLiars`/`BuildWarnMessage`,
+  the "never accuse until proven visible" safety gate across multiple
+  ticks, combat-log parsing across argument layouts, and the complete
+  warn→verify→kicked cycle including a still-present false-attempt and a
+  genuine-departure success case), new `test_spec_role.lua` (26 checks),
+  new `test_roster_panel.lua` (28 checks: `BuildData`'s raid/party paths,
+  subgroup role-sorting and count aggregation, out-of-range subgroup
+  clamping, `FormatSummary`'s formatting). Updated `test_defaults_notify.lua`
+  (defaultsRev 5→6 + new em-dash-migration regression test),
+  `test_poster.lua`/`test_rolecheck.lua` (ASCII-normalized text
+  assertions), `test_ui_smoke.lua` (new frame size), `test_lfg_invite.lua`
+  (both branches of the refined prefer-support-seat logic, plus missing
+  `IsRaidLeader`/`IsRaidOfficer` mocks the new privilege path needed).
+
 ## 0.4.43
 
 - **UI: Queue tab now shows a role icon per applicant** (step 1 of an

@@ -1,24 +1,28 @@
 ## Interface: 30300
 ## Title: AscensionLFM
-## Notes: Manastorm LFM/LFG — Full Auto, Mini HUD, RW Role Check, Aura auto-move, post/repost, Kick59.
-## Author: Lzra2000
-## Version: 0.4.43
+## Notes: Manastorm LFM host helper for Ascension.gg
+## Author: Lazra
+## Version: 0.4.69
 ## SavedVariables: AscensionLFMDB
 ## DefaultState: enabled
+## X-Website: https://ascension.gg
 
 core\Database.lua
 core\Parser.lua
 core\Slots.lua
-core\Activity.lua
-core\Reject.lua
-core\Presets.lua
+core\SpecRole.lua
 core\Queue.lua
+core\Reject.lua
 core\Invite.lua
 core\Kick.lua
+core\AuraScan.lua
 core\AuraBalance.lua
 core\RoleCheck.lua
 core\Poster.lua
+core\Presets.lua
 core\Scanner.lua
+core\Activity.lua
 ui\MiniHUD.lua
+ui\RosterPanel.lua
 ui\MainWindow.lua
 core\Bootstrap.lua

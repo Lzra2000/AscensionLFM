@@ -52,6 +52,32 @@ end
 -- @param message raw whisper
 -- @param status "pending"|"invited"|"rejected"|"blocked"
 -- @param detail optional reason string
+--- Build short dual-role label from primary role + OfferedRoles (e.g. "dps+aura").
+function Queue.FormatRoleLabel(role, message)
+    local primary = role and tostring(role) or nil
+    local offered = {}
+    if message and AscensionLFM.Parser and AscensionLFM.Parser.OfferedRoles then
+        offered = AscensionLFM.Parser.OfferedRoles(message) or {}
+    end
+    local order = { "tank", "healer", "aura", "dps" }
+    local parts = {}
+    local seen = {}
+    if primary then
+        table.insert(parts, primary)
+        seen[primary] = true
+    end
+    for _, r in ipairs(order) do
+        if offered[r] and not seen[r] then
+            table.insert(parts, r)
+            seen[r] = true
+        end
+    end
+    if #parts == 0 then
+        return nil
+    end
+    return table.concat(parts, "+")
+end
+
 function Queue.Push(name, role, message, status, detail)
     local db = DB()
     local q = Ensure(db)
@@ -62,9 +88,11 @@ function Queue.Push(name, role, message, status, detail)
         return false
     end
     local key = LowerName(name)
+    local roleLabel = Queue.FormatRoleLabel(role, message)
     for i = 1, #q do
         if LowerName(q[i].name) == key then
             q[i].role = role or q[i].role
+            q[i].roleLabel = roleLabel or q[i].roleLabel or q[i].role
             q[i].message = message or q[i].message
             q[i].status = status or q[i].status or "pending"
             q[i].detail = detail
@@ -78,6 +106,7 @@ function Queue.Push(name, role, message, status, detail)
     table.insert(q, 1, {
         name = name,
         role = role,
+        roleLabel = roleLabel or role,
         message = tostring(message or ""):sub(1, 120),
         status = status or "pending",
         detail = detail,

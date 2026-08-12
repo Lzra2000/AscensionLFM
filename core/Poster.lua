@@ -57,7 +57,7 @@ end
 
 --- Pure: build LFM string from a Slots.Snapshot()-style table.
 -- Format: LFM MS {t}/{tmax} Tanks {h}/{hmax} Healers {a}/{amax} Aura {d}/{dmax} DPS
-function Poster.BuildMessage(snapshot)
+function Poster.BuildMessage(snapshot, showAll)
     snapshot = snapshot or {}
     local bits = { "LFM MS" }
     for _, role in ipairs(ROLE_ORDER) do
@@ -66,15 +66,14 @@ function Poster.BuildMessage(snapshot)
         local max = tonumber(s.max) or 0
         if filled < 0 then filled = 0 end
         if max < 0 then max = 0 end
-        -- Only advertise roles that are actually open (max>0 and not yet
-        -- filled) — a full or disabled role adds noise without adding
-        -- information; readers only need to see what's still needed.
-        if max > 0 and filled < max then
+        -- Default: only open roles. showAll=true keeps filled lines too
+        -- (e.g. "2/2 Tanks | 1/3 Healers") so readers see composition.
+        if max > 0 and (showAll or filled < max) then
             table.insert(bits, string.format("%d/%d %s", filled, max, ROLE_LABELS[role]))
         end
     end
     if #bits == 1 then
-        return "LFM MS — full"
+        return "LFM MS - full"
     end
     return table.concat(bits, " | ")
 end
@@ -89,7 +88,7 @@ function Poster.IsFull(snapshot, groupSize, maxPartySize, unassignedCount)
     if maxPartySize > 0 and groupSize >= maxPartySize then
         return true, "maxPartySize"
     end
-    -- Nearly full + unassigned bodies: seats are taken; roles just unknown → stop repost
+    -- Nearly full + unassigned bodies: seats are taken; roles just unknown -> stop repost
     if unassignedCount > 0 and maxPartySize > 0 and groupSize >= (maxPartySize - 1) then
         return true, "unassigned"
     end
@@ -148,7 +147,7 @@ local function ResolveChannelIndex(name)
         return nil
     end
     if type(GetChannelName) == "function" then
-        -- GetChannelName(name) → id, name, ...  (3.3.5a). Guard with pcall:
+        -- GetChannelName(name) -> id, name, ...  (3.3.5a). Guard with pcall:
         -- an unrecognized/malformed name should just mean "not found", not
         -- an uncaught error that silently breaks the whole resolution.
         local ok, id = pcall(GetChannelName, name)
@@ -159,7 +158,7 @@ local function ResolveChannelIndex(name)
             end
         end
     end
-    -- Numeric channel id typed directly — also accept a copy-pasted "N."
+    -- Numeric channel id typed directly - also accept a copy-pasted "N."
     -- prefix like the channel tab shows ("1. General"), e.g. "1." -> 1.
     local asNum = tonumber(name) or tonumber(name:match("^(%d+)%."))
     if asNum and asNum > 0 then
@@ -170,10 +169,10 @@ end
 
 --- Whether the resolved channel id is one the player has actually joined.
 -- SendChatMessage to a CHANNEL type the player hasn't joined doesn't throw
--- a Lua error — it just silently fails client-side (a system message the
+-- a Lua error - it just silently fails client-side (a system message the
 -- addon never sees), the same "no error != it worked" trap already fixed
 -- for Kick59's UninviteUnit (v0.4.28). Defaults to true (assume joined)
--- if GetChannelList is unavailable, errors, or returns nothing — this
+-- if GetChannelList is unavailable, errors, or returns nothing - this
 -- check should never itself become a new reason posting silently breaks.
 local function IsChannelJoined(id)
     if type(GetChannelList) ~= "function" then
@@ -224,7 +223,7 @@ end
 -- positive cap left over from before it was disabled. Without this, the
 -- posted LFM text could advertise e.g. "0/3 Healers" for a role nobody can
 -- actually get invited for (TryHostInvite/TryLfgInvite already reject via
--- db.roles separately with "role filtered" — so the ad and the reply would
+-- db.roles separately with "role filtered" - so the ad and the reply would
 -- contradict each other), and Poster.IsFull's "slots" full-check could
 -- never resolve since that role's cap could never be met by anyone.
 local function FilterAcceptedRoles(snapshot, db)
@@ -248,7 +247,8 @@ end
 
 --- Build (or refresh) the current LFM text from slots.
 function Poster.RefreshMessage()
-    lastMessage = Poster.BuildMessage(FilterAcceptedRoles(LiveSnapshot(), DB()))
+    local db = DB()
+    lastMessage = Poster.BuildMessage(FilterAcceptedRoles(LiveSnapshot(), db), db and db.postShowAllRoles)
     return lastMessage
 end
 
@@ -269,9 +269,9 @@ end
 -- as the start of an escape/color/link code (|cAARRGGBB..., |H...|h, |T...|t);
 -- a raw "|" not followed by a recognized code throws "Invalid escape code
 -- in chat message" and the whole send fails. "||" is the standard WoW
--- escape for a literal pipe — it renders as a single "|" to readers, so
+-- escape for a literal pipe - it renders as a single "|" to readers, so
 -- the visible " | " role separator (v0.4.29) looks identical once
--- escaped. Only applied right before the actual SendChatMessage call —
+-- escaped. Only applied right before the actual SendChatMessage call -
 -- BuildMessage()'s output, the UI preview box, and Parser.Parse() (which
 -- reads other hosts' raw posts) all keep the clean, single-pipe text.
 local function EscapeForSend(s)
@@ -298,7 +298,7 @@ function Poster.PostOnce(msg, channel, channelName, nowOverride)
     if channel == "CHANNEL" then
         local id = ResolveChannelIndex(channelName)
         if not id then
-            -- Do NOT silently fall back to YELL — that's a completely
+            -- Do NOT silently fall back to YELL - that's a completely
             -- different, much shorter-range broadcast than the configured
             -- channel, and posting there instead without the host
             -- realizing means the LFM silently reaches almost nobody
@@ -307,7 +307,7 @@ function Poster.PostOnce(msg, channel, channelName, nowOverride)
             local reason = "channel not found: " .. tostring(channelName)
             lastStatus = "post failed: bad channel"
             if AscensionLFM.Print then
-                AscensionLFM.Print("Post failed — " .. reason
+                AscensionLFM.Print("Post failed - " .. reason
                     .. ". Check the Channel name field (try the number shown in your chat tab, e.g. \"1\").")
             end
             return false, reason
@@ -321,8 +321,8 @@ function Poster.PostOnce(msg, channel, channelName, nowOverride)
             local reason = "channel " .. tostring(id) .. " not joined"
             lastStatus = "post failed: channel not joined"
             if AscensionLFM.Print then
-                AscensionLFM.Print("Post failed — you haven't joined channel " .. tostring(id)
-                    .. ". Right-click a chat tab → Channels to join it, or check the number in the Post tab.")
+                AscensionLFM.Print("Post failed - you haven't joined channel " .. tostring(id)
+                    .. ". Right-click a chat tab -> Channels to join it, or check the number in the Post tab.")
             end
             return false, reason
         end
@@ -416,7 +416,7 @@ function Poster.Tick(now)
                 db.autoRepost = false
                 lastStatus = "stopped: full"
                 if db.announceFull then
-                    local fullMsg = tostring(db.fullAnnounceMessage or "LFM MS FULL — thanks!")
+                    local fullMsg = tostring(db.fullAnnounceMessage or "LFM MS FULL - thanks!")
                     if fullMsg ~= "" and type(SendChatMessage) == "function" then
                         local sendFullMsg = EscapeForSend(fullMsg)
                         local ch = NormalizeChannel(db.postChannel)

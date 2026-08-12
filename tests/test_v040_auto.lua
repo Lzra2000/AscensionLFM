@@ -339,12 +339,17 @@ check("seeking: role+aura auto-reply sent", #followSent == 1, tostring(#followSe
 check("seeking: role+aura reply content", followSent[1] and followSent[1].msg == "dps + aura yes",
     followSent[1] and followSent[1].msg or "none")
 
--- Step 3: Suriana's bot asks for level
+-- Step 3: Suriana's bot asks for level. Advance time past the new
+-- FOLLOWUP_COOLDOWN (3s, added to prevent a chatty bot from causing
+-- whisper spam across rapid-fire questions) so this second reply isn't
+-- itself throttled.
+_G.GetTime = function() return 1004 end
 followSent = {}
 AscensionLFM.Scanner._HandleWhisper("Suriana", "What level are you? Please reply with a number from 1 to 60.")
 check("seeking: level auto-reply sent", #followSent == 1, tostring(#followSent))
 check("seeking: level reply content", followSent[1] and followSent[1].msg == "21",
     followSent[1] and followSent[1].msg or "none")
+_G.GetTime = function() return 1000 end
 
 -- A stranger we never whispered asking the same question gets no reply —
 -- avoids the exact "unsolicited auto-reply to someone unrelated" mistake
@@ -360,6 +365,23 @@ check("seeking: no reply to someone we never applied to", #followSent == 0, tost
 followSent = {}
 AscensionLFM.Scanner._HandleWhisper("Suriana", "Registered as DPS - Aura: Yes. Waiting for invite.")
 check("seeking: no reply to bot's own confirmation message", #followSent == 0, tostring(#followSent))
+
+-- Regression: FOLLOWUP_COOLDOWN (3s) prevents replying to the same host
+-- twice in rapid succession — guards against a chatty/looping bot causing
+-- whisper spam. A second question landing within the cooldown window
+-- gets no reply; the same question after the window elapses does.
+-- (Stay within the outer 5-min whisperSent freshness window, seeded at
+-- GetTime()=1000 back in Step 1 - only test the new inner 3s cooldown.)
+_G.GetTime = function() return 1100 end
+AscensionLFM.Scanner._HandleWhisper("Suriana", "What level are you?")
+followSent = {}
+AscensionLFM.Scanner._HandleWhisper("Suriana", "Please confirm your role?")
+check("follow-up cooldown blocks a second reply within 3s", #followSent == 0, tostring(#followSent))
+_G.GetTime = function() return 1104 end
+followSent = {}
+AscensionLFM.Scanner._HandleWhisper("Suriana", "Please confirm your role?")
+check("follow-up reply allowed again once cooldown elapses", #followSent == 1, tostring(#followSent))
+_G.GetTime = function() return 1000 end
 
 io.write(string.format("test_v040_auto: %d passed, %d failed\n", passed, failed))
 if failed > 0 then

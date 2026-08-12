@@ -12,26 +12,27 @@ local MainWindow = {}
 AscensionLFM.MainWindow = MainWindow
 
 local FRAME_NAME = "AscensionLFMFrame"
-local FRAME_WIDTH = 720
+local FRAME_WIDTH = 760
 -- Dialog height fits common 768+ screens; tall category pages scroll.
-local FRAME_HEIGHT = 560
-local SIDEBAR_WIDTH = 148
+local FRAME_HEIGHT = 600
+local SIDEBAR_WIDTH = 158
 -- Toggle rows: title + 2-line desc must fit without spilling into the next control.
-local TOGGLE_ROW_H = 58
-local TOGGLE_STEP = 68 -- row height + 10px gap
+local TOGGLE_ROW_H = 66
+local TOGGLE_STEP = 74 -- row height + gap (no overlap)
 
 local CAT_GENERAL = "general"
 local CAT_SEEKING = "seeking"
 local CAT_HOSTING = "hosting"
 local CAT_POST = "post"
 local CAT_QUEUE = "queue"
+local CAT_ROSTER = "roster"
 local CAT_KICK = "kick"
 local CAT_LOG = "log"
 
 local CATEGORIES = {
     { id = CAT_GENERAL, label = "General",
       title = "General",
-      sub = "Mode and status. Default Notify = Listening ON. Full Auto Hosting is opt-in OFF." },
+      sub = "Mode, Mini HUD, message delivery routing. Default Notify = Listening ON." },
     { id = CAT_SEEKING, label = "Seeking",
       title = "Seeking",
       sub = "Roles, rotating whisper variants, leader blacklist, optional match sound." },
@@ -43,10 +44,13 @@ local CATEGORIES = {
       sub = "LFM compose, scan fills, RW Role Check, auto-repost + optional FULL announce." },
     { id = CAT_QUEUE, label = "Queue",
       title = "Queue",
-      sub = "Recent applicant whispers — Invite or Reject+rewhisper." },
+      sub = "Recent applicant whispers - Invite or Reject+rewhisper." },
+    { id = CAT_ROSTER, label = "Roster",
+      title = "Roster",
+      sub = "Groups 1-8: click role icon for popup, Ready check, Spec, X to remove." },
     { id = CAT_KICK, label = "Kick",
       title = "Kick",
-      sub = "Opt-in level-59 auto-kick with raid warning. Dangerous — default OFF." },
+      sub = "Level-59 kick + Aura buff scan (idle if buff hidden on others). Default OFF." },
     { id = CAT_LOG, label = "Log",
       title = "Log",
       sub = "Match history + activity (posts, invites, rejects, matches)." },
@@ -152,6 +156,39 @@ local function SetInk(fs, rgba)
     end
 end
 
+local function TruncateText(text, maxLen)
+    text = tostring(text or "")
+    maxLen = tonumber(maxLen) or 72
+    -- strip color codes for length estimate
+    local plain = text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|n", " ")
+    if #plain <= maxLen then
+        return text
+    end
+    return plain:sub(1, maxLen - 1) .. "..."
+end
+
+--- Fit a FontString into a region so long lines wrap instead of overlapping.
+local function FitText(fs, maxWidth, maxHeight)
+    if type(fs) ~= "table" then
+        return
+    end
+    if maxWidth and fs.SetWidth then
+        fs:SetWidth(maxWidth)
+    end
+    if maxHeight and fs.SetHeight then
+        fs:SetHeight(maxHeight)
+    end
+    if fs.SetWordWrap then
+        fs:SetWordWrap(true)
+    end
+    if fs.SetNonSpaceWrap then
+        fs:SetNonSpaceWrap(true)
+    end
+    if fs.SetJustifyV then
+        fs:SetJustifyV("TOP")
+    end
+end
+
 -- WotLK 3.3.5a CheckButton:GetChecked() returns 1 / nil, not true / false.
 local function CheckButtonIsOn(check)
     if type(check) ~= "table" or type(check.GetChecked) ~= "function" then
@@ -191,26 +228,27 @@ local function RefreshStatus()
     local last = ""
     if db.matchHistory and db.matchHistory[1] then
         local m = db.matchHistory[1]
-        last = string.format("\nLast: %s — %s", tostring(m.leader), tostring(m.summary or m.text or ""))
+        last = "  |  Last: " .. TruncateText(
+            tostring(m.leader or "") .. " - " .. tostring(m.summary or m.text or ""), 40)
     end
-    local kickBit = db.autoKickLevel59 and " · |cffff6060Kick59 ON|r" or ""
-    local fullBit = db.fullAutoHosting and " · |cff2a7a3aFull Auto ON|r" or ""
-    statusFS:SetText(string.format("Status: %s  ·  Mode: |cffc8a03c%s|r%s%s%s",
-        listening, ModeLabel(db.mode), fullBit, kickBit, last))
+    local kickBit = db.autoKickLevel59 and " * |cffff6060Kick59 ON|r" or ""
+    local fullBit = db.fullAutoHosting and " * |cff2a7a3aFull Auto ON|r" or ""
+    statusFS:SetText(TruncateText(string.format("Status: %s  *  Mode: |cffc8a03c%s|r%s%s%s",
+        listening, ModeLabel(db.mode), fullBit, kickBit, last), 110))
 
     if footerStatus then
         local kick = db.autoKickLevel59 and "Kick59 ON" or "Kick59 off"
         if activeCategory == CAT_KICK then
-            footerStatus:SetText("Kick log · Clear removes kick history")
+            footerStatus:SetText("Kick log * Clear removes kick history")
         elseif activeCategory == CAT_LOG then
-            footerStatus:SetText("Match + activity · Clear removes both")
+            footerStatus:SetText("Match + activity * Clear removes both")
         elseif activeCategory == CAT_QUEUE then
-            footerStatus:SetText("Applicant queue · Clear empties queue")
+            footerStatus:SetText("Applicant queue * Clear empties queue")
         else
             local fa = db.fullAutoHosting and "FullAuto ON" or "FullAuto off"
-            footerStatus:SetText(string.format("%s · Mode %s · %s · %s",
+            footerStatus:SetText(TruncateText(string.format("%s * Mode %s * %s * %s",
                 listeningOn and "Listening ON" or "Listening OFF",
-                ModeLabel(db.mode), fa, kick))
+                ModeLabel(db.mode), fa, kick), 72))
         end
         SetInk(footerStatus, MUTED)
     end
@@ -233,7 +271,7 @@ function MainWindow.RefreshSlots()
             table.insert(bits, string.format("%s %d/%d", label, s.filled, s.max))
         end
     end
-    slotsFS:SetText("Filled: " .. table.concat(bits, "  ·  "))
+    slotsFS:SetText(TruncateText("Filled: " .. table.concat(bits, "  *  "), 90))
     RefreshStatus()
     MainWindow.RefreshRoleCheck()
 end
@@ -298,7 +336,7 @@ function MainWindow.RefreshPost()
         end
         table.insert(bits, "Last post: " .. FormatLastPostWall())
         table.insert(bits, "Channel: " .. tostring(st.channel or "YELL"))
-        postStatusFS:SetText(table.concat(bits, "  ·  "))
+        postStatusFS:SetText(table.concat(bits, "  *  "))
     end
     if widgets.autoRepost and widgets.autoRepost.SetChecked then
         widgets.autoRepost:SetChecked(st.enabled and true or false)
@@ -349,6 +387,13 @@ function MainWindow.RefreshMatches()
 end
 
 function MainWindow.RefreshKicks()
+    if widgets.auraRelFS then
+        if AscensionLFM.AuraScan and AscensionLFM.AuraScan.GetReliabilityNote then
+            widgets.auraRelFS:SetText(AscensionLFM.AuraScan.GetReliabilityNote())
+        else
+            widgets.auraRelFS:SetText("")
+        end
+    end
     local db = AscensionLFM.Database.Get()
     local history = db.kickHistory or {}
     for i = 1, 6 do
@@ -356,8 +401,14 @@ function MainWindow.RefreshKicks()
         if fs then
             local k = history[i]
             if k then
-                fs:SetText(string.format("|cff4a3010%s|r at level |cff802020%s|r",
-                    tostring(k.name or "?"), tostring(k.level or "?")))
+                local reason = k.reason
+                if reason and reason ~= "" then
+                    fs:SetText(string.format("|cff4a3010%s|r - |cff802020%s|r",
+                        tostring(k.name or "?"), tostring(reason)))
+                else
+                    fs:SetText(string.format("|cff4a3010%s|r at level |cff802020%s|r",
+                        tostring(k.name or "?"), tostring(k.level or "?")))
+                end
                 fs:Show()
             else
                 fs:SetText("")
@@ -380,8 +431,10 @@ function MainWindow.RefreshActivity()
         if fs then
             local a = history[i]
             if a then
+                local text = tostring(a.text or "")
+                if #text > 72 then text = text:sub(1, 69) .. "..." end
                 fs:SetText(string.format("|cff6a4a10[%s]|r %s",
-                    tostring(a.kind or "?"), tostring(a.text or "")))
+                    tostring(a.kind or "?"), text))
                 fs:Show()
             else
                 fs:SetText("")
@@ -482,6 +535,29 @@ local function SyncWidgetsFromDB()
     if widgets.autoKick and widgets.autoKick.SetChecked then
         widgets.autoKick:SetChecked(db.autoKickLevel59 and true or false)
     end
+    if widgets.auraScan and widgets.auraScan.SetChecked then
+        widgets.auraScan:SetChecked(db.auraScanEnabled and true or false)
+    end
+    if widgets.auraScanKick and widgets.auraScanKick.SetChecked then
+        widgets.auraScanKick:SetChecked(db.auraScanAutoKick and true or false)
+    end
+    if widgets.routeButtons then
+        local routing = type(db.messageRouting) == "table" and db.messageRouting or {}
+        local labels = {
+            auto = "Auto",
+            raidwarning = "RW only",
+            raid = "Raid/Party",
+            ["local"] = "Local",
+            disabled = "Off",
+        }
+        for kind, btn in pairs(widgets.routeButtons) do
+            if btn and btn.SetText then
+                local r = routing[kind]
+                if r == nil or r == "" then r = "auto" end
+                btn:SetText(labels[tostring(r)] or tostring(r))
+            end
+        end
+    end
     if widgets.whisperEdit and widgets.whisperEdit.SetText then
         widgets.whisperEdit:SetText(tostring(db.whisperMessage or ""))
     end
@@ -520,6 +596,9 @@ local function SyncWidgetsFromDB()
     end
     if widgets.announceFull and widgets.announceFull.SetChecked then
         widgets.announceFull:SetChecked(db.announceFull and true or false)
+    end
+    if widgets.postShowAllRoles and widgets.postShowAllRoles.SetChecked then
+        widgets.postShowAllRoles:SetChecked(db.postShowAllRoles and true or false)
     end
     if widgets.miniHud and widgets.miniHud.SetChecked then
         widgets.miniHud:SetChecked(db.miniHudShow ~= false)
@@ -611,10 +690,10 @@ local function CreateToggleRow(parent, y, title, description, danger, onToggle)
     end)
 
     local titleFs = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    titleFs:SetPoint("TOPLEFT", check, "TOPRIGHT", 6, -2)
-    titleFs:SetPoint("RIGHT", row, "RIGHT", -8, 0)
+    titleFs:SetPoint("TOPLEFT", check, "TOPRIGHT", 6, -4)
+    titleFs:SetPoint("RIGHT", row, "RIGHT", -10, 0)
     titleFs:SetJustifyH("LEFT")
-    titleFs:SetText(title)
+    titleFs:SetText(TruncateText(title, 64))
     if danger then
         SetInk(titleFs, DANGER)
     else
@@ -622,18 +701,10 @@ local function CreateToggleRow(parent, y, title, description, danger, onToggle)
     end
 
     local descFs = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    descFs:SetPoint("TOPLEFT", titleFs, "BOTTOMLEFT", 0, -3)
-    descFs:SetPoint("RIGHT", row, "RIGHT", -8, 0)
-    if descFs.SetHeight then
-        descFs:SetHeight(30)
-    end
+    descFs:SetPoint("TOPLEFT", titleFs, "BOTTOMLEFT", 0, -2)
+    descFs:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -10, 6)
     descFs:SetJustifyH("LEFT")
-    if descFs.SetJustifyV then
-        descFs:SetJustifyV("TOP")
-    end
-    if descFs.SetNonSpaceWrap then
-        descFs:SetNonSpaceWrap(true)
-    end
+    FitText(descFs, nil, 36)
     descFs:SetText(description)
     SetInk(descFs, MUTED)
 
@@ -767,7 +838,10 @@ function MainWindow.SelectCategory(id)
     end
 
     if clearBtn then
-        if id == CAT_LOG or id == CAT_KICK or id == CAT_QUEUE then
+        if id == CAT_ROSTER and AscensionLFM.RosterPanel and AscensionLFM.RosterPanel.Refresh then
+            AscensionLFM.RosterPanel.Refresh()
+        end
+        if id == CAT_LOG or id == CAT_KICK or id == CAT_QUEUE or id == CAT_ROSTER then
             clearBtn:Show()
         else
             clearBtn:Hide()
@@ -826,7 +900,7 @@ function MainWindow.Init()
 
     local sub = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     sub:SetPoint("TOP", title, "BOTTOM", 0, -2)
-    sub:SetText("Manastorm Level Run LFM/LFG · v" .. tostring(AscensionLFM.VERSION or "0.4.16"))
+    sub:SetText("Manastorm Level Run LFM/LFG * v" .. tostring(AscensionLFM.VERSION or "0.4.16"))
     SetInk(sub, MUTED)
 
     local shell = CreateFrame("Frame", FRAME_NAME .. "Shell", frame)
@@ -844,11 +918,11 @@ function MainWindow.Init()
     sideLabel:SetText("CATEGORIES")
     SetInk(sideLabel, { 0.78, 0.62, 0.24, 1 })
 
-    local y = -28
+    local y = -26
     for i = 1, #CATEGORIES do
         local cat = CATEGORIES[i]
         local btn = CreateFrame("Button", FRAME_NAME .. "Nav_" .. cat.id, sidebar)
-        btn:SetHeight(28)
+        btn:SetHeight(26)
         btn:SetPoint("TOPLEFT", 8, y)
         btn:SetPoint("TOPRIGHT", -8, y)
         ApplyNavButton(btn, false)
@@ -942,7 +1016,7 @@ function MainWindow.Init()
     --------------------------------------------------------------------
     -- General
     --------------------------------------------------------------------
-    local general = BuildCategoryPage(pageHost, CAT_GENERAL, 320)
+    local general = BuildCategoryPage(pageHost, CAT_GENERAL, 620)
 
     local statusBox = CreateFrame("Frame", nil, general)
     statusBox:SetPoint("TOPLEFT", 0, 0)
@@ -951,7 +1025,9 @@ function MainWindow.Init()
     ApplyInset(statusBox)
     statusFS = statusBox:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     statusFS:SetPoint("TOPLEFT", statusBox, "TOPLEFT", 8, -8)
-    statusFS:SetPoint("TOPRIGHT", statusBox, "TOPRIGHT", -8, -8)
+    statusFS:SetPoint("BOTTOMRIGHT", statusBox, "BOTTOMRIGHT", -8, 8)
+    statusFS:SetJustifyH("LEFT")
+    FitText(statusFS, nil, 36)
     statusFS:SetJustifyH("LEFT")
     SetInk(statusFS, INK)
 
@@ -988,17 +1064,17 @@ function MainWindow.Init()
     modeHint:SetPoint("TOPLEFT", 4, -116)
     modeHint:SetPoint("RIGHT", -4, 0)
     modeHint:SetJustifyH("LEFT")
-    modeHint:SetText("|cff5a4010Off|r — Listening OFF (no chat scan).\n"
-        .. "|cff5a4010Notify|r — Listening ON: print MS LFM/LFG to chat + Log (default).\n"
-        .. "|cff5a4010Seeking|r — match open roles; optional auto-whisper LFM leaders.\n"
-        .. "|cff5a4010Hosting|r — role whispers → invite only if accepted role + open slot.\n"
-        .. "|cff5a4010Full Auto|r — Hosting category master (default OFF): invite + scan + repost + reject.")
+    modeHint:SetText("|cff5a4010Off|r - Listening OFF (no chat scan).\n"
+        .. "|cff5a4010Notify|r - Listening ON: print MS LFM/LFG to chat + Log (default).\n"
+        .. "|cff5a4010Seeking|r - match open roles; optional auto-whisper LFM leaders.\n"
+        .. "|cff5a4010Hosting|r - role whispers -> invite only if accepted role + open slot.\n"
+        .. "|cff5a4010Full Auto|r - Hosting category master (default OFF): invite + scan + repost + reject.")
     SetInk(modeHint, MUTED)
 
     CreateSectionLabel(general, "Mini Quick HUD", -210)
     widgets.miniHud = CreateToggleRow(general, -228,
         "Show floating quick bar",
-        "LFM / RW / Sync / Wipe / Mobs / FULL / Regrp / Need — no /alfm. Drag to move. Default ON.",
+        "LFM / RW / Sync / Wipe / Mobs / FULL / Regrp / Need - no /alfm. Drag to move. Default ON.",
         false,
         function(on)
             if AscensionLFM.MiniHUD and AscensionLFM.MiniHUD.SetShown then
@@ -1007,6 +1083,88 @@ function MainWindow.Init()
                 AscensionLFM.Database.Get().miniHudShow = on and true or false
             end
         end)
+
+    -- Message delivery routing (backend since 0.4.42; UI picker now)
+    CreateSectionLabel(general, "Message delivery (Mini HUD)", -300)
+    local routeHint = general:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    routeHint:SetPoint("TOPLEFT", 4, -318)
+    routeHint:SetPoint("RIGHT", -4, 0)
+    routeHint:SetJustifyH("LEFT")
+    routeHint:SetText("Per-message route for group announces. Click a button to cycle. "
+        .. "|cff5a4010Auto|r smart cascade * |cff5a4010RW only|r * |cff5a4010Raid/Party|r * |cff5a4010Local|r * |cff5a4010Off|r")
+    SetInk(routeHint, MUTED)
+
+    local ROUTE_CYCLE = { "auto", "raidwarning", "raid", "local", "disabled" }
+    local ROUTE_LABEL = {
+        auto = "Auto",
+        raidwarning = "RW only",
+        raid = "Raid/Party",
+        ["local"] = "Local",
+        disabled = "Off",
+    }
+    local ROUTE_KINDS = {
+        { "rw", "Role Check" },
+        { "wipe", "Wipe" },
+        { "shield", "Mobs/Shield" },
+        { "regroup", "Regroup" },
+        { "full", "FULL" },
+        { "need", "Need T/H/A/D" },
+    }
+    widgets.routeButtons = {}
+    local function CurrentRoute(kind)
+        local db = AscensionLFM.Database.Get()
+        if type(db.messageRouting) ~= "table" then
+            db.messageRouting = {}
+        end
+        local r = db.messageRouting[kind]
+        if r == nil or r == "" then
+            return "auto"
+        end
+        return tostring(r)
+    end
+    local function CycleRoute(kind)
+        local cur = CurrentRoute(kind)
+        local idx = 1
+        for i, v in ipairs(ROUTE_CYCLE) do
+            if v == cur then
+                idx = i
+                break
+            end
+        end
+        local nxt = ROUTE_CYCLE[(idx % #ROUTE_CYCLE) + 1]
+        local db = AscensionLFM.Database.Get()
+        if type(db.messageRouting) ~= "table" then
+            db.messageRouting = {}
+        end
+        if nxt == "auto" then
+            db.messageRouting[kind] = nil
+        else
+            db.messageRouting[kind] = nxt
+        end
+        return nxt
+    end
+    local ry = -360
+    for _, entry in ipairs(ROUTE_KINDS) do
+        local kind, label = entry[1], entry[2]
+        local row = CreateFrame("Frame", nil, general)
+        row:SetPoint("TOPLEFT", 4, ry)
+        row:SetPoint("TOPRIGHT", -4, ry)
+        row:SetHeight(22)
+        local lbl = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        lbl:SetPoint("LEFT", 0, 0)
+        lbl:SetText(label)
+        SetInk(lbl, INK)
+        local btn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+        btn:SetSize(90, 20)
+        btn:SetPoint("RIGHT", 0, 0)
+        btn:SetText(ROUTE_LABEL[CurrentRoute(kind)] or "Auto")
+        btn:SetScript("OnClick", function(self)
+            local nxt = CycleRoute(kind)
+            self:SetText(ROUTE_LABEL[nxt] or nxt)
+        end)
+        widgets.routeButtons[kind] = btn
+        ry = ry - 26
+    end
 
     --------------------------------------------------------------------
     -- Seeking
@@ -1060,7 +1218,7 @@ function MainWindow.Init()
 
     widgets.useVariants = CreateToggleRow(seeking, -256,
         "Rotate whisper variants ({role})",
-        "Cycles 2–3 templates below. {role} becomes tank/healer/aura/dps. Default ON.",
+        "Cycles 2-3 templates below. {role} becomes tank/healer/aura/dps. Default ON.",
         false,
         function(on)
             AscensionLFM.Database.Get().useWhisperVariants = on and true or false
@@ -1173,7 +1331,7 @@ function MainWindow.Init()
     MakeRoleCheck(hostRoles, "dps", "DPS", 280, 0, widgets.roleButtonsHost)
 
     -- My host role: which role YOU take (Slots.EnsureHostAssigned picks this
-    -- when set, instead of guessing). Applies to your own slot immediately —
+    -- when set, instead of guessing). Applies to your own slot immediately -
     -- not just a preference for the next auto-assign. "Auto" clears it and
     -- lets the host auto-pick an open accepted role again (default).
     CreateSectionLabel(hosting, "My host role", -156)
@@ -1267,7 +1425,7 @@ function MainWindow.Init()
     hy = hy - TOGGLE_STEP
     widgets.autoInviteLfg = CreateToggleRow(hosting, hy,
         "Auto-invite LFG seekers (chat)",
-        "When someone posts LFG MS with a role you need + open slot → InviteUnit. Default ON while Hosting.",
+        "When someone posts LFG MS with a role you need + open slot -> InviteUnit. Default ON while Hosting.",
         false,
         function(on)
             AscensionLFM.Database.Get().autoInviteLfg = on and true or false
@@ -1412,13 +1570,14 @@ function MainWindow.Init()
     slotsFS:SetPoint("TOPLEFT", 4, slotsY - 46)
     slotsFS:SetPoint("RIGHT", -4, 0)
     slotsFS:SetJustifyH("LEFT")
+    FitText(slotsFS, nil, 18)
     SetInk(slotsFS, MUTED)
 
     local rcY = slotsY - 72
     CreateSectionLabel(hosting, "Role Check", rcY)
     widgets.autoMoveTank = CreateToggleRow(hosting, rcY - 18,
         "Auto-move Tanks (1 per raid group, fills g1/g2 first)",
-        "Keep at most one Tank in each raid group (1–8), filling the lowest-numbered empty group first. Default ON.",
+        "Keep at most one Tank in each raid group (1-8), filling the lowest-numbered empty group first. Default ON.",
         false,
         function(on)
             AscensionLFM.Database.Get().autoMoveTank = on and true or false
@@ -1438,7 +1597,7 @@ function MainWindow.Init()
         end)
     widgets.autoMoveAura = CreateToggleRow(hosting, rcY - 18 - TOGGLE_STEP * 2,
         "Auto-move Auras (1 per raid group)",
-        "Keep at most one Aura player in each raid group (1–8). Extra Auras are moved to empty groups. Default ON.",
+        "Keep at most one Aura player in each raid group (1-8). Extra Auras are moved to empty groups. Default ON.",
         false,
         function(on)
             AscensionLFM.Database.Get().autoMoveAura = on and true or false
@@ -1455,7 +1614,7 @@ function MainWindow.Init()
         end)
     widgets.passiveRoleDetect = CreateToggleRow(hosting, rcY - 18 - TOGGLE_STEP * 4,
         "Catch role words in raid/party chat anytime",
-        "Assign a role the moment someone types exactly 'heal'/'tank'/'dps'/'aura' in group chat — no active Role Check needed. Default ON.",
+        "Assign a role the moment someone types exactly 'heal'/'tank'/'dps'/'aura' in group chat - no active Role Check needed. Default ON.",
         false,
         function(on)
             AscensionLFM.Database.Get().passiveRoleDetect = on and true or false
@@ -1672,7 +1831,7 @@ function MainWindow.Init()
             AscensionLFM.Print("scanned raid/party fills")
             if unassigned > 0 then
                 AscensionLFM.Print(string.format(
-                    "%d in group without role — Mini HUD RW, reply T/H/A/D", unassigned))
+                    "%d in group without role - Mini HUD RW, reply T/H/A/D", unassigned))
             end
         end
     end)
@@ -1753,6 +1912,18 @@ function MainWindow.Init()
         function(on)
             AscensionLFM.Database.Get().announceFull = on and true or false
         end)
+    widgets.postShowAllRoles = CreateToggleRow(post, -268 - TOGGLE_STEP * 2,
+        "LFM shows filled roles too",
+        "Post e.g. 2/2 Tanks | 1/3 Healers instead of only open slots. Default OFF.",
+        false,
+        function(on)
+            local db = AscensionLFM.Database.Get()
+            db.postShowAllRoles = on and true or false
+            if AscensionLFM.Poster and AscensionLFM.Poster.RefreshMessage then
+                AscensionLFM.Poster.RefreshMessage()
+            end
+            MainWindow.RefreshPost()
+        end)
 
     local intLbl = post:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     intLbl:SetPoint("TOPLEFT", 4, -406)
@@ -1800,13 +1971,13 @@ function MainWindow.Init()
     postHint:SetPoint("TOPLEFT", 4, -456)
     postHint:SetPoint("RIGHT", -4, 0)
     postHint:SetJustifyH("LEFT")
-    postHint:SetText("Example: LFM MS | 2/3 Healers | 1/3 Aura — full roles omitted, filled from Hosting slots + Scan.")
+    postHint:SetText("Example: LFM MS | 2/3 Healers | 1/3 Aura - full roles omitted, filled from Hosting slots + Scan.")
     SetInk(postHint, MUTED)
 
     --------------------------------------------------------------------
     -- Queue (applicants)
     --------------------------------------------------------------------
-    local queue = BuildCategoryPage(pageHost, CAT_QUEUE)
+    local queue = BuildCategoryPage(pageHost, CAT_QUEUE, 420)
     CreateSectionLabel(queue, "Recent applicant whispers", -4)
     local qHint = queue:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     qHint:SetPoint("TOPLEFT", 4, -20)
@@ -1872,20 +2043,92 @@ function MainWindow.Init()
     --------------------------------------------------------------------
     -- Kick
     --------------------------------------------------------------------
-    local kick = BuildCategoryPage(pageHost, CAT_KICK)
+    local roster = BuildCategoryPage(pageHost, CAT_ROSTER, 720)
+    local rosterBar = CreateFrame("Frame", nil, roster)
+    rosterBar:SetPoint("TOPLEFT", 0, -2)
+    rosterBar:SetPoint("TOPRIGHT", 0, -2)
+    rosterBar:SetHeight(44)
+    ApplyInset(rosterBar)
+
+    local rosterHint = rosterBar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    rosterHint:SetPoint("TOPLEFT", 8, -6)
+    rosterHint:SetPoint("RIGHT", -160, 0)
+    rosterHint:SetJustifyH("LEFT")
+    if rosterHint.SetWordWrap then rosterHint:SetWordWrap(true) end
+    if rosterHint.SetHeight then rosterHint:SetHeight(32) end
+    rosterHint:SetText("Click role icon -> choose Tank/Heal/Aura/DPS  |  X remove  |  gold = aura")
+    SetInk(rosterHint, MUTED)
+
+    local specBtn = CreateFrame("Button", nil, rosterBar, "UIPanelButtonTemplate")
+    specBtn:SetSize(88, 22)
+    specBtn:SetPoint("TOPRIGHT", -8, -10)
+    specBtn:SetText("My Spec")
+    specBtn:SetScript("OnClick", function()
+        if AscensionLFM.SpecRole and AscensionLFM.SpecRole.ApplyToSelf then
+            AscensionLFM.SpecRole.ApplyToSelf()
+        elseif AscensionLFM.Print then
+            AscensionLFM.Print("SpecRole module missing")
+        end
+    end)
+
+    if AscensionLFM.RosterPanel and AscensionLFM.RosterPanel.Attach then
+        local host = CreateFrame("Frame", nil, roster)
+        host:SetPoint("TOPLEFT", 0, -50)
+        host:SetPoint("BOTTOMRIGHT", 0, 0)
+        AscensionLFM.RosterPanel.Attach(host)
+    end
+
+local kick = BuildCategoryPage(pageHost, CAT_KICK, 520)
     CreateSectionLabel(kick, "Level-59 auto-kick", -4)
     widgets.autoKick = CreateToggleRow(kick, -22,
         "Enable kick at level 59 + raid warning every 10s",
-        "Hosting/Full Auto · lead/assist · ignores self · RW then kick (deferred). /alfm status shows why. Default OFF.",
+        "Hosting/Full Auto * lead/assist * ignores self * RW then kick (deferred). /alfm status shows why. Default OFF.",
         true,
         function(on)
             AscensionLFM.Database.Get().autoKickLevel59 = on and true or false
             RefreshStatus()
         end)
 
-    CreateSectionLabel(kick, "Recent kicks", -92)
+    CreateSectionLabel(kick, "Aura of Experience scanner", -92)
+    widgets.auraScan = CreateToggleRow(kick, -110,
+        "Scan aura seats for buff 818059 (only if visible on others)",
+        "Hosting only * flags liars (role=aura, no Aura of Experience). /alfm aurascan for one-shot. Default OFF.",
+        false,
+        function(on)
+            AscensionLFM.Database.Get().auraScanEnabled = on and true or false
+            RefreshStatus()
+        end)
+    widgets.auraScanKick = CreateToggleRow(kick, -110 - TOGGLE_STEP,
+        "Auto-kick when buff visible-on-others AND missing (warn + UninviteUnit)",
+        "Requires scanner ON * lead/assist * RW then kick. Dangerous - default OFF.",
+        true,
+        function(on)
+            AscensionLFM.Database.Get().auraScanAutoKick = on and true or false
+            RefreshStatus()
+        end)
+    local auraScanBtn = CreateFrame("Button", nil, kick, "UIPanelButtonTemplate")
+    auraScanBtn:SetSize(140, 22)
+    auraScanBtn:SetPoint("TOPLEFT", 8, -110 - TOGGLE_STEP * 2 - 8)
+    auraScanBtn:SetText("Scan now")
+    auraScanBtn:SetScript("OnClick", function()
+        if AscensionLFM.AuraScan and AscensionLFM.AuraScan.ScanNow then
+            AscensionLFM.AuraScan.ScanNow()
+        elseif AscensionLFM.Print then
+            AscensionLFM.Print("AuraScan module missing - delete Interface/AddOns/AscensionLFM and reinstall the zip")
+        end
+        MainWindow.RefreshKicks()
+    end)
+    local auraRelFS = kick:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    auraRelFS:SetPoint("TOPLEFT", 8, -110 - TOGGLE_STEP * 2 - 32)
+    auraRelFS:SetPoint("RIGHT", -8, 0)
+    auraRelFS:SetJustifyH("LEFT")
+    FitText(auraRelFS, nil, 32)
+    auraRelFS:SetTextColor(0.85, 0.75, 0.45)
+    widgets.auraRelFS = auraRelFS
+
+    CreateSectionLabel(kick, "Recent kicks", -110 - TOGGLE_STEP * 2 - 68)
     local kickBox = CreateFrame("Frame", nil, kick)
-    kickBox:SetPoint("TOPLEFT", 0, -110)
+    kickBox:SetPoint("TOPLEFT", 0, -110 - TOGGLE_STEP * 2 - 86)
     kickBox:SetPoint("BOTTOMRIGHT", 0, 0)
     ApplyInset(kickBox)
     local ky = -10
@@ -1895,14 +2138,16 @@ function MainWindow.Init()
         fs:SetPoint("TOPRIGHT", kickBox, "TOPRIGHT", -8, ky)
         fs:SetJustifyH("LEFT")
         SetInk(fs, INK)
+        if fs.SetHeight then fs:SetHeight(14) end
+        FitText(fs, nil, 14)
         kickFS[i] = fs
-        ky = ky - 16
+        ky = ky - 18
     end
 
     --------------------------------------------------------------------
     -- Log
     --------------------------------------------------------------------
-    local log = BuildCategoryPage(pageHost, CAT_LOG)
+    local log = BuildCategoryPage(pageHost, CAT_LOG, 480)
     CreateSectionLabel(log, "Recent matches", -4)
     local matchBox = CreateFrame("Frame", nil, log)
     matchBox:SetPoint("TOPLEFT", 0, -20)
@@ -1916,8 +2161,10 @@ function MainWindow.Init()
         fs:SetPoint("TOPRIGHT", matchBox, "TOPRIGHT", -8, my)
         fs:SetJustifyH("LEFT")
         SetInk(fs, INK)
+        if fs.SetHeight then fs:SetHeight(32) end
+        FitText(fs, nil, 32)
         matchFS[i] = fs
-        my = my - 36
+        my = my - 38
     end
 
     CreateSectionLabel(log, "Activity (posts / invites / rejects / matches)", -230)

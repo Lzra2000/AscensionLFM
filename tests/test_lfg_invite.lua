@@ -11,11 +11,15 @@ IsIgnored = function() return false end
 GetNumRaidMembers = function() return 0 end
 GetNumPartyMembers = function() return 0 end
 IsPartyLeader = function() return true end
+IsRaidLeader = function() return true end
+IsRaidOfficer = function() return false end
 UnitName = function() return "Host" end
 
 dofile("core/Database.lua")
 dofile("core/Parser.lua")
 dofile("core/Slots.lua")
+dofile("core/Activity.lua")
+dofile("core/Queue.lua")
 dofile("core/Invite.lua")
 
 local AscensionLFM = _G.AscensionLFM
@@ -77,15 +81,31 @@ ok, reason = AscensionLFM.Invite.TryLfgInvite("HealerFive", "Heal lfg MS15", pHe
 check("invite Heal lfg MS15", ok == true)
 check("healer invited", _G._lastInvite == "HealerFive")
 
--- Last seats: prefer support over DPS when tank/aura open
+-- Last seats + a support applicant already waiting: prefer support over DPS.
 AscensionLFM.Invite._ResetCooldowns()
 _G._lastInvite = nil
 Slots.ClearAll()
+if AscensionLFM.Queue and AscensionLFM.Queue.Clear then
+    AscensionLFM.Queue.Clear()
+end
 db.roles = { tank = true, healer = true, aura = true, dps = true }
 db.maxPartySize = 15
 GetNumRaidMembers = function() return 14 end
+AscensionLFM.Queue.Push("WaitingTank", "tank", "LFG MS tank", "pending")
 ok, reason = AscensionLFM.Invite.TryLfgInvite("DpsSix", "LFG MS DPS", AscensionLFM.Parser.Parse("LFG MS DPS"))
-check("last seat blocks dps", ok == false and reason == "prefer support seat")
+check("last seat blocks dps when support is waiting", ok == false and reason == "prefer support seat",
+    tostring(reason))
+
+-- Same near-full situation but nobody is actually waiting for a support
+-- role: the seat would otherwise sit empty forever, so DPS gets invited
+-- normally instead of being held back for a support applicant who may
+-- never come.
+AscensionLFM.Invite._ResetCooldowns()
+_G._lastInvite = nil
+Slots.ClearAll()
+AscensionLFM.Queue.Clear()
+ok, reason = AscensionLFM.Invite.TryLfgInvite("DpsSeven", "LFG MS DPS", AscensionLFM.Parser.Parse("LFG MS DPS"))
+check("last seat invites dps when nobody is waiting for support", ok == true, tostring(reason))
 GetNumRaidMembers = function() return 0 end
 
 -- Full Auto enables autoInviteLfg
