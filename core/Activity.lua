@@ -45,6 +45,24 @@ local function Ensure(db)
     return db.activityLog
 end
 
+-- Session totals: unlike activityLog (capped at MAX_ENTRIES so a busy
+-- hosting burst quickly rolls old entries off), these counters are
+-- uncapped and persist for the whole session (until ResetSession()),
+-- giving an accurate "how did this session go" summary regardless of
+-- how many events happened.
+local function EnsureStats(db)
+    if not db then
+        return nil
+    end
+    if type(db.sessionStats) ~= "table" then
+        db.sessionStats = {}
+    end
+    if not db.sessionStartedAt or db.sessionStartedAt == 0 then
+        db.sessionStartedAt = (type(time) == "function" and time()) or 0
+    end
+    return db.sessionStats
+end
+
 --- Push an activity line.
 -- @param kind "post"|"invite"|"reject"|"match"|"full"|"preset"
 -- @param text short description
@@ -73,6 +91,72 @@ function Activity.Push(kind, text, meta)
     while #log > MAX_ENTRIES do
         table.remove(log)
     end
+    local stats = EnsureStats(db)
+    if stats then
+        stats[kind] = (tonumber(stats[kind]) or 0) + 1
+    end
+    if AscensionLFM.MainWindow and AscensionLFM.MainWindow.RefreshActivity then
+        AscensionLFM.MainWindow.RefreshActivity()
+    end
+    return true
+end
+
+--- Raw session counters + elapsed time since the session started (or was
+-- last reset). Counts every Activity.Push kind seen this session, not
+-- just invite/reject/kick.
+function Activity.GetSessionSummary(nowOverride)
+    local db = DB()
+    local stats = (db and db.sessionStats) or {}
+    local startedAt = (db and tonumber(db.sessionStartedAt)) or 0
+    local now = tonumber(nowOverride) or (type(time) == "function" and time()) or 0
+    local elapsed = now - startedAt
+    if elapsed < 0 then
+        elapsed = 0
+    end
+    return {
+        invited = tonumber(stats.invite) or 0,
+        rejected = tonumber(stats.reject) or 0,
+        kicked = tonumber(stats.kick) or 0,
+        matched = tonumber(stats.match) or 0,
+        posted = tonumber(stats.post) or 0,
+        elapsedSeconds = elapsed,
+        startedAt = startedAt,
+    }
+end
+
+--- Pure: turn a summary table (from GetSessionSummary) into one readable
+-- line. Kept separate from GetSessionSummary so it's testable without a
+-- live DB/clock.
+function Activity.FormatSessionSummary(summary)
+    summary = summary or {}
+    local totalSeconds = math.max(0, tonumber(summary.elapsedSeconds) or 0)
+    local mins = math.floor(totalSeconds / 60)
+    local hours = math.floor(mins / 60)
+    mins = mins % 60
+    local timeStr
+    if hours > 0 then
+        timeStr = string.format("%dh%dm", hours, mins)
+    else
+        timeStr = string.format("%dm", mins)
+    end
+    return string.format("Session (%s): %d invited, %d rejected, %d kicked, %d matches, %d posts",
+        timeStr,
+        tonumber(summary.invited) or 0,
+        tonumber(summary.rejected) or 0,
+        tonumber(summary.kicked) or 0,
+        tonumber(summary.matched) or 0,
+        tonumber(summary.posted) or 0)
+end
+
+--- Clear session totals and restart the elapsed-time clock. Does NOT
+-- touch the rolling activityLog (use Activity.Clear() for that).
+function Activity.ResetSession()
+    local db = DB()
+    if not db then
+        return false
+    end
+    db.sessionStats = {}
+    db.sessionStartedAt = (type(time) == "function" and time()) or 0
     if AscensionLFM.MainWindow and AscensionLFM.MainWindow.RefreshActivity then
         AscensionLFM.MainWindow.RefreshActivity()
     end

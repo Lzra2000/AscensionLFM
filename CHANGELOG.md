@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.4.73
+
+- **New: session summary in the Log tab.** `activityLog` (the rolling
+  recent-activity list) is deliberately capped at 40 entries — fine for
+  a scrollback view, but useless for "how did this session go" given the
+  applicant volumes seen in busy hosting logs this whole session (dozens
+  per minute easily blow past 40 within a couple minutes). Added
+  separate, uncapped session counters in `core/Activity.lua`:
+  `Activity.Push()` (the single choke-point every meaningful event
+  already passes through) now also increments a per-kind counter in
+  `db.sessionStats`, alongside the existing bounded log — no new call
+  sites needed anywhere else. New `Activity.GetSessionSummary()`,
+  `Activity.FormatSessionSummary()` (kept pure/testable, separate from
+  the DB/clock-reading getter), and `Activity.ResetSession()` (clears
+  counters + restarts the elapsed-time clock, leaves the rolling log
+  untouched).
+  Log tab gained a "Session summary" section between Recent matches and
+  Activity, e.g. "Session (47m): 23 invited, 4 rejected, 2 kicked, 15
+  matches, 3 posts", plus a "Reset session" button.
+  Found and fixed a real gap while wiring this up: `core/AuraScan.lua`'s
+  kick confirmation only ever logged to its own `kickHistory` table
+  (used by the Kick tab's recent-kicks list) and never called
+  `Activity.Push` at all — meaning Aura-of-Experience-liar kicks had
+  zero activity trail and would never have counted toward "kicked" in
+  the new summary. Now pushes `kind="kick"` like Kick59's kicks already
+  did.
+  Regression tests added: new `test_activity.lua` (20 checks - rolling
+  log stays capped, session counters stay accurate well past 40 events,
+  `FormatSessionSummary`'s hour/minute formatting and ASCII-only output,
+  `ResetSession` clearing counters without touching the rolling log, and
+  counting correctly resuming afterward). `test_aura_scan.lua` gained a
+  check confirming the confirmed-kick path now reaches Activity. Full
+  suite green.
+
 ## 0.4.72
 
 - **Fix: v0.4.70's Post tab overlap fix was itself wrong.** Reported live

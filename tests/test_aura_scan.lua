@@ -277,6 +277,15 @@ local rVerifyGone = AuraScan.Tick(20008)
 check("verify confirms kicked once target genuinely leaves the roster",
     rVerifyGone == "kicked", tostring(rVerifyGone))
 
+-- Regression: a confirmed AuraScan kick now logs to Activity too (used
+-- to have zero trail there - kickHistory only - meaning it never counted
+-- toward the session summary's "kicked" total).
+local kickEntry = AscensionLFM.Activity.Recent(1)[1]
+check("aura-liar kick pushed to Activity log", kickEntry and kickEntry.kind == "kick",
+    kickEntry and tostring(kickEntry.kind) or "none")
+check("aura-liar kick names the target", kickEntry and kickEntry.text:find("Liar2", 1, true) ~= nil,
+    kickEntry and kickEntry.text or "none")
+
 io.write(string.format("test_aura_scan: %d passed, %d failed\n", passed, failed))
 if failed > 0 then
     os.exit(1)

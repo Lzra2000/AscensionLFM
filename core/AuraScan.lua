@@ -282,6 +282,11 @@ local function LogKick(name, reason)
     if AscensionLFM.Print then
         AscensionLFM.Print(string.format("kicked %s (no visible buff - no Aura of Experience)", tostring(name)))
     end
+    if AscensionLFM.Activity and AscensionLFM.Activity.Push then
+        AscensionLFM.Activity.Push("kick",
+            string.format("%s - no visible Aura of Experience (%s)", tostring(name), tostring(reason or "no visible buff")),
+            { name = name })
+    end
     if AscensionLFM.MainWindow and AscensionLFM.MainWindow.RefreshKicks then
         AscensionLFM.MainWindow.RefreshKicks()
     end

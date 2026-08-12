@@ -94,6 +94,7 @@ local slotsFS
 local roleCheckStatusFS
 local postRoleCheckStatusFS
 local matchFS = {}
+local sessionSummaryFS = nil
 local kickFS = {}
 local activityFS = {}
 local queueRows = {}
@@ -446,6 +447,11 @@ function MainWindow.RefreshActivity()
                 end
             end
         end
+    end
+    if sessionSummaryFS and AscensionLFM.Activity and AscensionLFM.Activity.GetSessionSummary
+        and AscensionLFM.Activity.FormatSessionSummary then
+        local summary = AscensionLFM.Activity.GetSessionSummary()
+        sessionSummaryFS:SetText(AscensionLFM.Activity.FormatSessionSummary(summary))
     end
 end
 
@@ -2192,9 +2198,28 @@ local kick = BuildCategoryPage(pageHost, CAT_KICK, 520)
         my = my - 38
     end
 
-    CreateSectionLabel(log, "Activity (posts / invites / rejects / matches)", -230)
+    CreateSectionLabel(log, "Session summary", -232)
+    sessionSummaryFS = log:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    sessionSummaryFS:SetPoint("TOPLEFT", 4, -250)
+    sessionSummaryFS:SetPoint("RIGHT", -110, 0)
+    sessionSummaryFS:SetJustifyH("LEFT")
+    SetInk(sessionSummaryFS, INK)
+    sessionSummaryFS:SetText("Session (0m): 0 invited, 0 rejected, 0 kicked, 0 matches, 0 posts")
+
+    local sessionResetBtn = CreateFrame("Button", nil, log, "UIPanelButtonTemplate")
+    sessionResetBtn:SetSize(96, 20)
+    sessionResetBtn:SetPoint("TOPRIGHT", -4, -248)
+    sessionResetBtn:SetText("Reset session")
+    sessionResetBtn:SetScript("OnClick", function()
+        if AscensionLFM.Activity and AscensionLFM.Activity.ResetSession then
+            AscensionLFM.Activity.ResetSession()
+        end
+        MainWindow.RefreshActivity()
+    end)
+
+    CreateSectionLabel(log, "Activity (posts / invites / rejects / matches)", -282)
     local actBox = CreateFrame("Frame", nil, log)
-    actBox:SetPoint("TOPLEFT", 0, -248)
+    actBox:SetPoint("TOPLEFT", 0, -300)
     actBox:SetPoint("BOTTOMRIGHT", 0, 0)
     ApplyInset(actBox)
     local ay = -8
