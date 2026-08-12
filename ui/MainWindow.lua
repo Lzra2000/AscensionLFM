@@ -76,10 +76,10 @@ local TOOLTIP_BACKDROP_TIGHT = {
 
 local INK = { 0.20, 0.14, 0.06, 1 }
 local GOLD = { 1.00, 0.82, 0.20, 1 }
-local MUTED = { 0.35, 0.28, 0.18, 1 }
+local MUTED = { 0.20, 0.15, 0.08, 1 }
 local TITLE_INK = { 0.30, 0.20, 0.04, 1 }
-local SECTION = { 0.42, 0.30, 0.10, 1 }
-local DANGER = { 0.55, 0.18, 0.08, 1 }
+local SECTION = { 0.24, 0.15, 0.04, 1 }
+local DANGER = { 0.42, 0.10, 0.04, 1 }
 
 local frame
 local activeCategory = CAT_GENERAL
@@ -132,11 +132,11 @@ local function ApplySidebar(f)
 end
 
 local function ApplyInset(f)
-    ApplyBackdrop(f, TOOLTIP_BACKDROP, 0.95, 0.90, 0.72, 0.55, 0.55, 0.45, 0.18, 0.9)
+    ApplyBackdrop(f, TOOLTIP_BACKDROP, 0.95, 0.90, 0.72, 0.92, 0.55, 0.45, 0.18, 0.9)
 end
 
 local function ApplyToggleRow(f)
-    ApplyBackdrop(f, TOOLTIP_BACKDROP_TIGHT, 0.95, 0.90, 0.72, 0.55, 0.55, 0.45, 0.18, 0.9)
+    ApplyBackdrop(f, TOOLTIP_BACKDROP_TIGHT, 0.95, 0.90, 0.72, 0.92, 0.55, 0.45, 0.18, 0.9)
 end
 
 local function ApplyNavButton(f, selected)
@@ -709,7 +709,7 @@ local function CreateToggleRow(parent, y, title, description, danger, onToggle)
     if danger then
         SetInk(titleFs, DANGER)
     else
-        SetInk(titleFs, { 0.42, 0.24, 0.04, 1 })
+        SetInk(titleFs, INK)
     end
 
     local descFs = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -903,14 +903,23 @@ function MainWindow.Init()
         tinsert(UISpecialFrames, FRAME_NAME)
     end
 
-    local title = _G[FRAME_NAME .. "Title"] or frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    if not _G[FRAME_NAME .. "Title"] then
-        title:SetPoint("TOP", frame, "TOP", 0, -10)
+    local titleBg = CreateFrame("Frame", nil, frame)
+    titleBg:SetPoint("TOP", frame, "TOP", 0, -2)
+    titleBg:SetSize(260, 34)
+    if titleBg.SetFrameLevel and frame.GetFrameLevel then
+        titleBg:SetFrameLevel((frame:GetFrameLevel() or 0) + 1)
     end
-    title:SetText("AscensionLFM")
-    SetInk(title, GOLD)
+    ApplyBackdrop(titleBg, TOOLTIP_BACKDROP, 0.95, 0.90, 0.72, 0.92, 0.55, 0.45, 0.18, 0.9)
 
-    local sub = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    local title = _G[FRAME_NAME .. "Title"] or frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    title:ClearAllPoints()
+    title:SetParent(titleBg)
+    title:SetDrawLayer("OVERLAY")
+    title:SetPoint("TOP", titleBg, "TOP", 0, -6)
+    title:SetText("AscensionLFM")
+    SetInk(title, INK)
+
+    local sub = titleBg:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     sub:SetPoint("TOP", title, "BOTTOM", 0, -2)
     sub:SetText("Manastorm Level Run LFM/LFG * v" .. tostring(AscensionLFM.VERSION or "0.4.16"))
     SetInk(sub, MUTED)
@@ -973,7 +982,7 @@ function MainWindow.Init()
     if categoryHeadSub.SetNonSpaceWrap then
         categoryHeadSub:SetNonSpaceWrap(true)
     end
-    SetInk(categoryHeadSub, { 0.28, 0.22, 0.12, 1 })
+    SetInk(categoryHeadSub, MUTED)
 
     local pageHost = CreateFrame("Frame", FRAME_NAME .. "PageHost", main)
     pageHost:SetPoint("TOPLEFT", 10, -54)
@@ -2154,7 +2163,7 @@ local kick = BuildCategoryPage(pageHost, CAT_KICK, 520)
     auraRelFS:SetPoint("RIGHT", -8, 0)
     auraRelFS:SetJustifyH("LEFT")
     FitText(auraRelFS, nil, 32)
-    auraRelFS:SetTextColor(0.85, 0.75, 0.45)
+    auraRelFS:SetTextColor(0.20, 0.15, 0.08)
     widgets.auraRelFS = auraRelFS
 
     CreateSectionLabel(kick, "Recent kicks", -110 - TOGGLE_STEP * 2 - 68)

@@ -86,6 +86,9 @@ local function NewFrame()
                 local text = ""
                 return {
                     SetPoint = Noop,
+                    ClearAllPoints = Noop,
+                    SetParent = Noop,
+                    SetDrawLayer = Noop,
                     SetText = function(_, value) text = value or "" end,
                     GetText = function() return text end,
                     SetJustifyH = Noop,

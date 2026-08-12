@@ -1,5 +1,67 @@
 # Changelog
 
+## 0.4.74
+
+- **Global readability pass: every text color re-checked for contrast,
+  several backdrops made fully opaque.** Reported live: all UI text hard
+  to read / slightly overlapping. Root cause wasn't positioning this
+  time - it was contrast. Two separate issues:
+  1. The main window uses Blizzard's native `UIPanelDialogTemplate` for
+     its outer chrome (title/subtitle sit directly on it, no backdrop of
+     our own). This addon's user is running DragonUI (a UI-replacement
+     addon, confirmed present in an earlier session log) - if it reskins
+     native dialog templates with a different color scheme than
+     Blizzard's stock light-tan header, our text colors (chosen assuming
+     the stock look) can end up low-contrast against whatever DragonUI
+     actually renders there, and there's no way to predict or control
+     that from inside this addon. Fixed by no longer trusting the native
+     template's coloring at all: added our own opaque cream backdrop
+     plate specifically behind the title + subtitle, guaranteeing
+     consistent contrast regardless of what any other addon has reskinned.
+  2. `ApplyInset`/`ApplyToggleRow` - the backdrop used by nearly every
+     content box and toggle row across every tab - were only 55% opaque,
+     meaning their effective color blends with whatever's rendered behind
+     the window in the game world at that moment. Bumped both to 92%
+     opacity for a reliable, predictable light-cream background
+     everywhere text is meant to sit.
+  With a now-guaranteed light backdrop, re-checked every text color's
+  actual contrast against it (rough luminance-based estimate, targeting
+  WCAG AA's ~4.5:1 minimum) and darkened the ones that were still
+  borderline-to-poor even against a solid light background:
+  - `MUTED` (used for nearly all toggle descriptions, status lines, and
+    hints across the whole UI - the single most impactful color in this
+    pass): 0.35/0.28/0.18 (~2.8:1) -> 0.20/0.15/0.08 (~5:1).
+  - `SECTION` (every category/section header, e.g. "AUTO-REPOST"):
+    0.42/0.30/0.10 (~2.6:1) -> 0.24/0.15/0.04 (~4.4:1).
+  - `DANGER` (red warning-style toggle titles): 0.55/0.18/0.08 (~2.9:1)
+    -> 0.42/0.10/0.04 (~4:1).
+  - Toggle row titles (every "Enable X" / "Auto-invite Y" label) used
+    their own hardcoded inline color independent of the shared
+    constants - replaced with `INK` (already the darkest/most legible
+    color) instead of duplicating a separate, undermaintained value.
+  - `categoryHeadSub` (the one-line description under each tab's own
+    header) was borderline (~3.4:1) - now uses `MUTED`.
+  - Found a genuine light-on-light bug along the way: the Kick tab's
+    Aura-reliability status text (`auraRelFS`) used a *light* tan color
+    (0.85/0.75/0.45) while sitting on the same light page background as
+    everything else - likely near-invisible in practice, not just
+    "hard to read". Changed to a dark, readable color.
+  Left the sidebar category-nav buttons alone - already correctly
+  swapping between dark text on a light selected-button background and
+  light text on a dark unselected-button background, verified both
+  ways have good contrast.
+  `GOLD` is no longer referenced (previously only used for the title,
+  which now uses `INK` against its own guaranteed-light backdrop) - left
+  defined in case a future dark-backdrop element wants a bright accent
+  color, rather than removing a working, harmless unused constant.
+  Fixed two real gaps in the UI smoke-test mock along the way
+  (`CreateFontString`'s mock was missing `ClearAllPoints`/`SetParent`/
+  `SetDrawLayer` - real WoW FontStrings have all three). Full suite
+  green; this class of change (color/contrast) isn't independently
+  verifiable by the Lua unit test harness beyond "doesn't crash," so no
+  new behavioral tests were added - only fixed what broke from the mock
+  additions.
+
 ## 0.4.73
 
 - **New: session summary in the Log tab.** `activityLog` (the rolling
