@@ -10,6 +10,19 @@ end
 local RosterPanel = {}
 AscensionLFM.RosterPanel = RosterPanel
 
+local function Now()
+    return (type(GetTime) == "function" and GetTime()) or os.clock()
+end
+
+-- { name=, checkAt= } - set after a TryKick() UninviteUnit call that
+-- didn't error, verified on the next tick before trusting it. Same
+-- "no error != it worked" lesson as Kick.lua's v0.4.28 fix and
+-- AuraScan.lua's warn/kick cycle - UninviteUnit is fire-and-forget and
+-- can silently no-op (e.g. lacking privilege in an edge case, or the
+-- target being in combat) without ever throwing a Lua error.
+local KICK_VERIFY_DELAY = 1.5
+local pendingKickVerify = nil
+
 local ROLE_ORDER = { "tank", "healer", "aura", "dps", "" }
 local ROLE_SHORT = { tank = "T", healer = "H", aura = "A", dps = "D", [""] = "?" }
 local ROLE_LABELS = {
@@ -192,9 +205,53 @@ local function TryKick(name)
         end
         return
     end
-    pcall(UninviteUnit, name)
+    local ok = pcall(UninviteUnit, name)
+    if not ok then
+        if AscensionLFM.Print then
+            AscensionLFM.Print("Roster: failed to remove " .. name)
+        end
+        return
+    end
+    -- Don't trust this yet - verify on the next tick before confirming.
+    pendingKickVerify = { name = name, checkAt = Now() + KICK_VERIFY_DELAY }
     if AscensionLFM.Print then
-        AscensionLFM.Print("Roster: removing " .. name)
+        AscensionLFM.Print("Roster: removing " .. name .. " ...")
+    end
+end
+
+--- Check a pending TryKick() removal against the live roster. Called from
+-- the panel's own periodic ticker (RosterPanel.Start()) - no separate
+-- Start/Tick pair needed since this is a single manual action, not an
+-- automated cycle with retries.
+local function CheckPendingKick()
+    if not pendingKickVerify then
+        return
+    end
+    if Now() < pendingKickVerify.checkAt then
+        return
+    end
+    local name = pendingKickVerify.name
+    pendingKickVerify = nil
+    local stillPresent = false
+    local groups = RosterPanel.BuildData()
+    for g = 1, 8 do
+        for _, m in ipairs(groups[g] or {}) do
+            if LowerName(m.name) == LowerName(name) then
+                stillPresent = true
+                break
+            end
+        end
+        if stillPresent then
+            break
+        end
+    end
+    if AscensionLFM.Print then
+        if stillPresent then
+            AscensionLFM.Print("Roster: " .. name .. " still in group - try again "
+                .. "(may lack privilege, or they're in combat)")
+        else
+            AscensionLFM.Print("Roster: " .. name .. " removed")
+        end
     end
 end
 
@@ -563,6 +620,9 @@ function RosterPanel.Start()
         RosterPanel.Refresh()
     end)
     f:SetScript("OnUpdate", function(self, elapsed)
+        if pendingKickVerify then
+            CheckPendingKick()
+        end
         self._t = (self._t or 0) + (elapsed or 0)
         if self._t < 2 then
             return
@@ -578,3 +638,7 @@ end
 
 RosterPanel.ROLE_ICONS = ROLE_ICONS
 RosterPanel.ROLE_ORDER = ROLE_ORDER
+RosterPanel._TryKick = TryKick
+RosterPanel._CheckPendingKick = CheckPendingKick
+RosterPanel._GetPendingKickVerify = function() return pendingKickVerify end
+RosterPanel._ResetForTests = function() pendingKickVerify = nil end

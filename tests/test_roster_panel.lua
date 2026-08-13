@@ -18,7 +18,8 @@ end
 
 _G.AscensionLFMDB = nil
 _G.AscensionLFM = nil
-_G.GetTime = function() return 1000 end
+_G.GetTime = function() return _G._rosterNow or 1000 end
+_G._rosterNow = 1000
 _G.CreateFrame = function() error("RosterPanel tests are data-only - should never build UI frames") end
 
 dofile("core/Database.lua")
@@ -129,6 +130,82 @@ check("no slotMax shows bare filled count", summaryNoMax:find("T 1", 1, true) ~=
 -- nil-safe: doesn't error on missing counts/slotMax.
 local okNilSafe = pcall(RosterPanel.FormatSummary, nil, nil)
 check("FormatSummary is nil-safe", okNilSafe == true)
+
+--------------------------------------------------------------------
+-- Regression: TryKick must not trust a successful UninviteUnit pcall as
+-- proof the removal actually happened - the same "no error != it
+-- worked" lesson as Kick.lua's v0.4.28 fix. Verify via the live roster
+-- on a deferred check instead of confirming immediately.
+--------------------------------------------------------------------
+_G.IsRaidLeader = function() return true end
+_G.IsRaidOfficer = function() return false end
+_G.IsPartyLeader = function() return false end
+local uninvited = {}
+_G.UninviteUnit = function(name) table.insert(uninvited, name) end
+
+-- Roster still has the target present when TryKick fires - simulates
+-- UninviteUnit silently no-op'ing (e.g. an edge-case privilege check, or
+-- the target being in combat) despite no Lua error.
+local rosterNames = { "Host", "Ghosty" }
+_G.GetNumRaidMembers = function() return #rosterNames end
+_G.GetRaidRosterInfo = function(i)
+    local n = rosterNames[i]
+    if not n then return nil end
+    return n, "", 1, 60, "Warrior", "WARRIOR", "", 1
+end
+
+RosterPanel._ResetForTests()
+_G._rosterNow = 2000
+RosterPanel._TryKick("Ghosty")
+check("TryKick attempts UninviteUnit", #uninvited == 1 and uninvited[1] == "Ghosty", tostring(#uninvited))
+check("TryKick does not immediately confirm - queued for verify",
+    RosterPanel._GetPendingKickVerify() ~= nil)
+
+-- Checking before the verify delay has elapsed does nothing yet.
+RosterPanel._CheckPendingKick()
+check("verify not yet due stays pending", RosterPanel._GetPendingKickVerify() ~= nil)
+
+-- Ghosty is STILL in the roster once the delay elapses - must NOT be
+-- silently confirmed as removed, and must clearly say so.
+_G._rosterNow = 2000 + 1.6
+local printedStill = {}
+local origPrintStill = AscensionLFM.Print
+AscensionLFM.Print = function(msg) table.insert(printedStill, msg) end
+RosterPanel._CheckPendingKick()
+AscensionLFM.Print = origPrintStill
+check("verify clears the pending check either way",
+    RosterPanel._GetPendingKickVerify() == nil)
+local stillInGroupMsg = false
+for _, msg in ipairs(printedStill) do
+    if msg:find("still in group", 1, true) then
+        stillInGroupMsg = true
+    end
+end
+check("still-present target gets an honest 'still in group' message, not a false confirmation",
+    stillInGroupMsg == true, table.concat(printedStill, " | "))
+
+-- Separate clean scenario: target genuinely leaves before the verify
+-- delay elapses - correctly confirmed.
+rosterNames = { "Host", "Ghosty2" }
+uninvited = {}
+RosterPanel._ResetForTests()
+_G._rosterNow = 3000
+RosterPanel._TryKick("Ghosty2")
+rosterNames = { "Host" } -- genuinely left
+_G._rosterNow = 3000 + 1.6
+local printed = {}
+local origPrint = AscensionLFM.Print
+AscensionLFM.Print = function(msg) table.insert(printed, msg) end
+RosterPanel._CheckPendingKick()
+AscensionLFM.Print = origPrint
+local removedMsg = false
+for _, msg in ipairs(printed) do
+    if msg:find("removed", 1, true) and not msg:find("still in group", 1, true) then
+        removedMsg = true
+    end
+end
+check("genuine departure prints a clean 'removed' confirmation", removedMsg == true,
+    table.concat(printed, " | "))
 
 io.write(string.format("test_roster_panel: %d passed, %d failed\n", passed, failed))
 if failed > 0 then

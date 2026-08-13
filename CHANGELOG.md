@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.4.75
+
+- **Fix: Roster tab's manual kick button trusted a successful
+  `UninviteUnit` call as proof the removal actually happened.** Found
+  while auditing `ui/RosterPanel.lua`'s interactive functions (built
+  during the v0.4.66-v0.4.69 reconciliation, not yet reviewed at this
+  level of detail). Same "no Lua error != it worked" trap already fixed
+  for Kick59 (v0.4.28) and built correctly into AuraScan.lua's warn/kick
+  cycle from the start — `UninviteUnit` is fire-and-forget and can
+  silently no-op (privilege edge case, target in combat, etc.) without
+  ever throwing, so `pcall(UninviteUnit, name)` succeeding is not proof
+  of anything. The Roster panel's kick button printed "Roster: removing
+  X" unconditionally right after the call, with no verification at all.
+  Fixed with a lightweight deferred check (no full retry/give-up cycle
+  needed — this is a manual one-off click, not an automated cycle; a
+  human can just click again): `TryKick()` now schedules a check
+  ~1.5s later via the panel's existing periodic ticker (moved out from
+  under its 2s display-refresh throttle so the kick check itself isn't
+  needlessly delayed), re-scans the live roster, and only then reports
+  either a clean "removed" confirmation or an honest "still in group -
+  try again (may lack privilege, or they're in combat)" — never a false
+  positive.
+  Regression tests added to test_roster_panel.lua: the immediate call
+  doesn't confirm anything, checking before the delay elapses stays
+  pending, a target still present at the delay gets the honest
+  "still in group" message (not silently confirmed), and a target that
+  genuinely left gets a clean "removed" confirmation with the exact
+  message content verified both ways. Full suite green.
+
 ## 0.4.74
 
 - **Global readability pass: every text color re-checked for contrast,
