@@ -16,10 +16,11 @@ end
 
 -- { name=, checkAt= } - set after a TryKick() UninviteUnit call that
 -- didn't error, verified on the next tick before trusting it. Same
--- "no error != it worked" lesson as Kick.lua's v0.4.28 fix and
--- AuraScan.lua's warn/kick cycle - UninviteUnit is fire-and-forget and
--- can silently no-op (e.g. lacking privilege in an edge case, or the
--- target being in combat) without ever throwing a Lua error.
+-- "no error != it worked" lesson as Kick.lua's v0.4.28 fix (and the
+-- warn/kick cycle the removed AuraScan.lua used to have) -
+-- UninviteUnit is fire-and-forget and can silently no-op (e.g. lacking
+-- privilege in an edge case, or the target being in combat) without
+-- ever throwing a Lua error.
 local KICK_VERIFY_DELAY = 1.5
 local pendingKickVerify = nil
 

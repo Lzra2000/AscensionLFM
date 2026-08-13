@@ -57,11 +57,6 @@ local DEFAULTS = {
     autoKickLevel59 = false,
     kickLevel = 59,
     kickWarnInterval = 10,
-    -- Aura of Experience (spell 818059) liar scan - default OFF
-    auraScanEnabled = false, -- scan assigned-aura players for real buff
-    auraScanAutoKick = false, -- warn+kick fakes (requires auraScanEnabled)
-    auraScanInterval = 15, -- seconds between scans
-    auraScanWarnInterval = 15, -- min gap between RW/kick cycles
     -- LFM Post / auto-repost (default OFF)
     postChannel = "YELL", -- YELL | SAY | GUILD | CHANNEL
     postChannelName = "", -- used when postChannel == CHANNEL

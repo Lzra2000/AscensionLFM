@@ -388,13 +388,6 @@ function MainWindow.RefreshMatches()
 end
 
 function MainWindow.RefreshKicks()
-    if widgets.auraRelFS then
-        if AscensionLFM.AuraScan and AscensionLFM.AuraScan.GetReliabilityNote then
-            widgets.auraRelFS:SetText(AscensionLFM.AuraScan.GetReliabilityNote())
-        else
-            widgets.auraRelFS:SetText("")
-        end
-    end
     local db = AscensionLFM.Database.Get()
     local history = db.kickHistory or {}
     for i = 1, 6 do
@@ -540,12 +533,6 @@ local function SyncWidgetsFromDB()
     end
     if widgets.autoKick and widgets.autoKick.SetChecked then
         widgets.autoKick:SetChecked(db.autoKickLevel59 and true or false)
-    end
-    if widgets.auraScan and widgets.auraScan.SetChecked then
-        widgets.auraScan:SetChecked(db.auraScanEnabled and true or false)
-    end
-    if widgets.auraScanKick and widgets.auraScanKick.SetChecked then
-        widgets.auraScanKick:SetChecked(db.auraScanAutoKick and true or false)
     end
     if widgets.routeButtons then
         local routing = type(db.messageRouting) == "table" and db.messageRouting or {}
@@ -2118,7 +2105,7 @@ function MainWindow.Init()
         AscensionLFM.RosterPanel.Attach(host)
     end
 
-local kick = BuildCategoryPage(pageHost, CAT_KICK, 520)
+local kick = BuildCategoryPage(pageHost, CAT_KICK, 300)
     CreateSectionLabel(kick, "Level-59 auto-kick", -4)
     widgets.autoKick = CreateToggleRow(kick, -22,
         "Enable kick at level 59 + raid warning every 10s",
@@ -2129,46 +2116,9 @@ local kick = BuildCategoryPage(pageHost, CAT_KICK, 520)
             RefreshStatus()
         end)
 
-    CreateSectionLabel(kick, "Aura of Experience scanner", -92)
-    widgets.auraScan = CreateToggleRow(kick, -110,
-        "Scan aura seats for buff 818059 (only if visible on others)",
-        "Hosting only * flags liars (role=aura, no Aura of Experience). /alfm aurascan for one-shot. Default OFF.",
-        false,
-        function(on)
-            AscensionLFM.Database.Get().auraScanEnabled = on and true or false
-            RefreshStatus()
-        end)
-    widgets.auraScanKick = CreateToggleRow(kick, -110 - TOGGLE_STEP,
-        "Auto-kick when buff visible-on-others AND missing (warn + UninviteUnit)",
-        "Requires scanner ON * lead/assist * RW then kick. Dangerous - default OFF.",
-        true,
-        function(on)
-            AscensionLFM.Database.Get().auraScanAutoKick = on and true or false
-            RefreshStatus()
-        end)
-    local auraScanBtn = CreateFrame("Button", nil, kick, "UIPanelButtonTemplate")
-    auraScanBtn:SetSize(140, 22)
-    auraScanBtn:SetPoint("TOPLEFT", 8, -110 - TOGGLE_STEP * 2 - 8)
-    auraScanBtn:SetText("Scan now")
-    auraScanBtn:SetScript("OnClick", function()
-        if AscensionLFM.AuraScan and AscensionLFM.AuraScan.ScanNow then
-            AscensionLFM.AuraScan.ScanNow()
-        elseif AscensionLFM.Print then
-            AscensionLFM.Print("AuraScan module missing - delete Interface/AddOns/AscensionLFM and reinstall the zip")
-        end
-        MainWindow.RefreshKicks()
-    end)
-    local auraRelFS = kick:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    auraRelFS:SetPoint("TOPLEFT", 8, -110 - TOGGLE_STEP * 2 - 32)
-    auraRelFS:SetPoint("RIGHT", -8, 0)
-    auraRelFS:SetJustifyH("LEFT")
-    FitText(auraRelFS, nil, 32)
-    auraRelFS:SetTextColor(0.20, 0.15, 0.08)
-    widgets.auraRelFS = auraRelFS
-
-    CreateSectionLabel(kick, "Recent kicks", -110 - TOGGLE_STEP * 2 - 68)
+    CreateSectionLabel(kick, "Recent kicks", -92)
     local kickBox = CreateFrame("Frame", nil, kick)
-    kickBox:SetPoint("TOPLEFT", 0, -110 - TOGGLE_STEP * 2 - 86)
+    kickBox:SetPoint("TOPLEFT", 0, -110)
     kickBox:SetPoint("BOTTOMRIGHT", 0, 0)
     ApplyInset(kickBox)
     local ky = -10

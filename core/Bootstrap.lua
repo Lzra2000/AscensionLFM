@@ -8,7 +8,7 @@ if type(AscensionLFM) ~= "table" then
     _G.AscensionLFM = AscensionLFM
 end
 
-AscensionLFM.VERSION = "0.4.77"
+AscensionLFM.VERSION = "0.4.78"
 AscensionLFM.ADDON_NAME = "AscensionLFM"
 
 local function Print(msg)
@@ -63,15 +63,6 @@ local function PrintStatus()
                 tonumber(ks.gaveUp) or 0,
                 tonumber(ks.sessionIgnore) or 0,
                 OnOff(ks.inCombat)))
-        end
-    end
-    if AscensionLFM.AuraScan and AscensionLFM.AuraScan.GetStatus then
-        local as = AscensionLFM.AuraScan.GetStatus()
-        if as then
-            Print(string.format("auraScan: enabled=%s * autoKick=%s * last=%s * liars=%s * withBuff=%s * seeOthers=%s * spell=%s",
-                OnOff(as.enabled), OnOff(as.autoKick), tostring(as.last or "?"),
-                tostring(as.liars or 0), tostring(as.withBuff or 0),
-                OnOff(as.canSeeOnOthers), tostring(as.spellId or "?")))
         end
     end
     if AscensionLFM.RoleCheck and AscensionLFM.RoleCheck.GetStatus then
@@ -205,7 +196,7 @@ local function RegisterSlash()
             Print("diag v" .. tostring(AscensionLFM.VERSION))
             local mods = {
                 "Database", "Parser", "Slots", "SpecRole", "Queue", "Reject",
-                "Invite", "Kick", "AuraScan", "RoleCheck", "Poster", "Scanner",
+                "Invite", "Kick", "RoleCheck", "Poster", "Scanner",
                 "MainWindow", "MiniHUD", "RosterPanel",
             }
             for _, m in ipairs(mods) do
@@ -227,17 +218,9 @@ local function RegisterSlash()
             end
             return
         end
-        if msg == "aurascan" or msg == "aura" then
-            if AscensionLFM.AuraScan and AscensionLFM.AuraScan.ScanNow then
-                AscensionLFM.AuraScan.ScanNow()
-            else
-                Print("AuraScan module missing - reinstall zip")
-            end
-            return
-        end
         if msg == "help" then
             Print("/alfm | /mslfm - toggle UI")
-            Print("/alfm status | diag | test | aurascan | applyspec | help")
+            Print("/alfm status | diag | test | applyspec | help")
             Print("Full Auto Hosting: /alfm -> Hosting -> master toggle (default OFF)")
             return
         end
@@ -270,9 +253,6 @@ local function StartModules()
     SafeStart("Scanner.Start", AscensionLFM.Scanner and AscensionLFM.Scanner.Start)
     SafeStart("Invite.Start", AscensionLFM.Invite and AscensionLFM.Invite.Start)
     SafeStart("Kick.Start", AscensionLFM.Kick and AscensionLFM.Kick.Start)
-    if AscensionLFM.AuraScan and AscensionLFM.AuraScan.Start then
-        SafeStart("AuraScan.Start", AscensionLFM.AuraScan.Start)
-    end
     SafeStart("Poster.Start", AscensionLFM.Poster and AscensionLFM.Poster.Start)
     SafeStart("RoleCheck.EnsureTicker", AscensionLFM.RoleCheck and AscensionLFM.RoleCheck.EnsureTicker)
     SafeStart("MainWindow.Init", AscensionLFM.MainWindow and AscensionLFM.MainWindow.Init)

@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.4.78
+
+- **Removed: automated Aura of Experience buff scanning (AuraScan.lua,
+  introduced during external reconciliation, v0.4.44-v0.4.68 batch).**
+  Deliberate decision, not a bug fix: despite genuine effort across this
+  whole session (checking Ascension's own nameplate buff-display code,
+  CompactRaidFrames, and even AscensionLogsCompanion's full combat-log/
+  inspect pipeline for a better technique), there is no reliable way to
+  read another player's buffs at range on this client - the underlying
+  `UnitAura` limitation AuraScan.lua's warn-then-verify-via-roster
+  workaround existed for in the first place couldn't be improved on
+  further. Rather than keep a feature that only partially works and
+  needs a fragile workaround, it's removed entirely:
+  - Deleted `core/AuraScan.lua` and `tests/test_aura_scan.lua`.
+  - Removed its two toggles, "Scan now" button, and reliability-note
+    label from the Kick tab; "Recent kicks" now sits directly under
+    the level-59 auto-kick toggle. Kick tab content height reduced
+    520 -> 300 to match (no more empty space where the removed section
+    used to be).
+  - Removed `/alfm aurascan`, its `diag` module-list entry, its
+    `/alfm status` line, and its `Start()` call from Bootstrap.lua.
+  - Removed the now-unused `auraScanEnabled` / `auraScanAutoKick` /
+    `auraScanInterval` / `auraScanWarnInterval` DEFAULTS entries from
+    Database.lua. The historical `rev < 6` migration step that zeroed
+    the first two is left untouched (harmless no-op now, but migration
+    chains shouldn't be edited retroactively).
+  **What's unchanged, on purpose:** "aura" remains a fully first-class
+  role everywhere else - whisper-based self-report still auto-invites
+  aura-role applicants exactly as before (Parser.lua/Invite.lua/
+  RoleCheck.lua untouched), and RosterPanel's role picker already lets
+  a host manually assign/reassign anyone to the aura seat by clicking
+  their role icon (`roles = { "tank", "healer", "aura", "dps", "" }`,
+  pre-existing, not new) - manual aura-seat management was already
+  fully supported before this change, nothing new needed there.
+  Full suite green (test_aura_scan.lua's 20-some checks removed with
+  the module; everything else passes unmodified).
+
 ## 0.4.77
 
 - **New: Manastorm level clears/failures now feed into the Session
