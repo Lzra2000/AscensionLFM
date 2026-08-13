@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.4.77
+
+- **New: Manastorm level clears/failures now feed into the Session
+  Summary (v0.4.73).** New module `core/ManastormTracker.lua` listens
+  for `MANASTORM_LEVEL_COMPLETED` and `MANASTORM_FAILED` - both
+  confirmed real events, verified directly against Ascension's own
+  AscensionLogsCompanion addon source (`Capture/ManastormScan.lua`,
+  provided this session), which documents `MANASTORM_LEVEL_COMPLETED`
+  firing once per level cleared (a1 = level number) and
+  `MANASTORM_FAILED` on a wipe/ejection. The Log tab's session summary
+  line now reads e.g. "Session (1h12m): 8 invited, 2 rejected, 1
+  kicked, 6 matches, 3 posts, 4 levels cleared, 1 failed" - only
+  appending the level-stats clause when there's something to show, so
+  it stays quiet on non-CoA server variants (Bronzebeard/Epoch) where
+  these events never fire (per that same source: "C_Manastorm is
+  absent on Bronzebeard/Epoch" - confirmed CoA-only).
+  Considered but did NOT build: switching Invite.lua/Poster.lua's
+  pause-during-instance check from polling to reacting to
+  `ACTIVE_MANASTORM_UPDATED` for instant resume the moment a host
+  leaves - both already tick every 0.5s, so an event-driven switch
+  would save at most 0.5s of latency, not worth the added complexity.
+  Regression tests in new tests/test_manastorm_tracker.lua (15 checks):
+  pure formatters, Activity.Push wiring, stacking across multiple
+  clears, graceful no-op with a broken/missing Activity module, and
+  FormatSessionSummary's zero-vs-non-zero append behavior. Full suite
+  green.
+
 ## 0.4.76
 
 - **Improved: "pause hosting while in instance" (v0.4.71) now uses the

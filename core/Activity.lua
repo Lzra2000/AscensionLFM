@@ -26,6 +26,8 @@ local VALID_KINDS = {
     shield = true,
     regroup = true,
     rolecheck = true,
+    manastorm_cleared = true,
+    manastorm_failed = true,
 }
 
 local function DB()
@@ -119,6 +121,8 @@ function Activity.GetSessionSummary(nowOverride)
         kicked = tonumber(stats.kick) or 0,
         matched = tonumber(stats.match) or 0,
         posted = tonumber(stats.post) or 0,
+        manastormCleared = tonumber(stats.manastorm_cleared) or 0,
+        manastormFailed = tonumber(stats.manastorm_failed) or 0,
         elapsedSeconds = elapsed,
         startedAt = startedAt,
     }
@@ -139,13 +143,25 @@ function Activity.FormatSessionSummary(summary)
     else
         timeStr = string.format("%dm", mins)
     end
-    return string.format("Session (%s): %d invited, %d rejected, %d kicked, %d matches, %d posts",
+    local line = string.format("Session (%s): %d invited, %d rejected, %d kicked, %d matches, %d posts",
         timeStr,
         tonumber(summary.invited) or 0,
         tonumber(summary.rejected) or 0,
         tonumber(summary.kicked) or 0,
         tonumber(summary.matched) or 0,
         tonumber(summary.posted) or 0)
+
+    -- Only append Manastorm level stats when there's something to show -
+    -- these stay at 0 on non-CoA server variants (Bronzebeard/Epoch),
+    -- where MANASTORM_LEVEL_COMPLETED/MANASTORM_FAILED never fire, so
+    -- always showing "0 cleared, 0 failed" there would just be noise.
+    local cleared = tonumber(summary.manastormCleared) or 0
+    local failed = tonumber(summary.manastormFailed) or 0
+    if cleared > 0 or failed > 0 then
+        line = line .. string.format(", %d levels cleared, %d failed", cleared, failed)
+    end
+
+    return line
 end
 
 --- Clear session totals and restart the elapsed-time clock. Does NOT
