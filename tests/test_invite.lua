@@ -368,6 +368,30 @@ ok, reason = Invite.TryHostInvite("OutsideApplicant", "dps")
 check("whisper invite works normally outside instance", ok == true, tostring(reason))
 _G.IsInInstance = nil
 
+--------------------------------------------------------------------
+-- New: prefers C_Manastorm.IsInManastorm() (confirmed real via
+-- Ascension's own client source) over the generic IsInInstance() - a
+-- host in some unrelated instance (not Manastorm) should NOT have
+-- hosting paused, and IsInManastorm() gives that precision.
+--------------------------------------------------------------------
+db.pauseInviteInInstance = true
+_G.IsInInstance = function() return true, "party" end -- generic instance: true
+_G.C_Manastorm = { IsInManastorm = function() return false end } -- but not Manastorm specifically
+Invite._ResetCooldowns()
+invited = {}
+ok, reason = Invite.TryHostInvite("NotManastormApplicant", "dps")
+check("C_Manastorm takes priority: unrelated instance does not pause", ok == true, tostring(reason))
+
+_G.C_Manastorm = { IsInManastorm = function() return true end }
+Invite._ResetCooldowns()
+invited = {}
+ok, reason = Invite.TryHostInvite("InManastormApplicant", "dps")
+check("C_Manastorm takes priority: actual Manastorm does pause", ok == false and reason == "in instance",
+    tostring(reason))
+
+_G.C_Manastorm = nil
+_G.IsInInstance = nil
+
 io.write(string.format("invite tests: %d passed, %d failed\n", passed, failed))
 if failed > 0 then
     os.exit(1)

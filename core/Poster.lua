@@ -20,6 +20,26 @@ local ROLE_LABELS = {
     dps = "DPS",
 }
 local ROLE_ORDER = { "tank", "healer", "aura", "dps" }
+
+-- Same logic as Invite.lua's IsHostInsideInstance() - prefers the precise
+-- C_Manastorm.IsInManastorm() signal (confirmed real via Ascension's own
+-- client source) over the generic IsInInstance(), so re-advertising an
+-- LFM only pauses for an actual Manastorm run, not any unrelated instance
+-- the host might briefly step into. Falls back to IsInInstance() if
+-- C_Manastorm isn't available.
+local function IsHostInsideInstance()
+    if type(C_Manastorm) == "table" and type(C_Manastorm.IsInManastorm) == "function" then
+        local ok, inManastorm = pcall(C_Manastorm.IsInManastorm)
+        if ok then
+            return inManastorm and true or false
+        end
+    end
+    if type(IsInInstance) ~= "function" then
+        return false
+    end
+    local ok, inInstance = pcall(IsInInstance)
+    return ok and inInstance and true or false
+end
 local CHANNELS = { YELL = true, SAY = true, GUILD = true, CHANNEL = true }
 
 local frame
@@ -404,12 +424,9 @@ function Poster.Tick(now)
         db.mode,
         full
     )
-    if ok and db.pauseRepostInInstance ~= false and type(IsInInstance) == "function" then
-        local okCall, inInstance = pcall(IsInInstance)
-        if okCall and inInstance then
-            ok = false
-            reason = "in instance"
-        end
+    if ok and db.pauseRepostInInstance ~= false and IsHostInsideInstance() then
+        ok = false
+        reason = "in instance"
     end
     if not ok then
         if reason == "in instance" then

@@ -37,7 +37,22 @@ end
 -- and public LFG-chat scan) pause here by default; db.pauseInviteInInstance
 -- lets a host explicitly opt back in if they genuinely want mid-run
 -- whisper invites to keep working.
+--
+-- Prefers the precise "actually in a Manastorm run" signal
+-- (C_Manastorm.IsInManastorm(), confirmed real via Ascension's own client
+-- source - used throughout their FrameXML for exactly this kind of state
+-- check) over the generic IsInInstance() - a host could legitimately be
+-- in some unrelated instance (a quick dungeon between hosting sessions,
+-- say) while still wanting hosting automation to keep working, and
+-- IsInManastorm() won't false-trigger for that. Falls back to
+-- IsInInstance() if C_Manastorm isn't available for any reason.
 local function IsHostInsideInstance()
+    if type(C_Manastorm) == "table" and type(C_Manastorm.IsInManastorm) == "function" then
+        local ok, inManastorm = pcall(C_Manastorm.IsInManastorm)
+        if ok then
+            return inManastorm and true or false
+        end
+    end
     if type(IsInInstance) ~= "function" then
         return false
     end

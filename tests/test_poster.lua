@@ -247,6 +247,42 @@ check("tick posts normally outside instance", status == "reposted", status)
 check("message sent outside instance", #sent == 1)
 _G.IsInInstance = nil
 
+--------------------------------------------------------------------
+-- New: prefers C_Manastorm.IsInManastorm() over the generic
+-- IsInInstance() - same as Invite.lua's equivalent fix.
+--------------------------------------------------------------------
+Poster._ResetForTests()
+db.autoRepost = true
+db.mode = "hosting"
+db.pauseRepostInInstance = true
+Slots.ClearAll()
+Slots.SetMax("tank", 2)
+Slots.SetMax("healer", 3)
+Slots.SetMax("aura", 3)
+Slots.SetMax("dps", 7)
+sent = {}
+_G.IsInInstance = function() return true, "party" end
+_G.C_Manastorm = { IsInManastorm = function() return false end }
+status = Poster.Tick(5000)
+check("C_Manastorm priority: unrelated instance does not pause repost", status == "reposted", status)
+check("message sent in unrelated instance", #sent == 1)
+
+Poster._ResetForTests()
+db.autoRepost = true
+Slots.ClearAll()
+Slots.SetMax("tank", 2)
+Slots.SetMax("healer", 3)
+Slots.SetMax("aura", 3)
+Slots.SetMax("dps", 7)
+sent = {}
+_G.C_Manastorm = { IsInManastorm = function() return true end }
+status = Poster.Tick(6000)
+check("C_Manastorm priority: actual Manastorm pauses repost", status == "paused: in instance", status)
+check("no message sent while actually in Manastorm", #sent == 0)
+
+_G.C_Manastorm = nil
+_G.IsInInstance = nil
+
 -- Defaults: autoRepost off
 local defs = AscensionLFM.Database.Defaults()
 check("default autoRepost off", defs.autoRepost == false)

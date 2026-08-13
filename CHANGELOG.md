@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.4.76
+
+- **Improved: "pause hosting while in instance" (v0.4.71) now uses the
+  precise Manastorm-specific signal instead of a generic instance check.**
+  Verified against Ascension's own client source (FrameXML/SharedXML,
+  provided directly): `C_Manastorm.IsInManastorm()` is a real API, used
+  throughout Ascension's own code for exactly this kind of state check
+  (`ManastormUtil.lua`, `Minimap.lua`, `UIParent.lua`, `StaticPopup.lua`).
+  Both `Invite.lua`'s `IsHostInsideInstance()` and `Poster.lua`'s
+  equivalent check now prefer it over the generic `IsInInstance()` -
+  which used to pause hosting for *any* instance the host stepped into,
+  not just Manastorm itself. A host briefly ducking into an unrelated
+  dungeon between hosting sessions no longer has auto-invite/auto-repost
+  needlessly paused; falls back to `IsInInstance()` if `C_Manastorm`
+  isn't available for any reason (defensive, matching this addon's
+  established pattern of never assuming an API exists without checking).
+  Also cross-checked `IsInInstance()`'s own usage pattern (`local
+  inInstance, instanceType = IsInInstance()`) against Ascension's actual
+  `PVPQueueButtonMixin:UpdateDisableReason` and `Atr_ContainerFrameItemButton_OnClick`'s
+  hooked Blizzard functions (`ContainerFrameItemButton_OnClick`/
+  `_OnModifiedClick`) from the Auctionator work - both confirmed to
+  match exactly what was already assumed, no further changes needed
+  there.
+  Regression tests added to test_invite.lua and test_poster.lua:
+  `C_Manastorm.IsInManastorm() == false` while `IsInInstance()` is true
+  correctly does NOT pause (unrelated instance); `IsInManastorm() ==
+  true` correctly does pause, taking priority over the generic check.
+  Full suite green.
+
 ## 0.4.75
 
 - **Fix: Roster tab's manual kick button trusted a successful
