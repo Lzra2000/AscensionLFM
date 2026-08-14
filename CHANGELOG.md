@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.4.82
+
+- **Fixed: collapsed MiniHUD had oversized DragonUI border pieces.**
+  Confirmed via a live `/alfmhuddebug` report this session: the
+  collapsed MiniHUD actually resizes the frame to 56x28 (not just
+  hides child content) - the v0.4.79 DragonUI chrome border pieces
+  (30x30 corners etc.) are fixed-size textures that don't auto-shrink
+  with the frame, so left visible at 56x28 they'd be wider than the
+  entire collapsed HUD. `SetExpanded()` now hides all 8 chrome border
+  pieces when collapsing and shows them again when expanding. The
+  background texture didn't need the same fix - it's anchored via
+  `SetAllPoints`, so it already correctly auto-adjusts to whatever size
+  the frame becomes.
+  New test hooks `MiniHUD._SetExpanded` / `MiniHUD._GetFrame`, and a
+  regression test in test_mini_hud.lua (4 new checks) verifying the
+  chrome pieces actually hide on collapse and show on expand -
+  confirmed the test genuinely catches the regression by temporarily
+  reverting the fix and watching it fail, then restoring. Test mock
+  fix: CreateTexture's Show/Hide/IsShown now track real state instead
+  of IsShown always reporting true regardless of calls (would have
+  made this exact regression test a false-positive pass).
+  Full suite green (69 checks in test_mini_hud.lua, up from 65).
+
 ## 0.4.81
 
 - **Main window reskinned with real DragonUI assets** (same approach as

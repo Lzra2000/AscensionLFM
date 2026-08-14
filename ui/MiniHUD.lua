@@ -824,6 +824,11 @@ local function SetExpanded(on)
         if statusFS then
             statusFS:Show()
         end
+        if frame.chromeBorderPieces then
+            for _, piece in ipairs(frame.chromeBorderPieces) do
+                if piece.Show then piece:Show() end
+            end
+        end
     else
         frame:SetWidth(56)
         frame:SetHeight(28)
@@ -840,6 +845,11 @@ local function SetExpanded(on)
         end
         if statusFS then
             statusFS:Hide()
+        end
+        if frame.chromeBorderPieces then
+            for _, piece in ipairs(frame.chromeBorderPieces) do
+                if piece.Hide then piece:Hide() end
+            end
         end
     end
     MiniHUD.Refresh()
@@ -969,6 +979,19 @@ local function BuildFrame()
     ConfigureTexture(chromeRight, DUI_METAL_V, topSize, 16, 0.298828, 0.591797, 0, 1)
     chromeRight:SetPoint("TOPRIGHT", chromeTopRight, "BOTTOMRIGHT")
     chromeRight:SetPoint("BOTTOMRIGHT", chromeBottomRight, "TOPRIGHT")
+
+    -- Stored so SetExpanded() can hide these when collapsed: the
+    -- collapsed HUD actually resizes the frame to 56x28 (not just
+    -- hides child content), and these are fixed-size textures (30x30
+    -- corners etc.) that don't auto-shrink with the frame - left
+    -- visible at that size they'd be wider than the whole collapsed
+    -- HUD. The background texture isn't in this list: it's anchored
+    -- via two stretched points (TOPLEFT+BOTTOMRIGHT), so it already
+    -- auto-adjusts to whatever size the frame becomes.
+    f.chromeBorderPieces = {
+        chromeTopLeft, chromeTopRight, chromeBottomLeft, chromeBottomRight,
+        chromeTop, chromeBottom, chromeLeft, chromeRight,
+    }
 
     local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     title:SetPoint("TOPLEFT", 8, -6)
@@ -1234,6 +1257,8 @@ MiniHUD._RateBlocked = RateBlocked
 MiniHUD._RateStamp = RateStamp
 MiniHUD._SendGroupAnnounce = SendGroupAnnounce
 MiniHUD._CanInviteOthers = CanInviteOthers
+MiniHUD._SetExpanded = SetExpanded
+MiniHUD._GetFrame = function() return frame end
 
 -- ============================================================================
 -- Diagnostic: /alfmhuddebug

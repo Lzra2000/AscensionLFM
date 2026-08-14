@@ -25,7 +25,7 @@ _G.CreateFrame = function(kind, name, parent, template)
         ClearAllPoints = function(self) self._points = {} end,
         GetPoint = function() return "CENTER", nil, "CENTER", 0, 180 end,
         CreateTexture = function()
-            return {
+            local tex = {
                 SetAllPoints = function() end,
                 SetPoint = function() end,
                 SetTexture = function() end,
@@ -40,10 +40,12 @@ _G.CreateFrame = function(kind, name, parent, template)
                 GetPoint = function() return nil end,
                 GetObjectType = function() return "Texture" end,
                 GetTexture = function() return nil end,
-                IsShown = function() return true end,
-                Show = function() end,
-                Hide = function() end,
+                _shown = true,
             }
+            tex.IsShown = function(self) return self._shown end
+            tex.Show = function(self) self._shown = true end
+            tex.Hide = function(self) self._shown = false end
+            return tex
         end,
         CreateFontString = function()
             return {
@@ -286,6 +288,33 @@ MiniHUD.SetShown(false)
 check("hide works", MiniHUD.IsShown() == false)
 MiniHUD.SetShown(true)
 check("show works", MiniHUD.IsShown() == true)
+
+--------------------------------------------------------------------
+-- Chrome border pieces (v0.4.79's DragonUI reskin) must hide when
+-- collapsed and show when expanded - the collapsed HUD actually
+-- resizes the frame to 56x28, and these are fixed-size (30x30 etc.)
+-- textures that don't auto-shrink with it; left visible at that size
+-- they'd be wider than the whole collapsed HUD. Confirmed as a real
+-- bug via a live /alfmhuddebug report this session before this fix.
+--------------------------------------------------------------------
+local hudFrame = MiniHUD._GetFrame()
+check("chromeBorderPieces exists", type(hudFrame.chromeBorderPieces) == "table")
+check("chromeBorderPieces has all 8 pieces", #hudFrame.chromeBorderPieces == 8,
+    tostring(#hudFrame.chromeBorderPieces))
+
+MiniHUD._SetExpanded(false)
+local allHidden = true
+for _, piece in ipairs(hudFrame.chromeBorderPieces) do
+    if piece:IsShown() then allHidden = false end
+end
+check("chrome border pieces hidden when collapsed", allHidden == true)
+
+MiniHUD._SetExpanded(true)
+local allShown = true
+for _, piece in ipairs(hudFrame.chromeBorderPieces) do
+    if not piece:IsShown() then allShown = false end
+end
+check("chrome border pieces shown when expanded", allShown == true)
 
 --------------------------------------------------------------------
 -- New: per-message routing (Message Studio style). db.messageRouting[kind]
