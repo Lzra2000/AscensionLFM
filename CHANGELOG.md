@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.4.80
+
+- **`/alfmhuddebug` upgraded: reports texcoords and auto-identifies
+  known DragonUI atlas pieces.** Same generalized diagnostic approach
+  built into DragonUI's own `RealChrome.Debug` this session (a shared
+  function DragonUI's tradeskill_skin.lua/spellbook_skin.lua now both
+  call instead of each keeping a separate duplicated debug command) -
+  duplicated here rather than shared, since AscensionLFM is a separate
+  addon with no Lua-level access to DragonUI's module table. Each
+  texture region's `GetTexCoord()` is read (handling both the 4-value
+  and 8-value quad return forms WoW's API can give back) and matched
+  against every DragonUI atlas piece confirmed this session
+  (uiframemetal2x's 4 corners, uiframemetalhorizontal2x/vertical2x's
+  edges) - so the output can say e.g. "-> topLeft (uiframemetal2x)"
+  next to a region instead of just raw numbers to cross-reference by
+  hand. Honest framing, matching this session's DragonUI work: this is
+  a measurement tool, not a guarantee - still needs a screenshot
+  alongside it and a follow-up pass to actually confirm a fix landed
+  right.
+  Both the texcoord-parsing (4-value vs 8-value quad form) and the
+  piece-identification matching were unit-tested in isolation before
+  being wired in. Full suite green (mock gap for GetTexCoord not
+  needed - the code's own defensive `if region.GetTexCoord then` check
+  already handles a mock without it correctly, confirmed by the
+  existing test passing unmodified).
+
 ## 0.4.79
 
 - **MiniHUD reskinned to use real DragonUI assets.** Replaced the

@@ -1238,11 +1238,42 @@ MiniHUD._CanInviteOthers = CanInviteOthers
 -- ============================================================================
 -- Diagnostic: /alfmhuddebug
 -- ============================================================================
--- Same purpose as DragonUI's own /duitsdebug/duisbdebug from this same
--- session: the DragonUI-style chrome sizing above (corner/edge pieces,
--- background) was scaled down from DragonUI's own "compact" profile by
--- estimate, not measured against a live render. Open the MiniHUD, run
--- this, and send the output (plus a screenshot) back for a precise pass.
+-- Same generalized approach as DragonUI's own RealChrome.Debug
+-- (chrome_shared.lua, this session) - reports texcoords and identifies
+-- known DragonUI atlas pieces by matching them, rather than just
+-- dumping raw sizes/positions. Duplicated here (not shared) since
+-- AscensionLFM is a separate addon from DragonUI with no Lua-level
+-- access to DragonUI's own module table.
+local KNOWN_PIECES = {
+    ["Interface\\AddOns\\DragonUI\\Textures\\UI\\uiframemetal2x"] = {
+        { "topLeft (uiframemetal2x)", 0.00195312, 0.294922, 0.00195312, 0.294922 },
+        { "topRight (uiframemetal2x)", 0.298828, 0.591797, 0.00195312, 0.294922 },
+        { "bottomLeft (uiframemetal2x)", 0.298828, 0.423828, 0.298828, 0.423828 },
+        { "bottomRight (uiframemetal2x)", 0.427734, 0.552734, 0.298828, 0.423828 },
+    },
+    ["Interface\\AddOns\\DragonUI\\Textures\\UI\\uiframemetalhorizontal2x"] = {
+        { "top edge (uiframemetalhorizontal2x)", 0, 1, 0.00390625, 0.589844 },
+        { "bottom edge (uiframemetalhorizontal2x)", 0, 0.5, 0.597656, 0.847656 },
+    },
+    ["Interface\\AddOns\\DragonUI\\Textures\\UI\\uiframemetalvertical2x"] = {
+        { "left edge (uiframemetalvertical2x)", 0.00195312, 0.294922, 0, 1 },
+        { "right edge (uiframemetalvertical2x)", 0.298828, 0.591797, 0, 1 },
+    },
+}
+
+local function IdentifyPiece(tex, left, right, top, bottom)
+    local candidates = tex and KNOWN_PIECES[tex]
+    if not candidates or not left then return nil end
+    local EPS = 0.001
+    for _, piece in ipairs(candidates) do
+        if math.abs(left - piece[2]) < EPS and math.abs(right - piece[3]) < EPS
+            and math.abs(top - piece[4]) < EPS and math.abs(bottom - piece[5]) < EPS then
+            return piece[1]
+        end
+    end
+    return nil
+end
+
 SLASH_ALFMHUDDEBUG1 = "/alfmhuddebug"
 if type(SlashCmdList) == "table" then
     SlashCmdList["ALFMHUDDEBUG"] = function()
@@ -1262,13 +1293,30 @@ if type(SlashCmdList) == "table" then
             local w, h = region:GetWidth(), region:GetHeight()
             local okPoint, rPoint, rRel, rRelPoint, rX, rY = pcall(region.GetPoint, region, 1)
             local shown = (region.IsShown and region:IsShown()) and " shown" or " hidden"
+
+            local coordLine, identified = "", ""
+            if region.GetTexCoord then
+                local okC, v1, v2, v3, v4, v5 = pcall(region.GetTexCoord, region)
+                if okC and v1 then
+                    local l, r, t, b
+                    if v5 == nil then
+                        l, r, t, b = v1, v2, v3, v4
+                    else
+                        l, r, t, b = v1, v5, v2, v4
+                    end
+                    coordLine = string.format("  texcoord=%.6f,%.6f,%.6f,%.6f", l or 0, r or 0, t or 0, b or 0)
+                    local name = IdentifyPiece(tex, l, r, t, b)
+                    if name then identified = "  -> " .. name end
+                end
+            end
+
             if okPoint then
-                print(string.format("  [%d] %.0fx%.0f%s  point=%s rel=%s,%s off=%.0f,%.0f  tex=%s",
+                print(string.format("  [%d] %.0fx%.0f%s  point=%s rel=%s,%s off=%.0f,%.0f  tex=%s%s%s",
                     i, w or 0, h or 0, shown,
                     rPoint or "?", rRel and (rRel.GetName and rRel:GetName() or "?") or "?", rRelPoint or "?",
-                    rX or 0, rY or 0, tostring(tex)))
+                    rX or 0, rY or 0, tostring(tex), coordLine, identified))
             else
-                print(string.format("  [%d] %.0fx%.0f%s  (no point)  tex=%s", i, w or 0, h or 0, shown, tostring(tex)))
+                print(string.format("  [%d] %.0fx%.0f%s  (no point)  tex=%s%s%s", i, w or 0, h or 0, shown, tostring(tex), coordLine, identified))
             end
         end
     end
