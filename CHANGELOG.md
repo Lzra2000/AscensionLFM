@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.4.83
+
+- **New: `/alfm debugall`** - consolidated diagnostic that opens every
+  DragonUI-reskinned window it reasonably can and runs each one's atlas
+  debug command in sequence, instead of running four separate commands
+  by hand (`/duitsdebug`, `/duisbdebug`, `/alfmhuddebug`,
+  `/alfmmaindebug`). Opens SpellBookFrame via the standard
+  `ToggleSpellBook(BOOKTYPE_SPELL)` API and this addon's own MiniHUD/
+  MainWindow directly, then calls each window's registered debug
+  command. Works across the DragonUI/AscensionLFM addon boundary
+  because `SlashCmdList` is a single global table shared by every
+  addon regardless of which one registered a given command - no
+  Lua-level dependency beyond that table existing.
+  TradeSkillFrame is deliberately NOT force-opened: it only exists once
+  the player is genuinely at a trainer or profession station, a real
+  game-state precondition that can't be faked - prints a note to open
+  one and run `/duitsdebug` manually instead of pretending to handle it.
+  Full suite green.
+
 ## 0.4.82
 
 - **Fixed: collapsed MiniHUD had oversized DragonUI border pieces.**
