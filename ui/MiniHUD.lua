@@ -1105,8 +1105,14 @@ local function BuildFrame()
     place(buttons.ready)
 
     statusFS = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    statusFS:SetPoint("BOTTOMLEFT", 8, 5)
-    statusFS:SetPoint("BOTTOMRIGHT", -8, 5)
+    -- Pushed further in than the original 8px: the DragonUI bottom
+    -- corner chrome pieces (16x16, positioned slightly outside the
+    -- frame edge) occupy roughly the first ~10px near each bottom
+    -- corner, both horizontally and vertically - 8px wasn't enough
+    -- clearance and the text visibly overlapped the corner art
+    -- (confirmed via a live screenshot this session).
+    statusFS:SetPoint("BOTTOMLEFT", 18, 5)
+    statusFS:SetPoint("BOTTOMRIGHT", -18, 5)
     statusFS:SetJustifyH("LEFT")
     if statusFS.SetHeight then statusFS:SetHeight(16) end
     if statusFS.SetWordWrap then statusFS:SetWordWrap(false) end

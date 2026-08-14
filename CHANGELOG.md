@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.4.84
+
+- **Fixed: status line ("T x/x H x/x A x/x D x/x") overlapped the
+  DragonUI bottom chrome corners on MiniHUD.** Confirmed via a live
+  screenshot. `statusFS` was anchored 8px in from each bottom corner;
+  the v0.4.79 bottom-corner chrome pieces (16x16, offset slightly
+  outside the frame edge) occupy roughly the first ~10px near each
+  bottom corner both horizontally and vertically, so 8px wasn't enough
+  clearance. Pushed the anchor to 18px in on both sides.
+  Also checked the top corners (30x30, larger than the bottom ones) for
+  the same category of issue against the title/HOST chip text - the
+  screenshot didn't show a problem there, and since the corner's actual
+  visible art is likely smaller than its full bounding box, this wasn't
+  touched without concrete evidence it's actually broken (matching this
+  session's "measure, don't guess" rule for DragonUI chrome work).
+  Full suite green.
+
 ## 0.4.83
 
 - **New: `/alfm debugall`** - consolidated diagnostic that opens every
