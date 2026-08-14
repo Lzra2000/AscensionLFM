@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.4.85
+
+- **Collapsed MiniHUD now shows a leader-icon instead of "ALFM" text.**
+  Aesthetic request: an icon reads cleaner than an abbreviated text
+  label at the collapsed 56x28 size. Uses
+  `Interface\GroupFrame\UI-Group-LeaderIcon` - the standard raid-leader
+  crown icon, thematically fitting next to the "HOST" status this addon
+  already shows. `SetExpanded()` now hides the title/chip text and
+  shows the icon when collapsing, and the reverse when expanding
+  (previously it just swapped the title text between "AscensionLFM"
+  and "ALFM" - the chip text ("HOST") was left showing at the same time
+  in both states, which is now also hidden while collapsed to keep the
+  tiny collapsed view uncluttered).
+  New regression tests (7 checks) verifying the icon/text visibility
+  correctly flips both directions - confirmed the tests genuinely catch
+  a reverted fix (temporarily disabled, watched it fail, restored).
+  Test mock fixes: CreateFontString's Show/Hide/IsShown now track real
+  state (previously no-ops with no IsShown at all - would have made
+  this exact test impossible to write correctly).
+  Full suite green (76 checks in test_mini_hud.lua, up from 69).
+
 ## 0.4.84
 
 - **Fixed: status line ("T x/x H x/x A x/x D x/x") overlapped the

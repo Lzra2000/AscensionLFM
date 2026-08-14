@@ -811,6 +811,13 @@ local function SetExpanded(on)
         frame:SetHeight(86)
         if frame.titleFS then
             frame.titleFS:SetText("AscensionLFM")
+            frame.titleFS:Show()
+        end
+        if frame.chipFS then
+            frame.chipFS:Show()
+        end
+        if frame.collapsedIconTex then
+            frame.collapsedIconTex:Hide()
         end
         for _, b in pairs(buttons) do
             if b and b.Show then
@@ -832,8 +839,16 @@ local function SetExpanded(on)
     else
         frame:SetWidth(56)
         frame:SetHeight(28)
+        -- Icon instead of the abbreviated "ALFM" text label - hide
+        -- both text elements, show just the leader-icon texture.
         if frame.titleFS then
-            frame.titleFS:SetText("ALFM")
+            frame.titleFS:Hide()
+        end
+        if frame.chipFS then
+            frame.chipFS:Hide()
+        end
+        if frame.collapsedIconTex then
+            frame.collapsedIconTex:Show()
         end
         for _, b in pairs(buttons) do
             if b and b.Hide then
@@ -1004,6 +1019,18 @@ local function BuildFrame()
     chip:SetText("HOST")
     chip:SetTextColor(0.85, 0.75, 0.4)
     f.chipFS = chip
+
+    -- Collapsed-state icon (raid-leader crown, Interface\GroupFrame\
+    -- UI-Group-LeaderIcon - a well-established, stable standard icon,
+    -- thematically fitting next to "HOST" status) shown instead of the
+    -- abbreviated "ALFM" text label when collapsed - hidden while
+    -- expanded, where the full title/chip text is shown instead.
+    local collapsedIcon = f:CreateTexture(nil, "OVERLAY")
+    collapsedIcon:SetTexture("Interface\\GroupFrame\\UI-Group-LeaderIcon")
+    collapsedIcon:SetSize(18, 18)
+    collapsedIcon:SetPoint("LEFT", f, "LEFT", 8, 0)
+    collapsedIcon:Hide()
+    f.collapsedIconTex = collapsedIcon
 
     -- Click brand / collapsed chip -> settings (expanded) or expand (collapsed)
     local hit = CreateFrame("Button", nil, f)

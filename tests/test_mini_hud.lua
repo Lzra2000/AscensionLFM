@@ -48,14 +48,18 @@ _G.CreateFrame = function(kind, name, parent, template)
             return tex
         end,
         CreateFontString = function()
-            return {
+            local fs = {
                 SetPoint = function() end,
-                SetText = function(self, t) self._text = t end,
                 SetTextColor = function() end,
                 SetJustifyH = function() end,
-                Show = function() end,
-                Hide = function() end,
+                _shown = true,
             }
+            fs.SetText = function(self, t) self._text = t end
+            fs.GetText = function(self) return self._text end
+            fs.Show = function(self) self._shown = true end
+            fs.Hide = function(self) self._shown = false end
+            fs.IsShown = function(self) return self._shown end
+            return fs
         end,
         Show = function(self) self._shown = true end,
         Hide = function(self) self._shown = false end,
@@ -315,6 +319,23 @@ for _, piece in ipairs(hudFrame.chromeBorderPieces) do
     if not piece:IsShown() then allShown = false end
 end
 check("chrome border pieces shown when expanded", allShown == true)
+
+--------------------------------------------------------------------
+-- Collapsed-state leader icon (this session): shown instead of the
+-- abbreviated "ALFM" text when collapsed, hidden (title/chip text
+-- shown instead) when expanded.
+--------------------------------------------------------------------
+check("collapsedIconTex exists", type(hudFrame.collapsedIconTex) == "table")
+
+MiniHUD._SetExpanded(false)
+check("icon shown when collapsed", hudFrame.collapsedIconTex:IsShown() == true)
+check("title text hidden when collapsed", hudFrame.titleFS:IsShown() == false)
+check("chip text hidden when collapsed", hudFrame.chipFS:IsShown() == false)
+
+MiniHUD._SetExpanded(true)
+check("icon hidden when expanded", hudFrame.collapsedIconTex:IsShown() == false)
+check("title text shown when expanded", hudFrame.titleFS:IsShown() == true)
+check("chip text shown when expanded", hudFrame.chipFS:IsShown() == true)
 
 --------------------------------------------------------------------
 -- New: per-message routing (Message Studio style). db.messageRouting[kind]
