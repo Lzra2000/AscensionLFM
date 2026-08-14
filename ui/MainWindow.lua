@@ -890,6 +890,106 @@ function MainWindow.Init()
         tinsert(UISpecialFrames, FRAME_NAME)
     end
 
+    -- Real DragonUI chrome (background + metal nineslice border), same
+    -- approach and same confirmed texture paths/atlas coordinates as
+    -- DragonUI's own bag/bank windows and this session's
+    -- TradeSkillFrame/SpellBookFrame reskins. AscensionLFM is a
+    -- separate addon from DragonUI, so these are full-path texture
+    -- references (no Lua-level dependency on DragonUI's code having
+    -- run - only needs the texture files present).
+    --
+    -- CreateMainFrame() falls back between UIPanelDialogTemplate (has
+    -- its own baked-in border/background texture regions) and a manual
+    -- SetBackdrop version - "neuter" (Show->Hide override, same
+    -- technique as DragonUI's own characterpanel/chrome.lua) whichever
+    -- vanilla texture regions exist directly on `frame` so DragonUI's
+    -- own code can't bring them back, then layer the real chrome on
+    -- top. This only sweeps frame:GetRegions() (direct texture
+    -- children) - titleBg below is a separate child FRAME with its own
+    -- already-custom ApplyBackdrop styling, untouched by this sweep.
+    for _, region in ipairs({ frame:GetRegions() }) do
+        if region.GetObjectType and region:GetObjectType() == "Texture" and not region._duiOwned then
+            region._duiShow = region.Show
+            region.Show = region.Hide
+            region:Hide()
+        end
+    end
+    if frame.SetBackdrop then
+        frame:SetBackdrop(nil)
+    end
+
+    do
+        local DUI_METAL = "Interface\\AddOns\\DragonUI\\Textures\\UI\\uiframemetal2x"
+        local DUI_METAL_H = "Interface\\AddOns\\DragonUI\\Textures\\UI\\uiframemetalhorizontal2x"
+        local DUI_METAL_V = "Interface\\AddOns\\DragonUI\\Textures\\UI\\uiframemetalvertical2x"
+        local DUI_BG = "Interface\\AddOns\\DragonUI\\Textures\\UI\\ui-background-rock"
+
+        local function ConfigureTexture(texture, path, width, height, left, right, top, bottom)
+            texture:SetTexture(path)
+            texture:SetSize(width, height)
+            texture:SetTexCoord(left, right, top, bottom)
+        end
+
+        local bg = frame:CreateTexture(nil, "BACKGROUND")
+        bg:SetTexture(DUI_BG)
+        bg:SetAlpha(0.97)
+        bg:SetPoint("TOPLEFT", frame, "TOPLEFT", 2, -20)
+        bg:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -2, 3)
+        bg._duiOwned = true
+
+        -- Full-size profile (not MiniHUD's scaled-down compact one) -
+        -- 760x600 is well within the range this sizing was confirmed
+        -- for (DragonUI's own bag/bank windows, TradeSkillFrame at
+        -- 384x512, SpellBookFrame).
+        local topSize, topHeight, bottomSize = 75, 75, 32
+        local topY, bottomY = 16, -3
+        local leftOffset, rightOffset = -8, 4
+
+        local cTopLeft = frame:CreateTexture(nil, "OVERLAY")
+        ConfigureTexture(cTopLeft, DUI_METAL, topSize, topHeight, 0.00195312, 0.294922, 0.00195312, 0.294922)
+        cTopLeft:SetPoint("TOPLEFT", frame, "TOPLEFT", leftOffset, topY)
+        cTopLeft._duiOwned = true
+
+        local cTopRight = frame:CreateTexture(nil, "OVERLAY")
+        ConfigureTexture(cTopRight, DUI_METAL, topSize, topHeight, 0.298828, 0.591797, 0.00195312, 0.294922)
+        cTopRight:SetPoint("TOPRIGHT", frame, "TOPRIGHT", rightOffset, topY)
+        cTopRight._duiOwned = true
+
+        local cBottomLeft = frame:CreateTexture(nil, "OVERLAY")
+        ConfigureTexture(cBottomLeft, DUI_METAL, bottomSize, bottomSize, 0.298828, 0.423828, 0.298828, 0.423828)
+        cBottomLeft:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", leftOffset, bottomY)
+        cBottomLeft._duiOwned = true
+
+        local cBottomRight = frame:CreateTexture(nil, "OVERLAY")
+        ConfigureTexture(cBottomRight, DUI_METAL, bottomSize, bottomSize, 0.427734, 0.552734, 0.298828, 0.423828)
+        cBottomRight:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", rightOffset, bottomY)
+        cBottomRight._duiOwned = true
+
+        local cTop = frame:CreateTexture(nil, "OVERLAY")
+        ConfigureTexture(cTop, DUI_METAL_H, 32, topHeight, 0, 1, 0.00390625, 0.589844)
+        cTop:SetPoint("TOPLEFT", cTopLeft, "TOPRIGHT")
+        cTop:SetPoint("TOPRIGHT", cTopRight, "TOPLEFT")
+        cTop._duiOwned = true
+
+        local cBottom = frame:CreateTexture(nil, "OVERLAY")
+        ConfigureTexture(cBottom, DUI_METAL_H, 16, bottomSize, 0, 0.5, 0.597656, 0.847656)
+        cBottom:SetPoint("TOPLEFT", cBottomLeft, "TOPRIGHT")
+        cBottom:SetPoint("TOPRIGHT", cBottomRight, "TOPLEFT")
+        cBottom._duiOwned = true
+
+        local cLeft = frame:CreateTexture(nil, "OVERLAY")
+        ConfigureTexture(cLeft, DUI_METAL_V, topSize, 16, 0.00195312, 0.294922, 0, 1)
+        cLeft:SetPoint("TOPLEFT", cTopLeft, "BOTTOMLEFT")
+        cLeft:SetPoint("BOTTOMLEFT", cBottomLeft, "TOPLEFT")
+        cLeft._duiOwned = true
+
+        local cRight = frame:CreateTexture(nil, "OVERLAY")
+        ConfigureTexture(cRight, DUI_METAL_V, topSize, 16, 0.298828, 0.591797, 0, 1)
+        cRight:SetPoint("TOPRIGHT", cTopRight, "BOTTOMRIGHT")
+        cRight:SetPoint("BOTTOMRIGHT", cBottomRight, "TOPRIGHT")
+        cRight._duiOwned = true
+    end
+
     local titleBg = CreateFrame("Frame", nil, frame)
     titleBg:SetPoint("TOP", frame, "TOP", 0, -2)
     titleBg:SetSize(260, 34)
@@ -2228,3 +2328,92 @@ end
 function MainWindow.GetFrame()
     return frame
 end
+
+-- ============================================================================
+-- Diagnostic: /alfmmaindebug
+-- ============================================================================
+-- Same generalized approach as MiniHUD's /alfmhuddebug and DragonUI's
+-- own RealChrome.Debug from this session - reports texcoords and
+-- identifies known DragonUI atlas pieces by matching coordinates.
+local MAINWIN_KNOWN_PIECES = {
+    ["Interface\\AddOns\\DragonUI\\Textures\\UI\\uiframemetal2x"] = {
+        { "topLeft (uiframemetal2x)", 0.00195312, 0.294922, 0.00195312, 0.294922 },
+        { "topRight (uiframemetal2x)", 0.298828, 0.591797, 0.00195312, 0.294922 },
+        { "bottomLeft (uiframemetal2x)", 0.298828, 0.423828, 0.298828, 0.423828 },
+        { "bottomRight (uiframemetal2x)", 0.427734, 0.552734, 0.298828, 0.423828 },
+    },
+    ["Interface\\AddOns\\DragonUI\\Textures\\UI\\uiframemetalhorizontal2x"] = {
+        { "top edge (uiframemetalhorizontal2x)", 0, 1, 0.00390625, 0.589844 },
+        { "bottom edge (uiframemetalhorizontal2x)", 0, 0.5, 0.597656, 0.847656 },
+    },
+    ["Interface\\AddOns\\DragonUI\\Textures\\UI\\uiframemetalvertical2x"] = {
+        { "left edge (uiframemetalvertical2x)", 0.00195312, 0.294922, 0, 1 },
+        { "right edge (uiframemetalvertical2x)", 0.298828, 0.591797, 0, 1 },
+    },
+}
+
+local function MainWinIdentifyPiece(tex, left, right, top, bottom)
+    local candidates = tex and MAINWIN_KNOWN_PIECES[tex]
+    if not candidates or not left then return nil end
+    local EPS = 0.001
+    for _, piece in ipairs(candidates) do
+        if math.abs(left - piece[2]) < EPS and math.abs(right - piece[3]) < EPS
+            and math.abs(top - piece[4]) < EPS and math.abs(bottom - piece[5]) < EPS then
+            return piece[1]
+        end
+    end
+    return nil
+end
+
+SLASH_ALFMMAINDEBUG1 = "/alfmmaindebug"
+if type(SlashCmdList) == "table" then
+    SlashCmdList["ALFMMAINDEBUG"] = function()
+        if type(frame) ~= "table" or not frame.GetRegions then
+            print("AscensionLFM: main window isn't built yet - open it first (/alfm).")
+            return
+        end
+
+        print("AscensionLFM MainWindow debug:")
+        print(string.format("  Frame size: %.0f x %.0f", frame:GetWidth(), frame:GetHeight()))
+
+        local i = 0
+        for _, region in ipairs({ frame:GetRegions() }) do
+            if region.GetObjectType and region:GetObjectType() == "Texture" then
+                i = i + 1
+                local tex = region.GetTexture and region:GetTexture()
+                local w, h = region:GetWidth(), region:GetHeight()
+                local okPoint, rPoint, rRel, rRelPoint, rX, rY = pcall(region.GetPoint, region, 1)
+                local shown = (region.IsShown and region:IsShown()) and " shown" or " hidden"
+                local owned = region._duiOwned and " [DragonUI-added]" or ""
+
+                local coordLine, identified = "", ""
+                if region.GetTexCoord then
+                    local okC, v1, v2, v3, v4, v5 = pcall(region.GetTexCoord, region)
+                    if okC and v1 then
+                        local l, r, t, b
+                        if v5 == nil then
+                            l, r, t, b = v1, v2, v3, v4
+                        else
+                            l, r, t, b = v1, v5, v2, v4
+                        end
+                        coordLine = string.format("  texcoord=%.6f,%.6f,%.6f,%.6f", l or 0, r or 0, t or 0, b or 0)
+                        local name = MainWinIdentifyPiece(tex, l, r, t, b)
+                        if name then identified = "  -> " .. name end
+                    end
+                end
+
+                if okPoint then
+                    print(string.format("  [%d] %.0fx%.0f%s  point=%s rel=%s,%s off=%.0f,%.0f  tex=%s%s%s%s",
+                        i, w or 0, h or 0, shown,
+                        rPoint or "?", rRel and (rRel.GetName and rRel:GetName() or "?") or "?", rRelPoint or "?",
+                        rX or 0, rY or 0, tostring(tex), owned, coordLine, identified))
+                else
+                    print(string.format("  [%d] %.0fx%.0f%s  (no point)  tex=%s%s%s%s", i, w or 0, h or 0, shown, tostring(tex), owned, coordLine, identified))
+                end
+            end
+        end
+        print(string.format("  Total texture regions: %d", i))
+        print("Copy this output (or a screenshot of the window) back for a more precise pass.")
+    end
+end
+

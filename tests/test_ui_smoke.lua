@@ -76,6 +76,9 @@ local function NewFrame()
                     SetAllPoints = Noop, SetPoint = Noop,
                     SetTexCoord = Noop, SetWidth = Noop, SetHeight = Noop,
                     SetSize = Noop, Show = Noop, Hide = Noop, SetVertexColor = Noop,
+                    SetAlpha = Noop, GetObjectType = function() return "Texture" end,
+                    GetWidth = function() return 0 end, GetHeight = function() return 0 end,
+                    GetPoint = function() return nil end, IsShown = function() return true end,
                 }
                 tex.SetTexture = function(self, path) self._texture = path end
                 tex.GetTexture = function(self) return self._texture end

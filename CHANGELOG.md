@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.4.81
+
+- **Main window reskinned with real DragonUI assets** (same approach as
+  v0.4.79's MiniHUD). `CreateMainFrame()`'s vanilla texture regions
+  (from `UIPanelDialogTemplate`, or the manual `UI-DialogBox-Background`/
+  `-Border` SetBackdrop fallback if that template failed to create) are
+  neutered - same Show->Hide override technique as DragonUI's own
+  characterpanel/chrome.lua - then DragonUI's real metal nineslice
+  border + `ui-background-rock` background are layered on top, full-size
+  profile (75/75/32, same as DragonUI's own bag/bank windows and this
+  session's TradeSkillFrame/SpellBookFrame reskins - 760x600 is well
+  within the size range that was confirmed for). Full-path texture
+  references again (`Interface\AddOns\DragonUI\Textures\...`), no
+  Lua-level dependency on DragonUI.
+  Scope, honestly: only the main frame's own background/border. The
+  titleBg sub-frame (already has its own non-vanilla custom styling,
+  untouched), individual buttons across all 8 category pages (General/
+  Seeking/Hosting/Post/Queue/Roster/Kick/Log - left on
+  UIPanelButtonTemplate, matching DragonUI's own practice per v0.4.79's
+  reasoning), and the separate Roster sub-panel window weren't converted
+  in this pass - reskinning every individual element across a 2200+ line
+  file in one shot without live verification at each step isn't
+  something to attempt responsibly.
+  New `/alfmmaindebug` diagnostic, same texcoord + atlas-piece-
+  identification approach as `/alfmhuddebug` (v0.4.80).
+  test_ui_smoke.lua's CreateTexture mock gained SetAlpha/GetObjectType/
+  GetWidth/GetHeight/GetPoint/IsShown (needed by the new chrome code).
+  Full suite green.
+
 ## 0.4.80
 
 - **`/alfmhuddebug` upgraded: reports texcoords and auto-identifies
