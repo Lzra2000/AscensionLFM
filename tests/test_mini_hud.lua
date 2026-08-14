@@ -25,7 +25,25 @@ _G.CreateFrame = function(kind, name, parent, template)
         ClearAllPoints = function(self) self._points = {} end,
         GetPoint = function() return "CENTER", nil, "CENTER", 0, 180 end,
         CreateTexture = function()
-            return { SetAllPoints = function() end, SetPoint = function() end, SetTexture = function() end, SetVertexColor = function() end }
+            return {
+                SetAllPoints = function() end,
+                SetPoint = function() end,
+                SetTexture = function() end,
+                SetVertexColor = function() end,
+                SetAlpha = function() end,
+                SetSize = function() end,
+                SetTexCoord = function() end,
+                SetWidth = function() end,
+                SetHeight = function() end,
+                GetWidth = function() return 0 end,
+                GetHeight = function() return 0 end,
+                GetPoint = function() return nil end,
+                GetObjectType = function() return "Texture" end,
+                GetTexture = function() return nil end,
+                IsShown = function() return true end,
+                Show = function() end,
+                Hide = function() end,
+            }
         end,
         CreateFontString = function()
             return {
@@ -42,6 +60,7 @@ _G.CreateFrame = function(kind, name, parent, template)
         IsShown = function(self) return self._shown end,
         SetText = function(self, t) self._text = t end,
         GetFontString = function() return nil end,
+        GetRegions = function() return end,
     }
     return f
 end

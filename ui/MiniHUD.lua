@@ -898,14 +898,77 @@ local function BuildFrame()
 
     local bg = f:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints(f)
-    bg:SetTexture("Interface\\DialogFrame\\UI-DialogBox-Background")
-    bg:SetVertexColor(0.15, 0.12, 0.06, 0.92)
+    -- Real DragonUI asset, referenced by full path since AscensionLFM is
+    -- a separate addon (no Lua-level dependency on DragonUI's own code
+    -- having run - just needs the texture file to exist on disk, which
+    -- is more robust across addon load order than calling into
+    -- DragonUI's exposed _G.DragonUI table would be). Same texture path
+    -- confirmed this session for DragonUI's own bag/bank windows and the
+    -- TradeSkillFrame/SpellBookFrame reskins.
+    bg:SetTexture("Interface\\AddOns\\DragonUI\\Textures\\UI\\ui-background-rock")
+    bg:SetAlpha(0.97)
 
-    local border = f:CreateTexture(nil, "BORDER")
-    border:SetPoint("TOPLEFT", -2, 2)
-    border:SetPoint("BOTTOMRIGHT", 2, -2)
-    border:SetTexture("Interface\\DialogFrame\\UI-DialogBox-Background-Dark")
-    border:SetVertexColor(0.7, 0.55, 0.2, 0.55)
+    -- Real DragonUI metal nineslice border, compact profile (matches
+    -- DragonUI's own bags_skin.lua "compact" sizing - topSize/topHeight
+    -- 52, bottomSize 24 - more proportionate to this HUD's small size
+    -- than the full 75/75/32 profile used on bags/character panel/
+    -- TradeSkillFrame/SpellBookFrame).
+    local DUI_METAL = "Interface\\AddOns\\DragonUI\\Textures\\UI\\uiframemetal2x"
+    local DUI_METAL_H = "Interface\\AddOns\\DragonUI\\Textures\\UI\\uiframemetalhorizontal2x"
+    local DUI_METAL_V = "Interface\\AddOns\\DragonUI\\Textures\\UI\\uiframemetalvertical2x"
+
+    local function ConfigureTexture(texture, path, width, height, left, right, top, bottom)
+        texture:SetTexture(path)
+        texture:SetSize(width, height)
+        texture:SetTexCoord(left, right, top, bottom)
+    end
+
+    -- Real DragonUI metal nineslice border, scaled down further than
+    -- even DragonUI's own "compact" profile (52/52/24, tuned for taller
+    -- windows like the character panel) - this HUD is only 86px tall,
+    -- so 52px-tall corners would take up more than half that height and
+    -- risk the top/bottom corners visually overlapping. Roughly the
+    -- same proportion the full profile (75px corners on a ~450px-tall
+    -- bag window) keeps, applied to this frame's actual height instead.
+    local topSize, topHeight, bottomSize = 30, 30, 16
+    local topY, bottomY = 7, -1
+    local leftOffset, rightOffset = -6, 2
+
+    local chromeTopLeft = f:CreateTexture(nil, "OVERLAY")
+    ConfigureTexture(chromeTopLeft, DUI_METAL, topSize, topHeight, 0.00195312, 0.294922, 0.00195312, 0.294922)
+    chromeTopLeft:SetPoint("TOPLEFT", f, "TOPLEFT", leftOffset, topY)
+
+    local chromeTopRight = f:CreateTexture(nil, "OVERLAY")
+    ConfigureTexture(chromeTopRight, DUI_METAL, topSize, topHeight, 0.298828, 0.591797, 0.00195312, 0.294922)
+    chromeTopRight:SetPoint("TOPRIGHT", f, "TOPRIGHT", rightOffset, topY)
+
+    local chromeBottomLeft = f:CreateTexture(nil, "OVERLAY")
+    ConfigureTexture(chromeBottomLeft, DUI_METAL, bottomSize, bottomSize, 0.298828, 0.423828, 0.298828, 0.423828)
+    chromeBottomLeft:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", leftOffset, bottomY)
+
+    local chromeBottomRight = f:CreateTexture(nil, "OVERLAY")
+    ConfigureTexture(chromeBottomRight, DUI_METAL, bottomSize, bottomSize, 0.427734, 0.552734, 0.298828, 0.423828)
+    chromeBottomRight:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", rightOffset, bottomY)
+
+    local chromeTop = f:CreateTexture(nil, "OVERLAY")
+    ConfigureTexture(chromeTop, DUI_METAL_H, 32, topHeight, 0, 1, 0.00390625, 0.589844)
+    chromeTop:SetPoint("TOPLEFT", chromeTopLeft, "TOPRIGHT")
+    chromeTop:SetPoint("TOPRIGHT", chromeTopRight, "TOPLEFT")
+
+    local chromeBottom = f:CreateTexture(nil, "OVERLAY")
+    ConfigureTexture(chromeBottom, DUI_METAL_H, 16, bottomSize, 0, 0.5, 0.597656, 0.847656)
+    chromeBottom:SetPoint("TOPLEFT", chromeBottomLeft, "TOPRIGHT")
+    chromeBottom:SetPoint("TOPRIGHT", chromeBottomRight, "TOPLEFT")
+
+    local chromeLeft = f:CreateTexture(nil, "OVERLAY")
+    ConfigureTexture(chromeLeft, DUI_METAL_V, topSize, 16, 0.00195312, 0.294922, 0, 1)
+    chromeLeft:SetPoint("TOPLEFT", chromeTopLeft, "BOTTOMLEFT")
+    chromeLeft:SetPoint("BOTTOMLEFT", chromeBottomLeft, "TOPLEFT")
+
+    local chromeRight = f:CreateTexture(nil, "OVERLAY")
+    ConfigureTexture(chromeRight, DUI_METAL_V, topSize, 16, 0.298828, 0.591797, 0, 1)
+    chromeRight:SetPoint("TOPRIGHT", chromeTopRight, "BOTTOMRIGHT")
+    chromeRight:SetPoint("BOTTOMRIGHT", chromeBottomRight, "TOPRIGHT")
 
     local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     title:SetPoint("TOPLEFT", 8, -6)
@@ -1171,3 +1234,46 @@ MiniHUD._RateBlocked = RateBlocked
 MiniHUD._RateStamp = RateStamp
 MiniHUD._SendGroupAnnounce = SendGroupAnnounce
 MiniHUD._CanInviteOthers = CanInviteOthers
+
+-- ============================================================================
+-- Diagnostic: /alfmhuddebug
+-- ============================================================================
+-- Same purpose as DragonUI's own /duitsdebug/duisbdebug from this same
+-- session: the DragonUI-style chrome sizing above (corner/edge pieces,
+-- background) was scaled down from DragonUI's own "compact" profile by
+-- estimate, not measured against a live render. Open the MiniHUD, run
+-- this, and send the output (plus a screenshot) back for a precise pass.
+SLASH_ALFMHUDDEBUG1 = "/alfmhuddebug"
+if type(SlashCmdList) == "table" then
+    SlashCmdList["ALFMHUDDEBUG"] = function()
+    if type(frame) ~= "table" or not frame.GetRegions then
+        print("AscensionLFM: MiniHUD frame isn't built yet - open it first.")
+        return
+    end
+
+    print("AscensionLFM MiniHUD debug:")
+    print(string.format("  Frame size: %.0f x %.0f", frame:GetWidth(), frame:GetHeight()))
+
+    local i = 0
+    for _, region in ipairs({ frame:GetRegions() }) do
+        if region.GetObjectType and region:GetObjectType() == "Texture" then
+            i = i + 1
+            local tex = region.GetTexture and region:GetTexture()
+            local w, h = region:GetWidth(), region:GetHeight()
+            local okPoint, rPoint, rRel, rRelPoint, rX, rY = pcall(region.GetPoint, region, 1)
+            local shown = (region.IsShown and region:IsShown()) and " shown" or " hidden"
+            if okPoint then
+                print(string.format("  [%d] %.0fx%.0f%s  point=%s rel=%s,%s off=%.0f,%.0f  tex=%s",
+                    i, w or 0, h or 0, shown,
+                    rPoint or "?", rRel and (rRel.GetName and rRel:GetName() or "?") or "?", rRelPoint or "?",
+                    rX or 0, rY or 0, tostring(tex)))
+            else
+                print(string.format("  [%d] %.0fx%.0f%s  (no point)  tex=%s", i, w or 0, h or 0, shown, tostring(tex)))
+            end
+        end
+    end
+    print(string.format("  Total texture regions: %d", i))
+    print("Copy this output (or a screenshot of the HUD) back for a more precise pass.")
+    end
+end
+

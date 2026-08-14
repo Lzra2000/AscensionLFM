@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.4.79
+
+- **MiniHUD reskinned to use real DragonUI assets.** Replaced the
+  generic Blizzard `UI-DialogBox-Background`/`UI-DialogBox-Background-
+  Dark` textures with DragonUI's own real metal nineslice border +
+  `ui-background-rock` background - the exact same texture paths and
+  atlas coordinates confirmed this session for DragonUI's own bag/bank
+  windows (`bags_skin.lua`) and the DragonUI addon's TradeSkillFrame/
+  SpellBookFrame reskins. Since AscensionLFM is a separate addon from
+  DragonUI, these are referenced by their full
+  `Interface\AddOns\DragonUI\Textures\...` path rather than through any
+  DragonUI Lua call - only needs the texture files to exist on disk (DragonUI installed), not any
+  timing/load-order dependency on DragonUI's own code having run yet.
+  Scaled down further than even DragonUI's own "compact" nineslice
+  profile (30/30/16 vs DragonUI's compact 52/52/24) since the MiniHUD
+  is only 86px tall - DragonUI's compact sizing was tuned for taller
+  windows and would have had the top/bottom corner pieces overlapping
+  at this frame's actual height.
+  Action buttons (LFM/RW/Sync/Wipe/Mobs/FULL/Regrp/T/H/A/D/Rost/RC) are
+  left on `UIPanelButtonTemplate` - DragonUI has no universal custom
+  button texture of its own (confirmed: DragonUI's own editor_mode.lua
+  uses this same template for some of its own buttons), so this matches
+  what DragonUI itself does rather than inventing a mismatched style.
+  New `/alfmhuddebug` diagnostic (same pattern as DragonUI's own
+  `/duitsdebug`/`/duisbdebug` from this session) dumps the live frame's
+  actual texture region sizes/positions/shown-state, since the sizing
+  above is a proportional estimate, not measured against a real render.
+  Test mock gaps fixed in test_mini_hud.lua: CreateTexture's mock gained
+  SetAlpha/SetSize/SetTexCoord/GetWidth/GetHeight/GetPoint/
+  GetObjectType/GetTexture (needed by the new chrome code), and the
+  frame mock gained GetRegions. Full suite green.
+
 ## 0.4.78
 
 - **Removed: automated Aura of Experience buff scanning (AuraScan.lua,
