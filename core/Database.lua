@@ -102,6 +102,8 @@ local DEFAULTS = {
     rejectCooldown = 30,
     rejectIgnoreList = {}, -- [nameLower] = true
     hallOfShame = {}, -- [nameLower] = { name=, reason=, addedAt= } - private, never posted anywhere
+    mplusDungeon = "", -- current Mythic+ dungeon name, prepended to the LFM post when set
+    mplusLevel = 0, -- current keystone level, 0 = not set / not shown
     rejectSessionIgnore = true, -- after one reject, skip further auto re-whispers this session
     -- Sounds (opt-in)
     soundOnMatch = false,

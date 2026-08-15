@@ -87,6 +87,21 @@ check("showAll=true includes filled roles too",
     Poster.BuildMessage(mixedSnap, true) == "LFM MS | 2/2 Tanks | 1/3 Healers | 3/3 Aura | 4/7 DPS",
     Poster.BuildMessage(mixedSnap, true))
 
+-- Mythic+ prefix (0.4.101 Raid+M+ tabs): only shown when BOTH dungeon and
+-- a positive level are set - one without the other stays silent rather
+-- than printing "[Deadmines +0]" or "[ +14]".
+check("mplus prefix needs both dungeon and level",
+    Poster.MPlusPrefix("Deadmines", 0) == "", Poster.MPlusPrefix("Deadmines", 0))
+check("mplus prefix needs both dungeon and level 2",
+    Poster.MPlusPrefix("", 14) == "", Poster.MPlusPrefix("", 14))
+check("mplus prefix format",
+    Poster.MPlusPrefix("Deadmines", 14) == "[Deadmines +14] ", Poster.MPlusPrefix("Deadmines", 14))
+check("mplus prefix trims whitespace",
+    Poster.MPlusPrefix("  Deadmines  ", 14) == "[Deadmines +14] ", Poster.MPlusPrefix("  Deadmines  ", 14))
+check("BuildMessage prepends mplus prefix",
+    Poster.BuildMessage(mixedSnap, false, "Deadmines", 14) == "[Deadmines +14] LFM MS | 1/3 Healers | 4/7 DPS",
+    Poster.BuildMessage(mixedSnap, false, "Deadmines", 14))
+
 -- Disabled roles (max<=0) are never shown even with showAll=true.
 local withDisabled = {
     tank = { filled = 2, max = 2 },

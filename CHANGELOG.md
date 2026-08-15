@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.102
+
+- **New: Raid + M+ tabs.** Two new categories in the settings sidebar:
+  - **Raid** — one-click slot-cap presets for 10/25/40-man (Tank/Healer/
+    Aura/DPS splits), applies via the existing `Slots.SetMax` so they're
+    editable individually afterward on the Hosting tab like any other cap.
+  - **M+** — dungeon name + keystone level fields. When both are set,
+    automatically prepends `[Dungeon +Level]` to the LFM post (e.g.
+    `[Deadmines +14] LFM MS ...`) via a new `Poster.MPlusPrefix()`, wired
+    into every `Poster.BuildMessage` call site. Silent (no prefix) unless
+    both fields are set - never posts `[Deadmines +0]` or `[ +14]`.
+
 ## 0.4.101
 
 - **Regroup re-invites now retry.** Each person on the confirmed re-invite

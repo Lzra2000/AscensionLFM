@@ -77,7 +77,19 @@ end
 
 --- Pure: build LFM string from a Slots.Snapshot()-style table.
 -- Format: LFM MS {t}/{tmax} Tanks {h}/{hmax} Healers {a}/{amax} Aura {d}/{dmax} DPS
-function Poster.BuildMessage(snapshot, showAll)
+--- Prefix used when a Mythic+ dungeon/level is set on the General/M+ tab -
+-- e.g. "[Deadmines +14] " in front of the usual "LFM MS ..." role bits.
+-- Pure so it's testable without touching the DB directly.
+function Poster.MPlusPrefix(dungeon, level)
+    dungeon = type(dungeon) == "string" and dungeon:match("^%s*(.-)%s*$") or ""
+    level = tonumber(level) or 0
+    if dungeon == "" or level <= 0 then
+        return ""
+    end
+    return string.format("[%s +%d] ", dungeon, level)
+end
+
+function Poster.BuildMessage(snapshot, showAll, mplusDungeon, mplusLevel)
     snapshot = snapshot or {}
     local bits = { "LFM MS" }
     for _, role in ipairs(ROLE_ORDER) do
@@ -92,10 +104,11 @@ function Poster.BuildMessage(snapshot, showAll)
             table.insert(bits, string.format("%d/%d %s", filled, max, ROLE_LABELS[role]))
         end
     end
+    local prefix = Poster.MPlusPrefix(mplusDungeon, mplusLevel)
     if #bits == 1 then
-        return "LFM MS - full"
+        return prefix .. "LFM MS - full"
     end
-    return table.concat(bits, " | ")
+    return prefix .. table.concat(bits, " | ")
 end
 
 --- Pure: true when every role cap is filled (max>0 roles only) OR group size >= maxPartySize.
@@ -268,7 +281,8 @@ end
 --- Build (or refresh) the current LFM text from slots.
 function Poster.RefreshMessage()
     local db = DB()
-    lastMessage = Poster.BuildMessage(FilterAcceptedRoles(LiveSnapshot(), db), db and db.postShowAllRoles)
+    lastMessage = Poster.BuildMessage(FilterAcceptedRoles(LiveSnapshot(), db), db and db.postShowAllRoles,
+        db and db.mplusDungeon, db and db.mplusLevel)
     return lastMessage
 end
 
@@ -398,7 +412,7 @@ function Poster.GetStatus()
         isFull = full,
         fullReason = fullReason,
         status = lastStatus,
-        message = lastMessage ~= "" and lastMessage or Poster.BuildMessage(snap),
+        message = lastMessage ~= "" and lastMessage or Poster.BuildMessage(snap, false, db and db.mplusDungeon, db and db.mplusLevel),
         channel = NormalizeChannel(db and db.postChannel),
         channelName = (db and db.postChannelName) or "",
     }
@@ -414,7 +428,7 @@ function Poster.Tick(now)
     end
 
     local snap = FilterAcceptedRoles(LiveSnapshot(), db)
-    lastMessage = Poster.BuildMessage(snap)
+    lastMessage = Poster.BuildMessage(snap, false, db.mplusDungeon, db.mplusLevel)
     local full, fullReason = Poster.IsFull(snap, LiveGroupSize(), db.maxPartySize, LiveUnassignedCount())
     local ok, reason = Poster.ShouldRepost(
         now,
