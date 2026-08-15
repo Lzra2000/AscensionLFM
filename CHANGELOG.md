@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.4.103
+
+- **Unified LFG/LFM into one "LFG/LFM" tab**, replacing the separate Raid
+  and M+ tabs from 0.4.102. One MS/Raid/M+ toggle at the top switches
+  between the three - each keeps its own settings independently (picking
+  MS doesn't clear your saved M+ dungeon/level or Raid preset, it just
+  stops showing/tagging with them).
+  - **MS** (default): plain LFM post, no tag.
+  - **Raid**: same 10/25/40-man slot-cap presets as before, now always
+    tags the post `[RAID]`.
+  - **M+**: same dungeon/level fields as before, tags `[Dungeon +Level]`
+    when both are set.
+  - New `db.contentType` ("ms"/"raid"/"mplus") is the single source of
+    truth; `Poster.ContentPrefix()` resolves it to the right tag (or
+    none). `Poster.BuildMessage()` takes it as an optional 5th argument -
+    omitting it keeps the exact 0.4.102 behavior (plain M+ prefix logic),
+    so nothing else calling it needed to change.
+  - Fixed a real gap in `test_ui_smoke.lua`'s FontString mock (missing
+    `SetAllPoints`/`SetWordWrap`) surfaced by this page's layout.
+
 ## 0.4.102
 
 - **New: Raid + M+ tabs.** Two new categories in the settings sidebar:

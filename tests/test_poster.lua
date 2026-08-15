@@ -102,6 +102,27 @@ check("BuildMessage prepends mplus prefix",
     Poster.BuildMessage(mixedSnap, false, "Deadmines", 14) == "[Deadmines +14] LFM MS | 1/3 Healers | 4/7 DPS",
     Poster.BuildMessage(mixedSnap, false, "Deadmines", 14))
 
+-- Unified content-type selector (0.4.103 LFG/LFM tab): "raid" always tags
+-- [RAID] regardless of mplus fields, "ms" suppresses any tag even if
+-- mplus fields happen to still be set (switching types doesn't clear the
+-- other type's saved values), omitted/"mplus" keeps the plain M+ prefix.
+check("content type raid always tags RAID",
+    Poster.ContentPrefix("raid", "", 0) == "[RAID] ", Poster.ContentPrefix("raid", "", 0))
+check("content type raid ignores leftover mplus fields",
+    Poster.ContentPrefix("raid", "Deadmines", 14) == "[RAID] ", Poster.ContentPrefix("raid", "Deadmines", 14))
+check("content type ms suppresses even set mplus fields",
+    Poster.ContentPrefix("ms", "Deadmines", 14) == "", Poster.ContentPrefix("ms", "Deadmines", 14))
+check("content type mplus uses the plain mplus prefix",
+    Poster.ContentPrefix("mplus", "Deadmines", 14) == "[Deadmines +14] ", Poster.ContentPrefix("mplus", "Deadmines", 14))
+check("content type omitted behaves like mplus (back-compat)",
+    Poster.ContentPrefix(nil, "Deadmines", 14) == "[Deadmines +14] ", Poster.ContentPrefix(nil, "Deadmines", 14))
+check("BuildMessage 5th arg raid overrides mplus fields",
+    Poster.BuildMessage(mixedSnap, false, "Deadmines", 14, "raid") == "[RAID] LFM MS | 1/3 Healers | 4/7 DPS",
+    Poster.BuildMessage(mixedSnap, false, "Deadmines", 14, "raid"))
+check("BuildMessage 5th arg ms suppresses mplus fields",
+    Poster.BuildMessage(mixedSnap, false, "Deadmines", 14, "ms") == "LFM MS | 1/3 Healers | 4/7 DPS",
+    Poster.BuildMessage(mixedSnap, false, "Deadmines", 14, "ms"))
+
 -- Disabled roles (max<=0) are never shown even with showAll=true.
 local withDisabled = {
     tank = { filled = 2, max = 2 },

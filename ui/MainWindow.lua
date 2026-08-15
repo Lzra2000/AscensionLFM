@@ -26,8 +26,7 @@ local CAT_HOSTING = "hosting"
 local CAT_POST = "post"
 local CAT_QUEUE = "queue"
 local CAT_ROSTER = "roster"
-local CAT_RAID = "raid"
-local CAT_MPLUS = "mplus"
+local CAT_CONTENT = "content"
 local CAT_KICK = "kick"
 local CAT_LOG = "log"
 
@@ -50,12 +49,9 @@ local CATEGORIES = {
     { id = CAT_ROSTER, label = "Roster",
       title = "Roster",
       sub = "Groups 1-8: click role icon for popup, Ready check, Spec, X to remove." },
-    { id = CAT_RAID, label = "Raid",
-      title = "Raid",
-      sub = "Quick slot-cap presets for 10/25/40-man raid comps." },
-    { id = CAT_MPLUS, label = "M+",
-      title = "Mythic+",
-      sub = "Dungeon + keystone level - prepended to the LFM post when set." },
+    { id = CAT_CONTENT, label = "LFG/LFM",
+      title = "LFG/LFM",
+      sub = "Pick MS, Raid, or M+ - each keeps its own settings and tags the LFM post." },
     { id = CAT_KICK, label = "Kick",
       title = "Kick",
       sub = "Level-59 kick + Aura buff scan (idle if buff hidden on others). Default OFF." },
@@ -2318,125 +2314,201 @@ function MainWindow.Init()
     end
 
 --------------------------------------------------------------------
-    -- Raid
+    -- LFG/LFM (unified content-type selector: MS / Raid / M+)
     --------------------------------------------------------------------
-    local raid = BuildCategoryPage(pageHost, CAT_RAID, 260)
-    CreateSectionLabel(raid, "Quick slot-cap presets", -4)
+    local content = BuildCategoryPage(pageHost, CAT_CONTENT, 300)
+    CreateSectionLabel(content, "Content type", -4)
     do
-        local note = raid:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        local note = content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         note:SetPoint("TOPLEFT", 0, -22)
         note:SetPoint("TOPRIGHT", 0, -22)
         note:SetJustifyH("LEFT")
         SetInk(note, MUTED)
-        note:SetText("Sets Tank/Healer/Aura/DPS caps on the Hosting tab in one click. Edit them individually there afterward if needed.")
+        note:SetText("Switching type doesn't clear the other type's settings - your Raid preset and M+ dungeon/level are both remembered, only one is shown/tagged at a time.")
         if note.SetWordWrap then note:SetWordWrap(true) end
 
-        local presets = {
-            { label = "10-man", tank = 2, healer = 2, aura = 1, dps = 5 },
-            { label = "25-man", tank = 3, healer = 5, aura = 2, dps = 15 },
-            { label = "40-man", tank = 4, healer = 8, aura = 3, dps = 25 },
-        }
-        local btnY = -66
-        for _, p in ipairs(presets) do
-            local btn = CreateFrame("Button", nil, raid, "UIPanelButtonTemplate")
-            if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then
-                AscensionLFM.Chrome.SkinActionButton(btn)
+        local typeBtns = {}
+        local raidPane = CreateFrame("Frame", nil, content)
+        local mplusPane = CreateFrame("Frame", nil, content)
+        local msPane = CreateFrame("Frame", nil, content)
+
+        local function ShowPaneFor(t)
+            msPane:Hide()
+            raidPane:Hide()
+            mplusPane:Hide()
+            if t == "raid" then
+                raidPane:Show()
+            elseif t == "mplus" then
+                mplusPane:Show()
+            else
+                msPane:Show()
             end
-            btn:SetSize(140, 24)
-            btn:SetPoint("TOPLEFT", 0, btnY)
-            btn:SetText(string.format("%s (T%d/H%d/A%d/D%d)", p.label, p.tank, p.healer, p.aura, p.dps))
-            btn:SetScript("OnClick", function()
-                if not AscensionLFM.Slots then
-                    return
+            for id, btn in pairs(typeBtns) do
+                if btn.SetBackdropBorderColor then
+                    btn:SetBackdropBorderColor(id == t and 0.95 or 0.85,
+                        id == t and 0.80 or 0.68, id == t and 0.35 or 0.22, id == t and 0.95 or 0.50)
                 end
-                AscensionLFM.Slots.SetMax("tank", p.tank)
-                AscensionLFM.Slots.SetMax("healer", p.healer)
-                AscensionLFM.Slots.SetMax("aura", p.aura)
-                AscensionLFM.Slots.SetMax("dps", p.dps)
-                MainWindow.RefreshSlots()
-                if AscensionLFM.Print then
-                    AscensionLFM.Print("Raid: applied " .. p.label .. " slot preset")
-                end
-            end)
-            btnY = btnY - 30
+            end
         end
-    end
 
-    --------------------------------------------------------------------
-    -- Mythic+
-    --------------------------------------------------------------------
-    local mplus = BuildCategoryPage(pageHost, CAT_MPLUS, 220)
-    CreateSectionLabel(mplus, "Current keystone", -4)
-    do
-        local dLabel = mplus:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        dLabel:SetPoint("TOPLEFT", 0, -26)
-        dLabel:SetText("Dungeon")
-        SetInk(dLabel, MUTED)
-
-        local dEdit = CreateFrame("EditBox", "AscensionLFMMPlusDungeon", mplus, "InputBoxTemplate")
-        dEdit:SetSize(220, 20)
-        dEdit:SetPoint("TOPLEFT", 60, -24)
-        dEdit:SetAutoFocus(false)
-        dEdit:SetMaxLetters(40)
-        local db0 = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
-        dEdit:SetText((db0 and db0.mplusDungeon) or "")
-
-        local lLabel = mplus:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        lLabel:SetPoint("TOPLEFT", 0, -56)
-        lLabel:SetText("Level")
-        SetInk(lLabel, MUTED)
-
-        local lEdit = CreateFrame("EditBox", "AscensionLFMMPlusLevel", mplus, "InputBoxTemplate")
-        lEdit:SetSize(40, 20)
-        lEdit:SetPoint("TOPLEFT", 60, -54)
-        lEdit:SetAutoFocus(false)
-        lEdit:SetMaxLetters(2)
-        lEdit:SetNumeric(true)
-        lEdit:SetText(tostring((db0 and db0.mplusLevel) or 0))
-
-        local preview = mplus:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        preview:SetPoint("TOPLEFT", 0, -92)
-        preview:SetPoint("TOPRIGHT", 0, -92)
-        preview:SetJustifyH("LEFT")
-        SetInk(preview, GOLD)
-        if preview.SetWordWrap then preview:SetWordWrap(true) end
-
-        local function ApplyAndPreview()
-            local dbNow = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
-            if not dbNow then
-                return
+        local function SetContentType(t)
+            local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
+            if db then
+                db.contentType = t
             end
-            dbNow.mplusDungeon = dEdit:GetText() or ""
-            dbNow.mplusLevel = tonumber(lEdit:GetText()) or 0
-            local prefix = ""
-            if AscensionLFM.Poster and AscensionLFM.Poster.MPlusPrefix then
-                prefix = AscensionLFM.Poster.MPlusPrefix(dbNow.mplusDungeon, dbNow.mplusLevel)
-            end
-            preview:SetText(prefix ~= "" and ("Preview: " .. prefix .. "LFM MS ...") or "Preview: (no prefix - set both fields)")
+            ShowPaneFor(t)
             if AscensionLFM.Poster and AscensionLFM.Poster.RefreshMessage then
                 AscensionLFM.Poster.RefreshMessage()
             end
         end
 
-        dEdit:SetScript("OnEnterPressed", function(self) ApplyAndPreview(); self:ClearFocus() end)
-        dEdit:SetScript("OnEditFocusLost", ApplyAndPreview)
-        lEdit:SetScript("OnEnterPressed", function(self) ApplyAndPreview(); self:ClearFocus() end)
-        lEdit:SetScript("OnEditFocusLost", ApplyAndPreview)
-
-        local clearBtn2 = CreateFrame("Button", nil, mplus, "UIPanelButtonTemplate")
-        if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then
-            AscensionLFM.Chrome.SkinActionButton(clearBtn2)
+        local xPos = 0
+        for _, def in ipairs({ { id = "ms", label = "MS" }, { id = "raid", label = "Raid" }, { id = "mplus", label = "M+" } }) do
+            local btn = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
+            if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then
+                AscensionLFM.Chrome.SkinActionButton(btn)
+            end
+            btn:SetSize(80, 24)
+            btn:SetPoint("TOPLEFT", xPos, -60)
+            btn:SetText(def.label)
+            btn:SetScript("OnClick", function() SetContentType(def.id) end)
+            typeBtns[def.id] = btn
+            xPos = xPos + 86
         end
-        clearBtn2:SetSize(70, 22)
-        clearBtn2:SetPoint("TOPLEFT", 110, -54)
-        clearBtn2:SetText("Clear")
-        clearBtn2:SetScript("OnClick", function()
-            dEdit:SetText("")
-            lEdit:SetText("0")
-            ApplyAndPreview()
-        end)
 
-        ApplyAndPreview()
+        -- MS pane: nothing special to configure - just says so.
+        msPane:SetPoint("TOPLEFT", 0, -96)
+        msPane:SetPoint("TOPRIGHT", 0, -96)
+        msPane:SetHeight(40)
+        local msNote = msPane:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        msNote:SetAllPoints()
+        msNote:SetJustifyH("LEFT")
+        SetInk(msNote, INK)
+        msNote:SetText("MS (default): standard LFM post, no content tag added. Slot caps are set on the Hosting tab.")
+        if msNote.SetWordWrap then msNote:SetWordWrap(true) end
+
+        -- Raid pane: the three size presets.
+        raidPane:SetPoint("TOPLEFT", 0, -96)
+        raidPane:SetPoint("TOPRIGHT", 0, -96)
+        raidPane:SetHeight(140)
+        do
+            local rNote = raidPane:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+            rNote:SetPoint("TOPLEFT", 0, 0)
+            rNote:SetPoint("TOPRIGHT", 0, 0)
+            rNote:SetJustifyH("LEFT")
+            SetInk(rNote, INK)
+            rNote:SetText("Tags the LFM post [RAID]. Pick a size to set Tank/Healer/Aura/DPS caps (editable individually afterward on Hosting):")
+            if rNote.SetWordWrap then rNote:SetWordWrap(true) end
+
+            local presets = {
+                { label = "10-man", tank = 2, healer = 2, aura = 1, dps = 5 },
+                { label = "25-man", tank = 3, healer = 5, aura = 2, dps = 15 },
+                { label = "40-man", tank = 4, healer = 8, aura = 3, dps = 25 },
+            }
+            local btnY = -34
+            for _, p in ipairs(presets) do
+                local pbtn = CreateFrame("Button", nil, raidPane, "UIPanelButtonTemplate")
+                if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then
+                    AscensionLFM.Chrome.SkinActionButton(pbtn)
+                end
+                pbtn:SetSize(180, 24)
+                pbtn:SetPoint("TOPLEFT", 0, btnY)
+                pbtn:SetText(string.format("%s (T%d/H%d/A%d/D%d)", p.label, p.tank, p.healer, p.aura, p.dps))
+                pbtn:SetScript("OnClick", function()
+                    if not AscensionLFM.Slots then
+                        return
+                    end
+                    AscensionLFM.Slots.SetMax("tank", p.tank)
+                    AscensionLFM.Slots.SetMax("healer", p.healer)
+                    AscensionLFM.Slots.SetMax("aura", p.aura)
+                    AscensionLFM.Slots.SetMax("dps", p.dps)
+                    MainWindow.RefreshSlots()
+                    if AscensionLFM.Print then
+                        AscensionLFM.Print("Raid: applied " .. p.label .. " slot preset")
+                    end
+                end)
+                btnY = btnY - 30
+            end
+        end
+
+        -- M+ pane: dungeon + level fields, live preview.
+        mplusPane:SetPoint("TOPLEFT", 0, -96)
+        mplusPane:SetPoint("TOPRIGHT", 0, -96)
+        mplusPane:SetHeight(140)
+        do
+            local dLabel = mplusPane:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+            dLabel:SetPoint("TOPLEFT", 0, 0)
+            dLabel:SetText("Dungeon")
+            SetInk(dLabel, MUTED)
+
+            local dEdit = CreateFrame("EditBox", "AscensionLFMMPlusDungeon", mplusPane, "InputBoxTemplate")
+            dEdit:SetSize(220, 20)
+            dEdit:SetPoint("TOPLEFT", 60, 2)
+            dEdit:SetAutoFocus(false)
+            dEdit:SetMaxLetters(40)
+            local db0 = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
+            dEdit:SetText((db0 and db0.mplusDungeon) or "")
+
+            local lLabel = mplusPane:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+            lLabel:SetPoint("TOPLEFT", 0, -30)
+            lLabel:SetText("Level")
+            SetInk(lLabel, MUTED)
+
+            local lEdit = CreateFrame("EditBox", "AscensionLFMMPlusLevel", mplusPane, "InputBoxTemplate")
+            lEdit:SetSize(40, 20)
+            lEdit:SetPoint("TOPLEFT", 60, -28)
+            lEdit:SetAutoFocus(false)
+            lEdit:SetMaxLetters(2)
+            lEdit:SetNumeric(true)
+            lEdit:SetText(tostring((db0 and db0.mplusLevel) or 0))
+
+            local preview = mplusPane:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+            preview:SetPoint("TOPLEFT", 0, -66)
+            preview:SetPoint("TOPRIGHT", 0, -66)
+            preview:SetJustifyH("LEFT")
+            SetInk(preview, GOLD)
+            if preview.SetWordWrap then preview:SetWordWrap(true) end
+
+            local function ApplyAndPreview()
+                local dbNow = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
+                if not dbNow then
+                    return
+                end
+                dbNow.mplusDungeon = dEdit:GetText() or ""
+                dbNow.mplusLevel = tonumber(lEdit:GetText()) or 0
+                local prefix = ""
+                if AscensionLFM.Poster and AscensionLFM.Poster.MPlusPrefix then
+                    prefix = AscensionLFM.Poster.MPlusPrefix(dbNow.mplusDungeon, dbNow.mplusLevel)
+                end
+                preview:SetText(prefix ~= "" and ("Preview: " .. prefix .. "LFM MS ...") or "Preview: (set both fields to tag the post)")
+                if AscensionLFM.Poster and AscensionLFM.Poster.RefreshMessage then
+                    AscensionLFM.Poster.RefreshMessage()
+                end
+            end
+
+            dEdit:SetScript("OnEnterPressed", function(self) ApplyAndPreview(); self:ClearFocus() end)
+            dEdit:SetScript("OnEditFocusLost", ApplyAndPreview)
+            lEdit:SetScript("OnEnterPressed", function(self) ApplyAndPreview(); self:ClearFocus() end)
+            lEdit:SetScript("OnEditFocusLost", ApplyAndPreview)
+
+            local clearBtn2 = CreateFrame("Button", nil, mplusPane, "UIPanelButtonTemplate")
+            if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then
+                AscensionLFM.Chrome.SkinActionButton(clearBtn2)
+            end
+            clearBtn2:SetSize(70, 22)
+            clearBtn2:SetPoint("TOPLEFT", 110, -28)
+            clearBtn2:SetText("Clear")
+            clearBtn2:SetScript("OnClick", function()
+                dEdit:SetText("")
+                lEdit:SetText("0")
+                ApplyAndPreview()
+            end)
+
+            ApplyAndPreview()
+        end
+
+        local startType = (db0 and db0.contentType) or "ms"
+        ShowPaneFor(startType)
     end
 
     local kick = BuildCategoryPage(pageHost, CAT_KICK, 300)

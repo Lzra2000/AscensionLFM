@@ -77,9 +77,9 @@ end
 
 --- Pure: build LFM string from a Slots.Snapshot()-style table.
 -- Format: LFM MS {t}/{tmax} Tanks {h}/{hmax} Healers {a}/{amax} Aura {d}/{dmax} DPS
---- Prefix used when a Mythic+ dungeon/level is set on the General/M+ tab -
--- e.g. "[Deadmines +14] " in front of the usual "LFM MS ..." role bits.
--- Pure so it's testable without touching the DB directly.
+--- Prefix used when a Mythic+ dungeon/level is set - e.g. "[Deadmines +14] "
+-- in front of the usual "LFM MS ..." role bits. Pure so it's testable
+-- without touching the DB directly.
 function Poster.MPlusPrefix(dungeon, level)
     dungeon = type(dungeon) == "string" and dungeon:match("^%s*(.-)%s*$") or ""
     level = tonumber(level) or 0
@@ -89,7 +89,22 @@ function Poster.MPlusPrefix(dungeon, level)
     return string.format("[%s +%d] ", dungeon, level)
 end
 
-function Poster.BuildMessage(snapshot, showAll, mplusDungeon, mplusLevel)
+--- Content-type prefix for the LFM post: "raid" always tags [RAID],
+-- "mplus" uses the dungeon+level tag (or nothing if either is unset),
+-- "ms"/anything else adds nothing. contentType is optional - omitting it
+-- keeps the pre-0.4.103 behavior (mplus-prefix-if-set) so existing
+-- BuildMessage(snap, showAll, dungeon, level) callers are unaffected.
+function Poster.ContentPrefix(contentType, mplusDungeon, mplusLevel)
+    if contentType == "raid" then
+        return "[RAID] "
+    elseif contentType == "ms" then
+        return ""
+    end
+    -- "mplus" or omitted (nil) - same as the plain M+ prefix.
+    return Poster.MPlusPrefix(mplusDungeon, mplusLevel)
+end
+
+function Poster.BuildMessage(snapshot, showAll, mplusDungeon, mplusLevel, contentType)
     snapshot = snapshot or {}
     local bits = { "LFM MS" }
     for _, role in ipairs(ROLE_ORDER) do
@@ -104,7 +119,7 @@ function Poster.BuildMessage(snapshot, showAll, mplusDungeon, mplusLevel)
             table.insert(bits, string.format("%d/%d %s", filled, max, ROLE_LABELS[role]))
         end
     end
-    local prefix = Poster.MPlusPrefix(mplusDungeon, mplusLevel)
+    local prefix = Poster.ContentPrefix(contentType, mplusDungeon, mplusLevel)
     if #bits == 1 then
         return prefix .. "LFM MS - full"
     end
@@ -282,7 +297,7 @@ end
 function Poster.RefreshMessage()
     local db = DB()
     lastMessage = Poster.BuildMessage(FilterAcceptedRoles(LiveSnapshot(), db), db and db.postShowAllRoles,
-        db and db.mplusDungeon, db and db.mplusLevel)
+        db and db.mplusDungeon, db and db.mplusLevel, db and db.contentType)
     return lastMessage
 end
 
@@ -412,7 +427,7 @@ function Poster.GetStatus()
         isFull = full,
         fullReason = fullReason,
         status = lastStatus,
-        message = lastMessage ~= "" and lastMessage or Poster.BuildMessage(snap, false, db and db.mplusDungeon, db and db.mplusLevel),
+        message = lastMessage ~= "" and lastMessage or Poster.BuildMessage(snap, false, db and db.mplusDungeon, db and db.mplusLevel, db and db.contentType),
         channel = NormalizeChannel(db and db.postChannel),
         channelName = (db and db.postChannelName) or "",
     }
@@ -428,7 +443,7 @@ function Poster.Tick(now)
     end
 
     local snap = FilterAcceptedRoles(LiveSnapshot(), db)
-    lastMessage = Poster.BuildMessage(snap, false, db.mplusDungeon, db.mplusLevel)
+    lastMessage = Poster.BuildMessage(snap, false, db.mplusDungeon, db.mplusLevel, db.contentType)
     local full, fullReason = Poster.IsFull(snap, LiveGroupSize(), db.maxPartySize, LiveUnassignedCount())
     local ok, reason = Poster.ShouldRepost(
         now,

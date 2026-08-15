@@ -89,6 +89,7 @@ local function NewFrame()
                 local text = ""
                 return {
                     SetPoint = Noop,
+                    SetAllPoints = Noop,
                     ClearAllPoints = Noop,
                     SetParent = Noop,
                     SetDrawLayer = Noop,
@@ -99,6 +100,7 @@ local function NewFrame()
                     SetTextColor = Noop,
                     SetWidth = Noop,
                     SetHeight = Noop,
+                    SetWordWrap = Noop,
                     SetNonSpaceWrap = Noop,
                     Show = Noop,
                     Hide = Noop,
