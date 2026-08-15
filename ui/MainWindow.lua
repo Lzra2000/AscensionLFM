@@ -74,12 +74,13 @@ local TOOLTIP_BACKDROP_TIGHT = {
     insets = { left = 2, right = 2, top = 2, bottom = 2 },
 }
 
-local INK = { 0.20, 0.14, 0.06, 1 }
-local GOLD = { 1.00, 0.82, 0.20, 1 }
-local MUTED = { 0.20, 0.15, 0.08, 1 }
-local TITLE_INK = { 0.30, 0.20, 0.04, 1 }
-local SECTION = { 0.24, 0.15, 0.04, 1 }
-local DANGER = { 0.42, 0.10, 0.04, 1 }
+-- High-contrast light-on-dark (readable on DragonUI rock panels).
+local INK = { 0.96, 0.92, 0.82, 1 }       -- primary body text
+local GOLD = { 1.00, 0.86, 0.28, 1 }      -- accents / highlights
+local MUTED = { 0.82, 0.76, 0.60, 1 }     -- secondary / descriptions
+local TITLE_INK = { 1.00, 0.88, 0.35, 1 } -- page titles
+local SECTION = { 1.00, 0.84, 0.40, 1 }   -- section headers
+local DANGER = { 1.00, 0.42, 0.32, 1 }    -- warnings / errors
 
 local frame
 local activeCategory = CAT_GENERAL
@@ -123,32 +124,103 @@ local function ApplyBackdrop(f, template, r, g, b, a, br, bg, bb, ba)
     end
 end
 
+local function RockPath()
+    if AscensionLFM.Chrome and AscensionLFM.Chrome.BackgroundPath then
+        return AscensionLFM.Chrome.BackgroundPath()
+    end
+    -- Chrome module missing entirely (shouldn't happen given TOC load
+    -- order) - fall back to the classic Blizzard texture, never DragonUI.
+    return "Interface\\DialogFrame\\UI-DialogBox-Background"
+end
+
+--- Pure DragonUI rock fill. No WHITE8X8 overlays that paint over the
+-- texture (that was hiding the rock and producing flat brown panels).
+-- Optional 1px gold edge via SetBackdrop only — does not cover the fill.
+local function ApplyRockPanel(f, edgeA, _insetA, bgA)
+    if type(f) ~= "table" then
+        return
+    end
+    bgA = bgA or 0.97
+    edgeA = edgeA or 0.55
+    if f._alfmRockApplied == true then
+        return
+    end
+    f._alfmRockApplied = true
+    if f.SetBackdrop then
+        -- Thin gold edge only; bgFile nil so it doesn't paint over the rock.
+        f:SetBackdrop({
+            bgFile = nil,
+            edgeFile = "Interface\\Buttons\\WHITE8X8",
+            edgeSize = 1,
+            insets = { left = 1, right = 1, top = 1, bottom = 1 },
+        })
+        if f.SetBackdropBorderColor then
+            f:SetBackdropBorderColor(0.85, 0.68, 0.22, edgeA)
+        end
+        if f.SetBackdropColor then
+            f:SetBackdropColor(0, 0, 0, 0)
+        end
+    end
+    if type(f.CreateTexture) == "function" then
+        local bg = f:CreateTexture(nil, "BACKGROUND")
+        bg:SetPoint("TOPLEFT", 1, -1)
+        bg:SetPoint("BOTTOMRIGHT", -1, 1)
+        bg:SetTexture(RockPath())
+        bg:SetAlpha(bgA)
+        bg._duiOwned = true
+    end
+end
+
 local function ApplyParchment(f)
-    ApplyBackdrop(f, TOOLTIP_BACKDROP, 0.78, 0.70, 0.50, 0.92, 0.45, 0.35, 0.14, 1)
+    ApplyRockPanel(f, 0.45, nil, 0.97)
 end
 
 local function ApplySidebar(f)
-    ApplyBackdrop(f, TOOLTIP_BACKDROP, 0.12, 0.09, 0.04, 0.95, 0.45, 0.35, 0.14, 1)
+    ApplyRockPanel(f, 0.40, nil, 0.97)
 end
 
 local function ApplyInset(f)
-    ApplyBackdrop(f, TOOLTIP_BACKDROP, 0.95, 0.90, 0.72, 0.92, 0.55, 0.45, 0.18, 0.9)
+    ApplyRockPanel(f, 0.50, nil, 0.95)
 end
 
 local function ApplyToggleRow(f)
-    ApplyBackdrop(f, TOOLTIP_BACKDROP_TIGHT, 0.95, 0.90, 0.72, 0.92, 0.55, 0.45, 0.18, 0.9)
+    ApplyRockPanel(f, 0.40, nil, 0.94)
 end
 
 local function ApplyNavButton(f, selected)
-    ApplyBackdrop(f, TOOLTIP_BACKDROP_TIGHT,
-        selected and 0.85 or 0.22,
-        selected and 0.70 or 0.16,
-        selected and 0.28 or 0.08,
-        selected and 1 or 0.95,
-        selected and 0.94 or 0.45,
-        selected and 0.82 or 0.35,
-        selected and 0.38 or 0.14,
-        1)
+    if type(f) ~= "table" then
+        return
+    end
+    if type(f.CreateTexture) == "function" and type(f._alfmNavBg) ~= "table" then
+        f._alfmNavBg = f:CreateTexture(nil, "BACKGROUND")
+        f._alfmNavBg:SetPoint("TOPLEFT", 1, -1)
+        f._alfmNavBg:SetPoint("BOTTOMRIGHT", -1, 1)
+        f._alfmNavBg:SetTexture(RockPath())
+        f._alfmNavBg._duiOwned = true
+    end
+    if type(f._alfmNavBg) == "table" and f._alfmNavBg.SetAlpha then
+        f._alfmNavBg:SetAlpha(0.97)
+    end
+    if f.SetBackdrop then
+        f:SetBackdrop({
+            bgFile = nil,
+            edgeFile = "Interface\\Buttons\\WHITE8X8",
+            edgeSize = 1,
+            insets = { left = 1, right = 1, top = 1, bottom = 1 },
+        })
+        if selected then
+            if f.SetBackdropBorderColor then
+                f:SetBackdropBorderColor(0.95, 0.82, 0.30, 0.95)
+            end
+        else
+            if f.SetBackdropBorderColor then
+                f:SetBackdropBorderColor(0.55, 0.42, 0.18, 0.45)
+            end
+        end
+        if f.SetBackdropColor then
+            f:SetBackdropColor(0, 0, 0, 0)
+        end
+    end
 end
 
 local function SetInk(fs, rgba)
@@ -798,9 +870,9 @@ local function SetCategoryHighlight(id)
             ApplyNavButton(button, selected)
             if button._label then
                 if selected then
-                    button._label:SetTextColor(0.12, 0.08, 0.02, 1)
+                    button._label:SetTextColor(1.00, 0.92, 0.55, 1)
                 else
-                    button._label:SetTextColor(0.92, 0.85, 0.65, 1)
+                    button._label:SetTextColor(0.90, 0.84, 0.68, 1)
                 end
             end
         end
@@ -851,22 +923,9 @@ function MainWindow.SelectCategory(id)
 end
 
 local function CreateMainFrame()
-    -- Prefer native dialog chrome; fall back if the template is missing on a client.
-    local ok, f = pcall(CreateFrame, "Frame", FRAME_NAME, UIParent, "UIPanelDialogTemplate")
-    if not ok or not f then
-        f = CreateFrame("Frame", FRAME_NAME, UIParent)
-        if f.SetBackdrop then
-            f:SetBackdrop({
-                bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
-                edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-                tile = true,
-                tileSize = 32,
-                edgeSize = 32,
-                insets = { left = 11, right = 12, top = 12, bottom = 11 },
-            })
-            f:SetBackdropColor(0, 0, 0, 1)
-        end
-    end
+    -- Plain frame only — UIPanelDialogTemplate fights DragonUI chrome
+    -- (baked regions + clipping). Rock + metal nineslice come from Chrome.lua.
+    local f = CreateFrame("Frame", FRAME_NAME, UIParent)
     return f
 end
 
@@ -905,8 +964,8 @@ function MainWindow.Init()
     -- vanilla texture regions exist directly on `frame` so DragonUI's
     -- own code can't bring them back, then layer the real chrome on
     -- top. This only sweeps frame:GetRegions() (direct texture
-    -- children) - titleBg below is a separate child FRAME with its own
-    -- already-custom ApplyBackdrop styling, untouched by this sweep.
+    -- children) - titleBg below is a separate child FRAME (restyled in
+    -- v0.4.87 to rock + gold edge so it matches the DragonUI chrome).
     for _, region in ipairs({ frame:GetRegions() }) do
         if region.GetObjectType and region:GetObjectType() == "Texture" and not region._duiOwned then
             region._duiShow = region.Show
@@ -918,98 +977,124 @@ function MainWindow.Init()
         frame:SetBackdrop(nil)
     end
 
-    do
-        local DUI_METAL = "Interface\\AddOns\\DragonUI\\Textures\\UI\\uiframemetal2x"
-        local DUI_METAL_H = "Interface\\AddOns\\DragonUI\\Textures\\UI\\uiframemetalhorizontal2x"
-        local DUI_METAL_V = "Interface\\AddOns\\DragonUI\\Textures\\UI\\uiframemetalvertical2x"
-        local DUI_BG = "Interface\\AddOns\\DragonUI\\Textures\\UI\\ui-background-rock"
+    -- DragonUI chrome via shared helper (ui/Chrome.lua). Full-size profile
+    -- (75/75/32) matches bag/bank/TradeSkillFrame sizing used previously.
+    if AscensionLFM.Chrome and AscensionLFM.Chrome.ApplyMetalChrome then
+        if AscensionLFM.Chrome and AscensionLFM.Chrome.ApplyMetalChrome then AscensionLFM.Chrome.ApplyMetalChrome(frame, "full") end
+    end
 
-        local function ConfigureTexture(texture, path, width, height, left, right, top, bottom)
-            texture:SetTexture(path)
-            texture:SetSize(width, height)
-            texture:SetTexCoord(left, right, top, bottom)
+    -- Hide the oversized UIPanelDialogTemplate close button, then place a
+    -- DragonUI-sized (18x18) X in the top-right metal corner so it sits
+    -- 1:1 inside the chrome piece (same redbutton2x atlas as bags/bank).
+    -- Skipped entirely without DragonUI: the native close button (already
+    -- correctly sized for the classic SetBackdrop chrome applied above)
+    -- stays exactly as-is instead of being replaced with a texture that
+    -- doesn't exist on disk.
+    if AscensionLFM.Chrome and AscensionLFM.Chrome.HasDragonUI and AscensionLFM.Chrome.HasDragonUI() then
+        local function hideClose(btn)
+            if not btn then return end
+            btn:Hide()
+            if btn.EnableMouse then btn:EnableMouse(false) end
+            if btn.SetScript then
+                btn:SetScript("OnClick", nil)
+            end
+        end
+        hideClose(_G[FRAME_NAME .. "Close"])
+        hideClose(_G[FRAME_NAME .. "CloseButton"])
+        if frame.GetChildren then
+            for _, child in ipairs({ frame:GetChildren() }) do
+                local n = child.GetName and child:GetName()
+                if n and (n:find("Close") or n:find("close")) then
+                    hideClose(child)
+                end
+            end
         end
 
-        local bg = frame:CreateTexture(nil, "BACKGROUND")
-        bg:SetTexture(DUI_BG)
-        bg:SetAlpha(0.97)
-        bg:SetPoint("TOPLEFT", frame, "TOPLEFT", 2, -20)
-        bg:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -2, 3)
-        bg._duiOwned = true
+        local closeBtn = CreateFrame("Button", FRAME_NAME .. "DUIClose", frame)
+        closeBtn:SetSize(18, 18)
+        -- Sit inside the top-right metal corner (full profile rightOffset=4, topY=16).
+        closeBtn:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -6, -6)
+        if closeBtn.SetFrameLevel and frame.GetFrameLevel then
+            closeBtn:SetFrameLevel((frame:GetFrameLevel() or 0) + 25)
+        end
+        closeBtn:EnableMouse(true)
+        closeBtn:RegisterForClicks("AnyUp")
 
-        -- Full-size profile (not MiniHUD's scaled-down compact one) -
-        -- 760x600 is well within the range this sizing was confirmed
-        -- for (DragonUI's own bag/bank windows, TradeSkillFrame at
-        -- 384x512, SpellBookFrame).
-        local topSize, topHeight, bottomSize = 75, 75, 32
-        local topY, bottomY = 16, -3
-        local leftOffset, rightOffset = -8, 4
+        local path = (AscensionLFM.Chrome and AscensionLFM.Chrome.DUI_CLOSE)
+            or "Interface\\AddOns\\DragonUI\\Textures\\UI\\redbutton2x"
+        local function tex(parent, layer)
+            local t = parent:CreateTexture(nil, layer or "ARTWORK")
+            t:SetAllPoints(parent)
+            t:SetTexture(path)
+            return t
+        end
+        local normal = tex(closeBtn, "ARTWORK")
+        normal:SetTexCoord(0.152344, 0.292969, 0.0078125, 0.304688)
+        closeBtn:SetNormalTexture(normal)
+        local pushed = tex(closeBtn, "ARTWORK")
+        pushed:SetTexCoord(0.152344, 0.292969, 0.632812, 0.929688)
+        closeBtn:SetPushedTexture(pushed)
+        local highlight = tex(closeBtn, "HIGHLIGHT")
+        highlight:SetTexCoord(0.449219, 0.589844, 0.0078125, 0.304688)
+        if highlight.SetBlendMode then
+            highlight:SetBlendMode("ADD")
+        end
+        closeBtn:SetHighlightTexture(highlight)
+        local disabled = tex(closeBtn, "ARTWORK")
+        disabled:SetTexCoord(0.152344, 0.292969, 0.320312, 0.617188)
+        closeBtn:SetDisabledTexture(disabled)
 
-        local cTopLeft = frame:CreateTexture(nil, "OVERLAY")
-        ConfigureTexture(cTopLeft, DUI_METAL, topSize, topHeight, 0.00195312, 0.294922, 0.00195312, 0.294922)
-        cTopLeft:SetPoint("TOPLEFT", frame, "TOPLEFT", leftOffset, topY)
-        cTopLeft._duiOwned = true
-
-        local cTopRight = frame:CreateTexture(nil, "OVERLAY")
-        ConfigureTexture(cTopRight, DUI_METAL, topSize, topHeight, 0.298828, 0.591797, 0.00195312, 0.294922)
-        cTopRight:SetPoint("TOPRIGHT", frame, "TOPRIGHT", rightOffset, topY)
-        cTopRight._duiOwned = true
-
-        local cBottomLeft = frame:CreateTexture(nil, "OVERLAY")
-        ConfigureTexture(cBottomLeft, DUI_METAL, bottomSize, bottomSize, 0.298828, 0.423828, 0.298828, 0.423828)
-        cBottomLeft:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", leftOffset, bottomY)
-        cBottomLeft._duiOwned = true
-
-        local cBottomRight = frame:CreateTexture(nil, "OVERLAY")
-        ConfigureTexture(cBottomRight, DUI_METAL, bottomSize, bottomSize, 0.427734, 0.552734, 0.298828, 0.423828)
-        cBottomRight:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", rightOffset, bottomY)
-        cBottomRight._duiOwned = true
-
-        local cTop = frame:CreateTexture(nil, "OVERLAY")
-        ConfigureTexture(cTop, DUI_METAL_H, 32, topHeight, 0, 1, 0.00390625, 0.589844)
-        cTop:SetPoint("TOPLEFT", cTopLeft, "TOPRIGHT")
-        cTop:SetPoint("TOPRIGHT", cTopRight, "TOPLEFT")
-        cTop._duiOwned = true
-
-        local cBottom = frame:CreateTexture(nil, "OVERLAY")
-        ConfigureTexture(cBottom, DUI_METAL_H, 16, bottomSize, 0, 0.5, 0.597656, 0.847656)
-        cBottom:SetPoint("TOPLEFT", cBottomLeft, "TOPRIGHT")
-        cBottom:SetPoint("TOPRIGHT", cBottomRight, "TOPLEFT")
-        cBottom._duiOwned = true
-
-        local cLeft = frame:CreateTexture(nil, "OVERLAY")
-        ConfigureTexture(cLeft, DUI_METAL_V, topSize, 16, 0.00195312, 0.294922, 0, 1)
-        cLeft:SetPoint("TOPLEFT", cTopLeft, "BOTTOMLEFT")
-        cLeft:SetPoint("BOTTOMLEFT", cBottomLeft, "TOPLEFT")
-        cLeft._duiOwned = true
-
-        local cRight = frame:CreateTexture(nil, "OVERLAY")
-        ConfigureTexture(cRight, DUI_METAL_V, topSize, 16, 0.298828, 0.591797, 0, 1)
-        cRight:SetPoint("TOPRIGHT", cTopRight, "BOTTOMRIGHT")
-        cRight:SetPoint("BOTTOMRIGHT", cBottomRight, "TOPRIGHT")
-        cRight._duiOwned = true
+        closeBtn:SetScript("OnClick", function()
+            frame:Hide()
+        end)
+        frame._alfmCloseBtn = closeBtn
     end
 
     local titleBg = CreateFrame("Frame", nil, frame)
     titleBg:SetPoint("TOP", frame, "TOP", 0, -2)
     titleBg:SetSize(260, 34)
     if titleBg.SetFrameLevel and frame.GetFrameLevel then
-        titleBg:SetFrameLevel((frame:GetFrameLevel() or 0) + 1)
+        -- Above chrome host (+20) so title text is not covered by metal.
+        titleBg:SetFrameLevel((frame:GetFrameLevel() or 0) + 22)
     end
-    ApplyBackdrop(titleBg, TOOLTIP_BACKDROP, 0.95, 0.90, 0.72, 0.92, 0.55, 0.45, 0.18, 0.9)
+    -- Pure rock title strip — no opaque WHITE8X8 overlays hiding the texture.
+    do
+        local bgPath = RockPath()
+        local tbg = titleBg:CreateTexture(nil, "BACKGROUND")
+        tbg:SetTexture(bgPath)
+        tbg:SetAllPoints(titleBg)
+        tbg:SetAlpha(0.97)
+        tbg._duiOwned = true
+        if titleBg.SetBackdrop then
+            titleBg:SetBackdrop({
+                bgFile = nil,
+                edgeFile = "Interface\\Buttons\\WHITE8X8",
+                edgeSize = 1,
+                insets = { left = 1, right = 1, top = 1, bottom = 1 },
+            })
+            if titleBg.SetBackdropBorderColor then
+                titleBg:SetBackdropBorderColor(0.85, 0.68, 0.22, 0.70)
+            end
+            if titleBg.SetBackdropColor then
+                titleBg:SetBackdropColor(0, 0, 0, 0)
+            end
+        end
+    end
 
-    local title = _G[FRAME_NAME .. "Title"] or frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:ClearAllPoints()
     title:SetParent(titleBg)
     title:SetDrawLayer("OVERLAY")
     title:SetPoint("TOP", titleBg, "TOP", 0, -6)
     title:SetText("AscensionLFM")
-    SetInk(title, INK)
+    -- Light gold on dark rock titleBg (INK/MUTED are dark parchment colours
+    -- and would be nearly invisible after the v0.4.87 titleBg restyle).
+    SetInk(title, { 1.00, 0.90, 0.35, 1 })
 
     local sub = titleBg:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     sub:SetPoint("TOP", title, "BOTTOM", 0, -2)
     sub:SetText("Manastorm Level Run LFM/LFG * v" .. tostring(AscensionLFM.VERSION or "0.4.16"))
-    SetInk(sub, MUTED)
+    SetInk(sub, { 0.88, 0.80, 0.55, 1 })
 
     local shell = CreateFrame("Frame", FRAME_NAME .. "Shell", frame)
     shell:SetPoint("TOPLEFT", frame, "TOPLEFT", 12, -40)
@@ -1024,7 +1109,7 @@ function MainWindow.Init()
     local sideLabel = sidebar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     sideLabel:SetPoint("TOPLEFT", 10, -10)
     sideLabel:SetText("CATEGORIES")
-    SetInk(sideLabel, { 0.78, 0.62, 0.24, 1 })
+    SetInk(sideLabel, { 1.00, 0.84, 0.35, 1 })
 
     local y = -26
     for i = 1, #CATEGORIES do
@@ -1086,6 +1171,7 @@ function MainWindow.Init()
     SetInk(footerStatus, MUTED)
 
     local closeBtn = CreateFrame("Button", nil, footer, "UIPanelButtonTemplate")
+    if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(closeBtn) end
     closeBtn:SetSize(72, 22)
     closeBtn:SetPoint("RIGHT", 0, 0)
     closeBtn:SetText("Close")
@@ -1094,6 +1180,7 @@ function MainWindow.Init()
     end)
 
     clearBtn = CreateFrame("Button", nil, footer, "UIPanelButtonTemplate")
+    if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(clearBtn) end
     clearBtn:SetSize(72, 22)
     clearBtn:SetPoint("RIGHT", closeBtn, "LEFT", -6, 0)
     clearBtn:SetText("Clear")
@@ -1263,6 +1350,7 @@ function MainWindow.Init()
         lbl:SetText(label)
         SetInk(lbl, INK)
         local btn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+    if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(btn) end
         btn:SetSize(90, 20)
         btn:SetPoint("RIGHT", 0, 0)
         btn:SetText(ROUTE_LABEL[CurrentRoute(kind)] or "Auto")
@@ -1395,6 +1483,7 @@ function MainWindow.Init()
     blEdit:SetMaxLetters(24)
     widgets.blacklistEdit = blEdit
     local blAdd = CreateFrame("Button", nil, seeking, "UIPanelButtonTemplate")
+    if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(blAdd) end
     blAdd:SetSize(50, 20)
     blAdd:SetPoint("LEFT", blEdit, "RIGHT", 4, 0)
     blAdd:SetText("Add")
@@ -1406,6 +1495,7 @@ function MainWindow.Init()
         end
     end)
     local blRem = CreateFrame("Button", nil, seeking, "UIPanelButtonTemplate")
+    if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(blRem) end
     blRem:SetSize(64, 20)
     blRem:SetPoint("LEFT", blAdd, "RIGHT", 4, 0)
     blRem:SetText("Remove")
@@ -1508,6 +1598,7 @@ function MainWindow.Init()
     MakeHostRoleCheck(hostRoleRow, "dps", "DPS", 280, 0)
 
     local hostRoleAutoBtn = CreateFrame("Button", nil, hostRoleRow, "UIPanelButtonTemplate")
+    if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(hostRoleAutoBtn) end
     hostRoleAutoBtn:SetSize(56, 20)
     hostRoleAutoBtn:SetPoint("LEFT", hostRoleRow, "LEFT", 380, 0)
     hostRoleAutoBtn:SetText("Auto")
@@ -1606,6 +1697,7 @@ function MainWindow.Init()
     presetRow:SetPoint("TOPRIGHT", 0, presetSecY - 18)
     presetRow:SetHeight(24)
     local load2337 = CreateFrame("Button", nil, presetRow, "UIPanelButtonTemplate")
+    if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(load2337) end
     load2337:SetSize(100, 20)
     load2337:SetPoint("LEFT", 0, 0)
     load2337:SetText("MS 2/3/3/7")
@@ -1614,6 +1706,7 @@ function MainWindow.Init()
         SyncWidgetsFromDB()
     end)
     local load2255 = CreateFrame("Button", nil, presetRow, "UIPanelButtonTemplate")
+    if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(load2255) end
     load2255:SetSize(100, 20)
     load2255:SetPoint("LEFT", load2337, "RIGHT", 4, 0)
     load2255:SetText("MS 2/2/2/5")
@@ -1628,6 +1721,7 @@ function MainWindow.Init()
     pName:SetMaxLetters(24)
     pName:SetText("My MS")
     local pSave = CreateFrame("Button", nil, presetRow, "UIPanelButtonTemplate")
+    if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(pSave) end
     pSave:SetSize(50, 20)
     pSave:SetPoint("LEFT", pName, "RIGHT", 4, 0)
     pSave:SetText("Save")
@@ -1796,6 +1890,7 @@ function MainWindow.Init()
     rcBtnRow:SetHeight(24)
 
     local rwBtn = CreateFrame("Button", nil, rcBtnRow, "UIPanelButtonTemplate")
+    if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(rwBtn) end
     rwBtn:SetSize(120, 22)
     rwBtn:SetPoint("LEFT", 0, 0)
     rwBtn:SetText("RW Role Check")
@@ -1813,6 +1908,7 @@ function MainWindow.Init()
     end)
 
     local resyncBtn = CreateFrame("Button", nil, rcBtnRow, "UIPanelButtonTemplate")
+    if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(resyncBtn) end
     resyncBtn:SetSize(130, 22)
     resyncBtn:SetPoint("LEFT", rwBtn, "RIGHT", 6, 0)
     resyncBtn:SetText("Resync roles now")
@@ -1926,6 +2022,7 @@ function MainWindow.Init()
     btnRow:SetHeight(26)
 
     local rebuildBtn = CreateFrame("Button", nil, btnRow, "UIPanelButtonTemplate")
+    if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(rebuildBtn) end
     rebuildBtn:SetSize(110, 22)
     rebuildBtn:SetPoint("LEFT", 0, 0)
     rebuildBtn:SetText("Rebuild")
@@ -1937,6 +2034,7 @@ function MainWindow.Init()
     end)
 
     local scanBtn = CreateFrame("Button", nil, btnRow, "UIPanelButtonTemplate")
+    if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(scanBtn) end
     scanBtn:SetSize(120, 22)
     scanBtn:SetPoint("LEFT", rebuildBtn, "RIGHT", 6, 0)
     scanBtn:SetText("Scan raid/party")
@@ -1961,6 +2059,7 @@ function MainWindow.Init()
     end)
 
     local postBtn = CreateFrame("Button", nil, btnRow, "UIPanelButtonTemplate")
+    if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(postBtn) end
     postBtn:SetSize(90, 22)
     postBtn:SetPoint("LEFT", scanBtn, "RIGHT", 6, 0)
     postBtn:SetText("Post once")
@@ -1979,6 +2078,7 @@ function MainWindow.Init()
     rcPostRow:SetHeight(26)
 
     local postRwBtn = CreateFrame("Button", nil, rcPostRow, "UIPanelButtonTemplate")
+    if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(postRwBtn) end
     postRwBtn:SetSize(120, 22)
     postRwBtn:SetPoint("LEFT", 0, 0)
     postRwBtn:SetText("RW Role Check")
@@ -1995,6 +2095,7 @@ function MainWindow.Init()
     end)
 
     local postResyncBtn = CreateFrame("Button", nil, rcPostRow, "UIPanelButtonTemplate")
+    if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(postResyncBtn) end
     postResyncBtn:SetSize(130, 22)
     postResyncBtn:SetPoint("LEFT", postRwBtn, "RIGHT", 6, 0)
     postResyncBtn:SetText("Resync roles now")
@@ -2141,6 +2242,7 @@ function MainWindow.Init()
         row.ROLE_ICONS = ROLE_ICONS
         row.ROLE_ICON_UNKNOWN = ROLE_ICON_UNKNOWN
         local inv = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+    if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(inv) end
         inv:SetSize(64, 20)
         inv:SetPoint("TOPRIGHT", -8, -6)
         inv:SetText("Invite")
@@ -2152,6 +2254,7 @@ function MainWindow.Init()
         end)
         row.inviteBtn = inv
         local rej = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+    if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(rej) end
         rej:SetSize(110, 20)
         rej:SetPoint("TOPRIGHT", -8, -28)
         rej:SetText("Reject+whisp")
@@ -2187,6 +2290,7 @@ function MainWindow.Init()
     SetInk(rosterHint, MUTED)
 
     local specBtn = CreateFrame("Button", nil, rosterBar, "UIPanelButtonTemplate")
+    if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(specBtn) end
     specBtn:SetSize(88, 22)
     specBtn:SetPoint("TOPRIGHT", -8, -10)
     specBtn:SetText("My Spec")
@@ -2266,6 +2370,7 @@ local kick = BuildCategoryPage(pageHost, CAT_KICK, 300)
     sessionSummaryFS:SetText("Session (0m): 0 invited, 0 rejected, 0 kicked, 0 matches, 0 posts")
 
     local sessionResetBtn = CreateFrame("Button", nil, log, "UIPanelButtonTemplate")
+    if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(sessionResetBtn) end
     sessionResetBtn:SetSize(96, 20)
     sessionResetBtn:SetPoint("TOPRIGHT", -4, -248)
     sessionResetBtn:SetText("Reset session")
@@ -2330,37 +2435,13 @@ function MainWindow.GetFrame()
 end
 
 -- ============================================================================
+-- ============================================================================
 -- Diagnostic: /alfmmaindebug
 -- ============================================================================
--- Same generalized approach as MiniHUD's /alfmhuddebug and DragonUI's
--- own RealChrome.Debug from this session - reports texcoords and
--- identifies known DragonUI atlas pieces by matching coordinates.
-local MAINWIN_KNOWN_PIECES = {
-    ["Interface\\AddOns\\DragonUI\\Textures\\UI\\uiframemetal2x"] = {
-        { "topLeft (uiframemetal2x)", 0.00195312, 0.294922, 0.00195312, 0.294922 },
-        { "topRight (uiframemetal2x)", 0.298828, 0.591797, 0.00195312, 0.294922 },
-        { "bottomLeft (uiframemetal2x)", 0.298828, 0.423828, 0.298828, 0.423828 },
-        { "bottomRight (uiframemetal2x)", 0.427734, 0.552734, 0.298828, 0.423828 },
-    },
-    ["Interface\\AddOns\\DragonUI\\Textures\\UI\\uiframemetalhorizontal2x"] = {
-        { "top edge (uiframemetalhorizontal2x)", 0, 1, 0.00390625, 0.589844 },
-        { "bottom edge (uiframemetalhorizontal2x)", 0, 0.5, 0.597656, 0.847656 },
-    },
-    ["Interface\\AddOns\\DragonUI\\Textures\\UI\\uiframemetalvertical2x"] = {
-        { "left edge (uiframemetalvertical2x)", 0.00195312, 0.294922, 0, 1 },
-        { "right edge (uiframemetalvertical2x)", 0.298828, 0.591797, 0, 1 },
-    },
-}
-
+-- Atlas identification lives in ui/Chrome.lua (shared with MiniHUD).
 local function MainWinIdentifyPiece(tex, left, right, top, bottom)
-    local candidates = tex and MAINWIN_KNOWN_PIECES[tex]
-    if not candidates or not left then return nil end
-    local EPS = 0.001
-    for _, piece in ipairs(candidates) do
-        if math.abs(left - piece[2]) < EPS and math.abs(right - piece[3]) < EPS
-            and math.abs(top - piece[4]) < EPS and math.abs(bottom - piece[5]) < EPS then
-            return piece[1]
-        end
+    if AscensionLFM.Chrome and AscensionLFM.Chrome.IdentifyPiece then
+        return AscensionLFM.Chrome.IdentifyPiece(tex, left, right, top, bottom)
     end
     return nil
 end

@@ -208,8 +208,13 @@ function Reject.TryRewhisper(name, reason, role)
     return true
 end
 
---- Add / remove permanent reject-ignore (no re-whisper).
-function Reject.AddIgnore(name)
+--- Add / remove permanent reject-ignore (no re-whisper). reason is
+-- optional free text (why they're blocked - the actual "hall of shame"
+-- record); db.rejectIgnoreList itself stays a plain boolean map for
+-- backward compat with every existing IsIgnoredName truthiness check
+-- across the addon (Invite.CanInvite, Scanner whisper filtering, etc.) -
+-- db.hallOfShame is the richer record layered on top, purely additive.
+function Reject.AddIgnore(name, reason)
     local db = DB()
     if not db then
         return
@@ -217,7 +222,19 @@ function Reject.AddIgnore(name)
     if type(db.rejectIgnoreList) ~= "table" then
         db.rejectIgnoreList = {}
     end
-    db.rejectIgnoreList[LowerName(name)] = true
+    local key = LowerName(name)
+    db.rejectIgnoreList[key] = true
+
+    if type(db.hallOfShame) ~= "table" then
+        db.hallOfShame = {}
+    end
+    local existing = db.hallOfShame[key]
+    db.hallOfShame[key] = {
+        name = name,
+        reason = (type(reason) == "string" and reason ~= "" and reason)
+            or (existing and existing.reason) or nil,
+        addedAt = (existing and existing.addedAt) or Now(),
+    }
 end
 
 function Reject.RemoveIgnore(name)
@@ -225,7 +242,26 @@ function Reject.RemoveIgnore(name)
     if db and type(db.rejectIgnoreList) == "table" then
         db.rejectIgnoreList[LowerName(name)] = nil
     end
+    if db and type(db.hallOfShame) == "table" then
+        db.hallOfShame[LowerName(name)] = nil
+    end
     sessionIgnore[LowerName(name)] = nil
+end
+
+--- Ordered (most recently added first) list of { name=, reason=, addedAt= }.
+function Reject.GetHallOfShame()
+    local db = DB()
+    local out = {}
+    if not db or type(db.hallOfShame) ~= "table" then
+        return out
+    end
+    for _, entry in pairs(db.hallOfShame) do
+        table.insert(out, entry)
+    end
+    table.sort(out, function(a, b)
+        return (a.addedAt or 0) > (b.addedAt or 0)
+    end)
+    return out
 end
 
 function Reject.IsOnIgnore(name)

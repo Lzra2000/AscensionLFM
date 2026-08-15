@@ -216,6 +216,7 @@ AscensionLFM.Poster = {
 }
 
 AscensionLFM.Database.Init()
+dofile("ui/Chrome.lua")
 dofile("ui/MainWindow.lua")
 
 local MW = assert(AscensionLFM.MainWindow)

@@ -1,5 +1,262 @@
 # Changelog
 
+## 0.4.99c
+
+- **New: private "hall of shame" blocklist**, built on the existing
+  reject-ignore infrastructure (which already auto-blocks future invites
+  via `Invite.CanInvite`/`Scanner`) — now with a reason + date attached
+  instead of a bare name. Never posted or broadcast anywhere; visible only
+  to you, in your own chat/SavedVariables.
+  - `/alfm block <name> [reason]`, `/alfm unblock <name>`, `/alfm shame`
+    (lists everyone, most recent first, with reason and days-ago)
+  - Roster: Shift+Click the kick (X) button to kick **and** block in one
+    step instead of typing the name into a slash command.
+- Ran the full test suite for the first time this session (it wasn't part
+  of the uploaded working copy) and fixed everything it caught:
+  - 26 unguarded `AscensionLFM.Chrome.X()` calls across MainWindow/MiniHUD/
+    RosterPanel would crash if Chrome.lua somehow isn't loaded - all now
+    guarded (`if AscensionLFM.Chrome and ...`).
+  - Version was out of sync across the 3 required places (`AscensionLFM.toc`,
+    `core/Bootstrap.lua`'s `VERSION`, `tests/test_toc_paths.lua`) - synced.
+  - `tests/test_mini_hud.lua`, `test_ui_smoke.lua`, `test_roster_panel.lua`
+    predate `ui/Chrome.lua`'s existence and didn't load it; added the
+    `dofile` and the missing mock methods it needs (`SetAllPoints`,
+    `SetFrameLevel`/`GetFrameLevel`, `SetBackdrop*`, `HookScript`,
+    `IsAddOnLoaded` for the DragonUI-detection path).
+  - `ActionRegroup`'s reinvite loop now explicitly excludes the player's
+    own name (defensive - `RememberPresent` never adds it, but a test
+    seeding `regroupRoster` directly, or old SavedVariables data, could).
+  - New regression test: after a full disband, re-inviting past 4 people
+    must call `ConvertToRaid()` first or the 5th+ invite silently never
+    joins (plain party caps at 5) - verified this test actually fails
+    without the fix before restoring it, per this repo's own testing
+    workflow in `AGENTS.md`.
+
+## 0.4.99b (hotfix)
+
+- **Fixed "prevented the call of the secure function 'UNKNOWN()'"**, thrown
+  by both the new Roster drag-and-drop and the paced Regroup re-invite
+  queue. Root cause: WoW's secure-execution model only allows
+  protected/protected-adjacent API calls (`SetRaidSubgroup`, `InviteUnit`,
+  `UninviteUnit`) synchronously inside the call stack of a real hardware
+  event (a click) — not from `OnUpdate`, timers, or anything deferred.
+  - Drag-and-drop: dropped detection used to poll `IsMouseButtonDown` every
+    `OnUpdate` tick and call `SetRaidSubgroup` from there. Rebuilt on real
+    `OnMouseUp` handlers (each group card, each row, and each row's small
+    buttons so a release anywhere in the drop zone is caught) — `OnUpdate`
+    is now purely cosmetic (ghost position, border highlight), it never
+    calls `TryMoveGroup` itself.
+  - Regroup: the previous fix's paced re-invite queue (one invite per
+    MiniHUD tick) hit the same wall. Reverted to firing all re-invites
+    synchronously within the button click, and moved the `ConvertToRaid()`
+    call (still needed after a full disband, see 0.4.99) into that same
+    synchronous block instead of relying on `Invite.InvitePlayer`'s
+    internal conversion — which also removes the cooldown-throttling that
+    made pacing look necessary in the first place.
+
+## 0.4.99
+
+- **New: auto-mark tanks and healers with raid target icons.** New
+  `core/RaidMarks.lua` — Skull/Cross go to the first two assigned tanks,
+  Square/Moon/Triangle to the first three healers (order = whoever was
+  assigned longest ago this session), matching the near-universal
+  "skull = MT" raid convention instead of leaving markers unset or manual.
+  New "Mark" button in the MiniHUD row and `/alfm mark`. Clears all 8
+  existing markers first so a reassigned member doesn't keep a stale icon.
+  Raid-only (SetRaidTarget has no equivalent group-wide meaning in a plain
+  party); requires raid lead/assist like every other privileged action.
+
+- **Window chrome nineslice edges fixed for real:** two-point anchor stretch
+  (SetPoint on both ends of a texture, expecting the un-set axis to auto-size)
+  turned out not to work reliably for Texture regions on this client — the
+  unset axis silently fell back to the engine's 32px default regardless of
+  the actual anchor gap. Edge widths/heights are now computed explicitly
+  from frame size + corner offsets and hard-set via SetWidth/SetHeight.
+  Fixes the gold SetBackdrop safety line showing through on both MainWindow
+  and MiniHUD (compact profile was worse-hit: 48px needed, only 32px shown).
+- New `ui/Chrome.lua` helpers: `HasDragonUI()`, `BackgroundPath()`,
+  `ApplyClassicChrome()` — full native-Blizzard fallback (background + border
+  + close button left alone) when DragonUI isn't installed, instead of the
+  window rendering with only a bare 2px gold outline and nothing else.
+- All 25 `UIPanelButtonTemplate` buttons across MainWindow/MiniHUD/RosterPanel
+  reskinned to the addon's gold/dark chrome theme via `Chrome.SkinActionButton`
+  (native grey Blizzard button look was the last visual inconsistency).
+- **Roster: move members between raid subgroups.** New ⇄ button opens a
+  Group 1-8 picker (`SetRaidSubgroup`); rows are also drag-and-droppable onto
+  another group's card directly (manual cursor-poll drag simulation — WoW
+  frames have no native HTML-style drag). Both paths share the same
+  "don't trust a no-error call" verification pattern already used for kicks.
+- **Regroup rewritten twice this cycle, both real bugs:**
+  1. Now fully disbands the group (`UninviteUnit` on everyone but self) before
+     re-inviting from a fresh snapshot, instead of only inviting people who
+     were missing.
+  2. That disband+reinvite bypassed `Invite.InvitePlayer` (raw `InviteUnit`
+     calls), which skipped `EnsureRaidIfNeeded()` — after a full disband
+     (which drops you to solo) the group never re-converted past a 5-person
+     party, so anyone past the 4th re-invite silently failed. Also skipped
+     `InvitePlayer`'s cooldown, so firing 15 invites in one synchronous loop
+     would've had ~14 rejected by the global 3s cooldown once routed
+     correctly. Fixed by queuing re-invites and draining one per MiniHUD tick
+     through `Invite.InvitePlayer`, same conversion/cooldown/ignore-list
+     handling as every other invite path in the addon.
+  3. Watch list now ages out entries unseen for 6h (`regroupSeenAt` per
+     name) instead of an unbounded FIFO that could carry names from an
+     unrelated earlier raid for days.
+  4. Watch list is also fully wiped on an observed solo→grouped transition
+     during the session ("new group started"), not just time-based pruning —
+     skipped on a reload while already mid-raid (state starts `nil`/unknown,
+     not `false`, so that case isn't mistaken for a fresh group).
+
+## 0.4.98
+
+- **Chrome measurement toolkit for pixel-perfect nineslice tuning:**
+  - `/alfmchrome` — dump MainWindow chrome pieces (size, points, texcoords, shown)
+  - `/alfmchrome hud` — same for MiniHUD
+  - `/alfmchromeref` — dump DragonUI metal/rock textures on ContainerFrame1 (bag reference)
+  - `/alfmchromeside` — bag left + main window right for visual compare
+  - `/alfmchromeprofile [full|compact]` — print current profile numbers for copy-paste
+
+## 0.4.97
+
+- **MainWindow no longer uses UIPanelDialogTemplate.** The template's
+  baked regions and clipping kept fighting the DragonUI metal nineslice
+  (border still invisible on 0.4.96 screenshots). Plain `Frame` only;
+  rock + metal come entirely from `Chrome.ApplyMetalChrome`.
+- **Visible gold outer edge fallback** (2px) so the window always has a
+  clear border even if metal `.blp` files fail to resolve.
+- Metal full profile tuned (56×56 corners, slight inset).
+- Title uses `GameFontNormalLarge` + brighter gold so "AscensionLFM"
+  reads clearly in the title strip.
+
+## 0.4.96
+
+- **Nineslice offsets moved inside the frame.** Full-profile metal corners
+  used bag-style negative offsets (`leftOffset=-8`, `topY=16`) which
+  sit outside the dialog bounds. On `UIPanelDialogTemplate` those pieces
+  were clipped/invisible — screenshots still showed only a thin gold
+  line. New full profile: 48×48 / 24 corners at offset 0 (fully inside),
+  still using the real DragonUI metal atlases. Title bar FrameLevel
+  raised above the chrome host so the title stays readable.
+
+## 0.4.95
+
+- **DragonUI nineslice drawn on elevated chrome host.** Metal border
+  pieces (corners + stretched edges from `uiframemetal2x` /
+  horizontal / vertical) are now created on a child host frame at
+  FrameLevel+20 so they always render above content panels. Parent
+  OVERLAY textures were being covered by sidebar/shell children, which
+  is why the metal border looked missing on 0.4.9x screenshots. Same
+  atlas/texcoords/offsets as DragonUI `RealChrome.Apply` / bags_skin
+  LayoutChrome. Close button FrameLevel raised to +25. Rock BACKGROUND
+  still on the main frame under content.
+
+## 0.4.94
+
+- **Text readability pass (light-on-dark).** Body/description colours were
+  still the old parchment dark-ink values (or too dim), so labels looked
+  muddy on rock panels. Raised contrast across the board:
+  - `INK` → near-white cream for primary text
+  - `MUTED` → brighter secondary descriptions
+  - `SECTION` / `TITLE_INK` → clearer gold headers
+  - `DANGER` → brighter coral for warnings
+  - Nav labels stay light in both selected and idle states
+  - MiniHUD status/chip and roster level text slightly brightened
+- Includes the 18×18 DragonUI close button from 0.4.93 (hide template X).
+
+## 0.4.93
+
+- **Close (X) button resized to fit the DragonUI metal corner 1:1.**
+  The UIPanelDialogTemplate close control was oversized and sat outside
+  the chrome. It is now hidden; a dedicated 18×18 button uses
+  DragonUI `redbutton2x` (same atlas/texcoords as bags/bank close) and
+  is anchored `TOPRIGHT` (-6, -6) inside the metal corner piece.
+
+## 0.4.92
+
+- **Fix: DragonUI rock texture was invisible — panels looked flat brown.**
+  `ApplyRockPanel` (and titleBg / roster cards) layered full-size
+  WHITE8X8 textures with high-alpha vertex colours over the rock fill.
+  Those overlays painted solid brown/gold on top of `ui-background-rock`,
+  so the actual DragonUI texture never showed. Removed the covering
+  overlays; panels now show the real rock texture with only a 1px gold
+  `SetBackdrop` edge. Confirmed against live screenshot of v0.4.91.
+
+## 0.4.91
+
+- **Aligned with DragonUI's own `RealChrome` (from the user's DragonUI
+  source package).** Added `Chrome.SkinCloseButton` using the exact
+  `redbutton2x` path and texcoords from DragonUI `bags_skin.lua` /
+  `chrome_shared.lua`. MainWindow skins the dialog-template close
+  button after applying metal chrome. Confirmed texture set present
+  under `Interface\AddOns\DragonUI\Textures\UI\` (rock, metal
+  nineslice, redbutton2x). Outer frame chrome was already matching
+  RealChrome.Apply profiles; this completes the close-button piece.
+
+## 0.4.90
+
+- **Full DragonUI skin for MainWindow content — no more parchment.**
+  User request: only DragonUI elements. All previous cream/tooltip
+  backdrops (`ApplyParchment`, `ApplyInset`, `ApplyToggleRow`,
+  `ApplyNavButton`, sidebar) now go through a shared `ApplyRockPanel`
+  helper that uses `ui-background-rock` + gold edge + dark inset —
+  same language as the outer chrome / title bar / roster cards.
+- **Text palette flipped to light-on-dark** (`INK` / `MUTED` / `SECTION`
+  / `TITLE_INK` / `DANGER`) so labels stay readable on rock panels.
+  Nav buttons use rock fill with a brighter gold edge when selected.
+  Standard `UIPanelButtonTemplate` left as-is (matches DragonUI's own
+  practice — no custom button atlas). Full suite green.
+
+## 0.4.89
+
+- **Fix: MainWindow title text was nearly invisible after the v0.4.87
+  titleBg restyle.** Title/subtitle still used the parchment ink colours
+  (`INK` / `MUTED` — dark brown) against the new dark rock background.
+  Switched to light gold (`1.00, 0.82, 0.24` / `0.78, 0.68, 0.42`),
+  matching the MiniHUD title and sidebar category labels.
+- **Sidebar restyled to DragonUI rock.** `ApplySidebar` now uses the
+  same rock fill + gold edge + dark inset as the outer chrome / title
+  bar instead of the old dark tooltip backdrop. Category label colours
+  were already light gold — no text changes needed there. Content-area
+  parchment insets (`ApplyInset` / toggle rows) intentionally left
+  alone: they still use dark ink on light fill for readability.
+  Full suite green.
+
+## 0.4.88
+
+- **Roster cards + RolePicker restyled to match DragonUI chrome.** Group
+  cards on the Roster tab and the role-picker popup previously used
+  flat WHITE8X8 fills (cards only had a 2px gold top edge). Both now
+  use the same `ui-background-rock` fill + full gold outer edge + dark
+  inset language as the MainWindow title bar (v0.4.87), falling back to
+  the Chrome module path when available. No behaviour change — pure
+  visual consistency pass. Full suite green.
+
+## 0.4.87
+
+- **MainWindow title bar restyled to match DragonUI chrome.** The
+  titleBg strip still used a light tooltip-style ApplyBackdrop (cream
+  fill + gold edge) from before the v0.4.81 reskin, so it sat as a
+  bright rectangle on top of the dark metal/rock chrome. Replaced with
+  the same `ui-background-rock` texture the main frame uses, plus a
+  thin gold outer edge and a dark inset — same colour language as the
+  RolePicker / Roster cards, no new DragonUI atlas pieces required.
+  Text colours (title ink / muted sub) unchanged. Full suite green.
+
+## 0.4.86
+
+- **Refactor: extract shared DragonUI chrome helper (`ui/Chrome.lua`).**
+  MiniHUD and MainWindow both carried identical texture paths, atlas
+  coordinate tables, `ConfigureTexture`, and `IdentifyPiece` logic
+  (only the size/offset profile differed). Moved the common pieces into
+  one module with named profiles (`compact` for MiniHUD, `full` for
+  MainWindow). Both windows and both `/alfmhuddebug` / `/alfmmaindebug`
+  diagnostics now call into `AscensionLFM.Chrome`. Behaviour and
+  visual sizing are unchanged — this only removes the duplication so
+  future chrome tweaks only need one edit.
+  New pure unit tests in `tests/test_chrome.lua` (IdentifyPiece match/
+  miss, both profiles, nil-safe ApplyMetalChrome). toc load order:
+  Chrome before MiniHUD/MainWindow. Full suite green.
+
 ## 0.4.85
 
 - **Collapsed MiniHUD now shows a leader-icon instead of "ALFM" text.**

@@ -22,8 +22,19 @@ _G.CreateFrame = function(kind, name, parent, template)
         SetClampedToScreen = function() end,
         SetScript = function() end,
         SetPoint = function(self, ...) table.insert(self._points, { ... }) end,
+        SetAllPoints = function(self) end,
         ClearAllPoints = function(self) self._points = {} end,
         GetPoint = function() return "CENTER", nil, "CENTER", 0, 180 end,
+        SetFrameLevel = function(self, lvl) self._level = lvl end,
+        GetFrameLevel = function(self) return self._level or 0 end,
+        SetBackdrop = function() end,
+        SetBackdropColor = function() end,
+        SetBackdropBorderColor = function() end,
+        HookScript = function() end,
+        SetNormalTexture = function() end,
+        SetPushedTexture = function() end,
+        SetDisabledTexture = function() end,
+        GetHighlightTexture = function() return nil end,
         CreateTexture = function()
             local tex = {
                 SetAllPoints = function() end,
@@ -78,7 +89,13 @@ end
 dofile("core/Database.lua")
 dofile("core/Slots.lua")
 dofile("core/Poster.lua")
+dofile("ui/Chrome.lua")
 dofile("ui/MiniHUD.lua")
+-- Chrome.HasDragonUI() caches its result after the first check, so this
+-- must be set before ANYTHING that could trigger chrome application
+-- (MiniHUD.Ensure() below) - these tests assert on the DragonUI metal
+-- nineslice path specifically (8 pieces), not the classic fallback.
+_G.IsAddOnLoaded = function(name) return name == "DragonUI" end
 
 AscensionLFM.Database.Init()
 local MiniHUD = assert(AscensionLFM.MiniHUD)
@@ -169,10 +186,40 @@ _G.UnitName = function(u)
     return nil
 end
 AscensionLFM.Database.Get().regroupRoster = { "Alice", "Bob", "Host" }
+-- PruneStaleRegroup (added this session) drops any entry without a
+-- regroupSeenAt timestamp - real code always sets one via
+-- RememberPresent/RememberPlayer, so mirror that here instead of
+-- seeding regroupRoster directly with no timestamp.
+AscensionLFM.Database.Get().regroupSeenAt = { alice = 1000, bob = 1000, host = 1000 }
 local ok2, nInv = MiniHUD.ActionRegroup()
 check("regroup ok", ok2 == true, tostring(ok2))
 check("regroup announced", _G._chats[1] and tostring(_G._chats[1].msg):find("REGROUP", 1, true) ~= nil)
 check("regroup invited missing", #invited == 2, table.concat(invited, ","))
+
+-- Regression: after a full disband (see 0.4.99's ActionRegroup rewrite),
+-- the group is back to solo - re-inviting past 4 people must explicitly
+-- ConvertToRaid() first, or invite #5+ silently fails to join at all
+-- (a plain party caps at 5). Confirmed as a real bug via live testing
+-- this session before this fix.
+MiniHUD._ResetForTests()
+_G._chats = {}
+local invited2 = {}
+local convertCalled = false
+_G.InviteUnit = function(name) table.insert(invited2, name) end
+_G.ConvertToRaid = function() convertCalled = true end
+_G.GetNumRaidMembers = function() return 0 end -- disbanded down to solo
+_G.GetNumPartyMembers = function() return 0 end
+_G.GetRaidRosterInfo = function() return nil end
+_G.UnitName = function(u)
+    if u == "player" then return "Host" end
+    return nil
+end
+local db = AscensionLFM.Database.Get()
+db.regroupRoster = { "Alice", "Bob", "Carol", "Dave", "Eve" }
+db.regroupSeenAt = { alice = 1000, bob = 1000, carol = 1000, dave = 1000, eve = 1000 }
+MiniHUD.ActionRegroup()
+check("regroup converts to raid past 5", convertCalled == true)
+check("regroup invites all 5 after conversion", #invited2 == 5, table.concat(invited2, ","))
 
 -- Shared rate limit must not block different actions
 MiniHUD._ResetForTests()

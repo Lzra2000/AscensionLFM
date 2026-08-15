@@ -2,7 +2,7 @@
 ## Title: AscensionLFM
 ## Notes: Manastorm LFM host helper for Ascension.gg
 ## Author: Lazra
-## Version: 0.4.85
+## Version: 0.4.99c
 ## SavedVariables: AscensionLFMDB
 ## DefaultState: enabled
 ## X-Website: https://ascension.gg
@@ -10,6 +10,7 @@
 core\Database.lua
 core\Parser.lua
 core\Slots.lua
+core\RaidMarks.lua
 core\SpecRole.lua
 core\Queue.lua
 core\Reject.lua
@@ -22,6 +23,7 @@ core\Presets.lua
 core\Scanner.lua
 core\Activity.lua
 core\ManastormTracker.lua
+ui\Chrome.lua
 ui\MiniHUD.lua
 ui\RosterPanel.lua
 ui\MainWindow.lua

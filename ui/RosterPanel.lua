@@ -116,20 +116,21 @@ local function EnsureRolePicker()
     f:SetHeight(5 * 28 + 12)
     f:EnableMouse(true)
     f:SetClampedToScreen(true)
+    local bgPath = (AscensionLFM.Chrome and AscensionLFM.Chrome.BackgroundPath and AscensionLFM.Chrome.BackgroundPath())
+        or "Interface\\DialogFrame\\UI-DialogBox-Background"
     local bg = f:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints()
-    bg:SetTexture("Interface\\Buttons\\WHITE8X8")
-    bg:SetVertexColor(0.08, 0.07, 0.05, 0.96)
+    bg:SetTexture(bgPath)
+    bg:SetAlpha(0.97)
     local border = f:CreateTexture(nil, "BORDER")
     border:SetAllPoints()
     border:SetTexture("Interface\\Buttons\\WHITE8X8")
     border:SetVertexColor(0.85, 0.68, 0.22, 0.55)
-    -- inset bg
-    local inset = f:CreateTexture(nil, "BACKGROUND")
+    local inset = f:CreateTexture(nil, "BORDER")
     inset:SetPoint("TOPLEFT", 1, -1)
     inset:SetPoint("BOTTOMRIGHT", -1, 1)
     inset:SetTexture("Interface\\Buttons\\WHITE8X8")
-    inset:SetVertexColor(0.10, 0.09, 0.07, 0.98)
+    inset:SetVertexColor(0.08, 0.07, 0.05, 0.90)
 
     f.rows = {}
     local roles = { "tank", "healer", "aura", "dps", "" }
@@ -179,6 +180,343 @@ local function ShowRolePicker(anchor, memberName)
     f:ClearAllPoints()
     if anchor then
         f:SetPoint("TOPLEFT", anchor, "TOPRIGHT", 4, 4)
+    else
+        f:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+    end
+    f:Show()
+    f:Raise()
+end
+
+local groupPicker
+local groupPickerTarget
+
+local function HideGroupPicker()
+    if groupPicker then
+        groupPicker:Hide()
+    end
+    groupPickerTarget = nil
+end
+
+--- Raid index for SetRaidSubgroup (needs the live roster position, not
+-- the unit token cached on the row - that can go stale between one
+-- Refresh() and the next click).
+local function FindRaidIndex(name)
+    if type(GetNumRaidMembers) ~= "function" or type(GetRaidRosterInfo) ~= "function" then
+        return nil
+    end
+    local target = LowerName(name)
+    local n = GetNumRaidMembers() or 0
+    for i = 1, n do
+        local rname = GetRaidRosterInfo(i)
+        if type(rname) == "string" and LowerName(rname) == target then
+            return i
+        end
+    end
+    return nil
+end
+
+local MOVE_VERIFY_DELAY = 1.5
+local pendingMoveVerify = nil -- { name=, targetGroup=, checkAt= }
+
+local function TryMoveGroup(name, targetGroup)
+    if type(name) ~= "string" or name == "" then
+        return
+    end
+    targetGroup = tonumber(targetGroup)
+    if not targetGroup or targetGroup < 1 or targetGroup > 8 then
+        return
+    end
+    if type(SetRaidSubgroup) ~= "function" then
+        if AscensionLFM.Print then
+            AscensionLFM.Print("Roster: SetRaidSubgroup unavailable on this client")
+        end
+        return
+    end
+    if type(GetNumRaidMembers) ~= "function" or (GetNumRaidMembers() or 0) == 0 then
+        if AscensionLFM.Print then
+            AscensionLFM.Print("Roster: moving between groups only works in a raid, not a party")
+        end
+        return
+    end
+    local can = false
+    if type(IsRaidLeader) == "function" and IsRaidLeader() then can = true end
+    if type(IsRaidOfficer) == "function" and IsRaidOfficer() then can = true end
+    if not can then
+        if AscensionLFM.Print then
+            AscensionLFM.Print("Roster: need lead/assist (Assign Members) to move " .. name)
+        end
+        return
+    end
+    local idx = FindRaidIndex(name)
+    if not idx then
+        if AscensionLFM.Print then
+            AscensionLFM.Print("Roster: couldn't find " .. name .. " in the live raid roster")
+        end
+        return
+    end
+    local ok = pcall(SetRaidSubgroup, idx, targetGroup)
+    if not ok then
+        if AscensionLFM.Print then
+            AscensionLFM.Print("Roster: move failed for " .. name)
+        end
+        return
+    end
+    pendingMoveVerify = { name = name, targetGroup = targetGroup, checkAt = Now() + MOVE_VERIFY_DELAY }
+    if AscensionLFM.Print then
+        AscensionLFM.Print("Roster: moving " .. name .. " -> Group " .. targetGroup .. " ...")
+    end
+end
+
+--- Same "don't trust a no-error call" verification as CheckPendingKick -
+-- SetRaidSubgroup silently no-ops if the target group is full (5/5) or
+-- the mover lacks "Assign Members" as an assistant.
+local function CheckPendingMove()
+    if not pendingMoveVerify then
+        return
+    end
+    if Now() < pendingMoveVerify.checkAt then
+        return
+    end
+    local name, targetGroup = pendingMoveVerify.name, pendingMoveVerify.targetGroup
+    pendingMoveVerify = nil
+    local groups = RosterPanel.BuildData()
+    local landed = nil
+    for g = 1, 8 do
+        for _, m in ipairs(groups[g] or {}) do
+            if LowerName(m.name) == LowerName(name) then
+                landed = g
+                break
+            end
+        end
+        if landed then break end
+    end
+    if AscensionLFM.Print then
+        if landed == targetGroup then
+            AscensionLFM.Print("Roster: " .. name .. " is now in Group " .. targetGroup)
+        elseif landed then
+            AscensionLFM.Print("Roster: " .. name .. " still in Group " .. landed
+                .. " - target group may be full (5/5)")
+        else
+            AscensionLFM.Print("Roster: " .. name .. " no longer found in raid")
+        end
+    end
+end
+
+-- ============================================================================
+-- Drag-and-drop between group cards. WoW frames have no native HTML-style
+-- drag; this is the standard addon-side simulation: track mouse-down on a
+-- row, follow the cursor with a small ghost label every OnUpdate tick, and
+-- poll IsMouseButtonDown to detect the drop instead of relying on
+-- OnDragStart/OnReceiveDrag (those are for SetMovable frames and Blizzard's
+-- item/spell cursor types, not this kind of row-to-card drag).
+-- ============================================================================
+
+local dragging = nil -- { name=, fromGroup=, ghost= }
+local dragGhost
+
+local EndDrag -- forward decl, UpdateDrag below needs to call it
+
+local function EnsureDragGhost()
+    if dragGhost then
+        return dragGhost
+    end
+    local g = CreateFrame("Frame", "AscensionLFMRosterDragGhost", UIParent)
+    g:SetFrameStrata("TOOLTIP")
+    g:SetSize(140, 22)
+    g:EnableMouse(false)
+    local bg = g:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints()
+    bg:SetTexture("Interface\\Buttons\\WHITE8X8")
+    bg:SetVertexColor(0.08, 0.07, 0.05, 0.92)
+    local border = g:CreateTexture(nil, "BORDER")
+    border:SetAllPoints()
+    border:SetTexture("Interface\\Buttons\\WHITE8X8")
+    border:SetVertexColor(0.85, 0.68, 0.22, 0.9)
+    local inset = g:CreateTexture(nil, "ARTWORK")
+    inset:SetPoint("TOPLEFT", 1, -1)
+    inset:SetPoint("BOTTOMRIGHT", -1, 1)
+    inset:SetTexture("Interface\\Buttons\\WHITE8X8")
+    inset:SetVertexColor(0.08, 0.07, 0.05, 0.92)
+    local fs = g:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    fs:SetAllPoints()
+    fs:SetJustifyH("CENTER")
+    fs:SetTextColor(1, 0.9, 0.6)
+    g.fs = fs
+    g:Hide()
+    dragGhost = g
+    return g
+end
+
+local function BeginDrag(name, fromGroup)
+    if type(name) ~= "string" or name == "" then
+        return
+    end
+    if type(GetNumRaidMembers) ~= "function" or (GetNumRaidMembers() or 0) == 0 then
+        -- Party has no subgroups - don't even start the ghost, since any
+        -- drop would just fail with "only works in a raid" anyway.
+        return
+    end
+    local g = EnsureDragGhost()
+    g.fs:SetText(name)
+    g:Show()
+    g:Raise()
+    dragging = { name = name, fromGroup = fromGroup }
+end
+
+local function CardUnderCursor()
+    local scale = UIParent:GetEffectiveScale()
+    local x, y = GetCursorPosition()
+    x, y = x / scale, y / scale
+    for g = 1, 8 do
+        local card = groupCards[g]
+        if card and card:IsShown() then
+            local l, r = card:GetLeft(), card:GetRight()
+            local t, b = card:GetTop(), card:GetBottom()
+            if l and r and t and b and x >= l and x <= r and y >= b and y <= t then
+                return g
+            end
+        end
+    end
+    return nil
+end
+
+local function HighlightCard(overGroup)
+    for g = 1, 8 do
+        local card = groupCards[g]
+        if card and card.SetBackdropBorderColor then
+            if g == overGroup then
+                card:SetBackdropBorderColor(0.4, 0.9, 0.5, 0.95)
+            else
+                card:SetBackdropBorderColor(0.85, 0.68, 0.22, 0.50)
+            end
+        end
+    end
+end
+
+--- Ends the drag WITHOUT ever calling a protected function itself - pure
+-- visual cleanup (hide ghost, reset borders). Safe to call from anywhere,
+-- including OnUpdate.
+local function CancelDragVisualOnly()
+    dragging = nil
+    if dragGhost then
+        dragGhost:Hide()
+    end
+    HighlightCard(nil)
+end
+
+--- The ONLY place that calls TryMoveGroup (which calls the protected
+-- SetRaidSubgroup). MUST only ever be invoked from a real OnMouseUp
+-- handler (a genuine hardware event) - never from OnUpdate/a timer/a
+-- queue. WoW's secure-execution model blocks protected API calls that
+-- aren't made synchronously inside the call stack of an actual input
+-- event; polling IsMouseButtonDown in OnUpdate and calling
+-- SetRaidSubgroup from there produced exactly that block in practice
+-- ("prevented the call of the secure function 'UNKNOWN()'").
+EndDrag = function(overGroup)
+    local d = dragging
+    CancelDragVisualOnly()
+    if not d then
+        return
+    end
+    if overGroup and overGroup ~= d.fromGroup then
+        TryMoveGroup(d.name, overGroup)
+    end
+end
+
+--- Called every OnUpdate tick while a drag is active (see RosterPanel.Start()).
+-- Cosmetic only: follows the cursor with the ghost label and highlights
+-- whichever card is under it. Never calls TryMoveGroup/EndDrag itself -
+-- the actual drop is handled by each card's own OnMouseUp (see
+-- EnsureCards) and by the host-panel catch-all below for releases that
+-- land outside every card.
+local function UpdateDrag()
+    if not dragging then
+        return
+    end
+    local scale = UIParent:GetEffectiveScale()
+    local x, y = GetCursorPosition()
+    dragGhost:ClearAllPoints()
+    dragGhost:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", x / scale + 14, y / scale + 10)
+    HighlightCard(CardUnderCursor())
+end
+
+local function EnsureGroupPicker()
+    if groupPicker then
+        return groupPicker
+    end
+    local f = CreateFrame("Frame", "AscensionLFMGroupPicker", UIParent)
+    f:SetFrameStrata("TOOLTIP")
+    f:SetFrameLevel(200)
+    f:SetWidth(110)
+    f:SetHeight(8 * 22 + 12)
+    f:EnableMouse(true)
+    f:SetClampedToScreen(true)
+    local bgPath = (AscensionLFM.Chrome and AscensionLFM.Chrome.BackgroundPath and AscensionLFM.Chrome.BackgroundPath())
+        or "Interface\\DialogFrame\\UI-DialogBox-Background"
+    local bg = f:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints()
+    bg:SetTexture(bgPath)
+    bg:SetAlpha(0.97)
+    local border = f:CreateTexture(nil, "BORDER")
+    border:SetAllPoints()
+    border:SetTexture("Interface\\Buttons\\WHITE8X8")
+    border:SetVertexColor(0.85, 0.68, 0.22, 0.55)
+    local inset = f:CreateTexture(nil, "BORDER")
+    inset:SetPoint("TOPLEFT", 1, -1)
+    inset:SetPoint("BOTTOMRIGHT", -1, 1)
+    inset:SetTexture("Interface\\Buttons\\WHITE8X8")
+    inset:SetVertexColor(0.08, 0.07, 0.05, 0.90)
+
+    f.rows = {}
+    for g = 1, 8 do
+        local row = CreateFrame("Button", nil, f)
+        row:SetHeight(22)
+        row:SetPoint("TOPLEFT", 6, -6 - (g - 1) * 22)
+        row:SetPoint("TOPRIGHT", -6, -6 - (g - 1) * 22)
+        local fs = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        fs:SetPoint("LEFT", 2, 0)
+        fs:SetText("Group " .. g)
+        local hi = row:CreateTexture(nil, "HIGHLIGHT")
+        hi:SetAllPoints()
+        hi:SetTexture("Interface\\Buttons\\WHITE8X8")
+        hi:SetVertexColor(1, 1, 1, 0.12)
+        row.group = g
+        row.fs = fs
+        row:SetScript("OnClick", function(self)
+            if groupPickerTarget then
+                TryMoveGroup(groupPickerTarget, self.group)
+            end
+            HideGroupPicker()
+        end)
+        f.rows[g] = row
+    end
+
+    f:SetScript("OnHide", function()
+        groupPickerTarget = nil
+    end)
+    f:Hide()
+    groupPicker = f
+    return f
+end
+
+local function ShowGroupPicker(anchor, memberName, currentGroup)
+    if type(memberName) ~= "string" or memberName == "" then
+        return
+    end
+    local f = EnsureGroupPicker()
+    groupPickerTarget = memberName
+    for g, row in ipairs(f.rows) do
+        if g == currentGroup then
+            row.fs:SetTextColor(1, 0.82, 0.28)
+            row.fs:SetText("Group " .. g .. " (here)")
+        else
+            row.fs:SetTextColor(0.9, 0.9, 0.9)
+            row.fs:SetText("Group " .. g)
+        end
+    end
+    f:ClearAllPoints()
+    if anchor then
+        f:SetPoint("TOPRIGHT", anchor, "TOPLEFT", -4, 4)
     else
         f:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
     end
@@ -381,11 +719,11 @@ local function SetRoleButton(btn, role)
         end
     end
     if btn.bg then
-        btn.bg:SetTexture("Interface\Buttons\WHITE8X8")
+        btn.bg:SetTexture("Interface\\Buttons\\WHITE8X8")
         btn.bg:SetVertexColor(col[1] * 0.2, col[2] * 0.2, col[3] * 0.2, 0.95)
     end
     if btn.border then
-        btn.border:SetTexture("Interface\Buttons\WHITE8X8")
+        btn.border:SetTexture("Interface\\Buttons\\WHITE8X8")
         btn.border:SetVertexColor(col[1], col[2], col[3], 0.9)
     end
     if btn.letter then
@@ -407,17 +745,29 @@ local function EnsureCards(parent)
         card:SetSize(colW, cardH)
         card:SetPoint("TOPLEFT", parent, "TOPLEFT", 4 + col * (colW + 10), -36 - row * (cardH + 10))
 
+        -- DragonUI rock card when available, classic dialog fill otherwise
+        -- (no opaque overlays hiding either texture).
+        local bgPath = (AscensionLFM.Chrome and AscensionLFM.Chrome.BackgroundPath and AscensionLFM.Chrome.BackgroundPath())
+            or "Interface\\DialogFrame\\UI-DialogBox-Background"
         local bg = card:CreateTexture(nil, "BACKGROUND")
-        bg:SetAllPoints()
-        bg:SetTexture("Interface\\Buttons\\WHITE8X8")
-        bg:SetVertexColor(0.10, 0.09, 0.07, 0.92)
-
-        local edge = card:CreateTexture(nil, "BORDER")
-        edge:SetPoint("TOPLEFT", 0, 0)
-        edge:SetPoint("TOPRIGHT", 0, 0)
-        edge:SetHeight(2)
-        edge:SetTexture("Interface\\Buttons\\WHITE8X8")
-        edge:SetVertexColor(0.85, 0.68, 0.22, 0.7)
+        bg:SetPoint("TOPLEFT", 1, -1)
+        bg:SetPoint("BOTTOMRIGHT", -1, 1)
+        bg:SetTexture(bgPath)
+        bg:SetAlpha(0.94)
+        if card.SetBackdrop then
+            card:SetBackdrop({
+                bgFile = nil,
+                edgeFile = "Interface\\Buttons\\WHITE8X8",
+                edgeSize = 1,
+                insets = { left = 1, right = 1, top = 1, bottom = 1 },
+            })
+            if card.SetBackdropBorderColor then
+                card:SetBackdropBorderColor(0.85, 0.68, 0.22, 0.50)
+            end
+            if card.SetBackdropColor then
+                card:SetBackdropColor(0, 0, 0, 0)
+            end
+        end
 
         local title = card:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         title:SetPoint("TOPLEFT", 8, -6)
@@ -436,6 +786,22 @@ local function EnsureCards(parent)
             local rowF = CreateFrame("Frame", nil, card)
             rowF:SetSize(colW - 12, 24)
             rowF:SetPoint("TOPLEFT", 6, -26 - (i - 1) * 25)
+            rowF:EnableMouse(true)
+            rowF:SetScript("OnMouseDown", function(self, button)
+                if button == "LeftButton" and self.memberName then
+                    BeginDrag(self.memberName, self.memberGroup)
+                end
+            end)
+            -- Rows sit on top of their card and have their own mouse
+            -- events enabled (for drag-start above), so a release over a
+            -- row would otherwise never reach the card's OnMouseUp -
+            -- forward it to the same drop handling, using this row's own
+            -- group (g is this card's group index from the enclosing loop).
+            rowF:SetScript("OnMouseUp", function(self, button)
+                if button == "LeftButton" and dragging then
+                    EndDrag(g)
+                end
+            end)
 
             local roleBtn = CreateFrame("Button", nil, rowF)
             roleBtn:SetSize(22, 22)
@@ -475,20 +841,81 @@ local function EnsureCards(parent)
             end)
 
             local kickBtn = CreateFrame("Button", nil, rowF, "UIPanelButtonTemplate")
-            kickBtn:SetSize(26, 18)
+    if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(kickBtn) end
+            kickBtn:SetSize(24, 18)
             kickBtn:SetPoint("RIGHT", -2, 0)
             kickBtn:SetText("X")
             kickBtn:SetScript("OnClick", function(self)
-                if self.memberName then
-                    TryKick(self.memberName)
+                if not self.memberName then
+                    return
                 end
+                if IsShiftKeyDown and IsShiftKeyDown() then
+                    -- Kick + private permanent block in one step - the
+                    -- roster-side shortcut for the hall of shame
+                    -- (/alfm block does the same, this just saves typing
+                    -- the exact name while they're right there in front
+                    -- of you). Never posts anywhere, only affects your
+                    -- own future invites.
+                    if AscensionLFM.Reject and AscensionLFM.Reject.AddIgnore then
+                        AscensionLFM.Reject.AddIgnore(self.memberName)
+                        if AscensionLFM.Print then
+                            AscensionLFM.Print("Roster: blocked " .. self.memberName .. " (private) + kicking")
+                        end
+                    end
+                end
+                TryKick(self.memberName)
+            end)
+            kickBtn:SetScript("OnEnter", function(self)
+                if not self.memberName then return end
+                GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+                GameTooltip:AddLine(self.memberName)
+                GameTooltip:AddLine("Kick", 0.7, 0.7, 0.7)
+                GameTooltip:AddLine("Shift+Click: kick + block from future invites (private)", 0.7, 0.7, 0.7)
+                GameTooltip:Show()
+            end)
+            kickBtn:SetScript("OnLeave", function()
+                GameTooltip:Hide()
             end)
 
+            -- Move-to-group: opens the 1-8 picker anchored to this button,
+            -- same interaction pattern as the role picker.
+            local moveBtn = CreateFrame("Button", nil, rowF, "UIPanelButtonTemplate")
+    if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(moveBtn) end
+            moveBtn:SetSize(20, 18)
+            moveBtn:SetPoint("RIGHT", kickBtn, "LEFT", -2, 0)
+            moveBtn:SetText("\226\135\132") -- U+2194 arrows-left-right glyph via UTF-8 bytes
+            moveBtn:SetScript("OnClick", function(self)
+                if self.memberName then
+                    ShowGroupPicker(self, self.memberName, self.memberGroup)
+                end
+            end)
+            moveBtn:SetScript("OnEnter", function(self)
+                if not self.memberName then return end
+                GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+                GameTooltip:AddLine(self.memberName)
+                GameTooltip:AddLine("Click to move to another group", 0.7, 0.7, 0.7)
+                GameTooltip:Show()
+            end)
+            moveBtn:SetScript("OnLeave", function()
+                GameTooltip:Hide()
+            end)
+            -- Same drop-forwarding as the row itself (see rowF's OnMouseUp
+            -- above) - these small buttons sit on top of the row and would
+            -- otherwise swallow a release before it reaches anything else.
+            local function ForwardDrop(_, button)
+                if button == "LeftButton" and dragging then
+                    EndDrag(g)
+                end
+            end
+            roleBtn:HookScript("OnMouseUp", ForwardDrop)
+            kickBtn:HookScript("OnMouseUp", ForwardDrop)
+            moveBtn:HookScript("OnMouseUp", ForwardDrop)
+
             local lvlFS = rowF:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-            lvlFS:SetPoint("RIGHT", kickBtn, "LEFT", -6, 0)
-            lvlFS:SetWidth(26)
+            lvlFS:SetPoint("RIGHT", moveBtn, "LEFT", -4, 0)
+            lvlFS:SetWidth(22)
             lvlFS:SetJustifyH("RIGHT")
-            lvlFS:SetTextColor(0.7, 0.65, 0.5)
+            lvlFS:SetTextColor(0.85, 0.78, 0.58)
 
             local nameFS = rowF:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
             nameFS:SetPoint("LEFT", roleBtn, "RIGHT", 6, 0)
@@ -500,8 +927,15 @@ local function EnsureCards(parent)
             rowF.nameFS = nameFS
             rowF.lvlFS = lvlFS
             rowF.kickBtn = kickBtn
+            rowF.moveBtn = moveBtn
             card.rows[i] = rowF
         end
+        card:EnableMouse(true)
+        card:SetScript("OnMouseUp", function(self, button)
+            if button == "LeftButton" and dragging then
+                EndDrag(g)
+            end
+        end)
         groupCards[g] = card
     end
 end
@@ -520,6 +954,7 @@ function RosterPanel.Attach(parent)
     if summaryFS.SetWordWrap then summaryFS:SetWordWrap(false) end
 
     local rcBtn = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+    if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(rcBtn) end
     rcBtn:SetSize(70, 22)
     rcBtn:SetPoint("TOPRIGHT", -4, -4)
     rcBtn:SetText("Ready")
@@ -534,6 +969,10 @@ end
 
 function RosterPanel.Refresh()
     HideRolePicker()
+    HideGroupPicker()
+    if dragging then
+        EndDrag(nil)
+    end
     if not hostFrame then
         return
     end
@@ -575,8 +1014,12 @@ function RosterPanel.Refresh()
                 local m = list[i]
                 if m then
                     row:Show()
+                    row.memberName = m.name
+                    row.memberGroup = m.subgroup
                     row.roleBtn.memberName = m.name
                     row.kickBtn.memberName = m.name
+                    row.moveBtn.memberName = m.name
+                    row.moveBtn.memberGroup = m.subgroup
                     SetRoleButton(row.roleBtn, m.role)
                     local cc = CLASS_COLORS[string.upper(tostring(m.class or ""))] or { 0.85, 0.8, 0.7 }
                     if not m.online then
@@ -586,12 +1029,18 @@ function RosterPanel.Refresh()
                     row.nameFS:SetTextColor(cc[1], cc[2], cc[3])
                     row.lvlFS:SetText(m.level > 0 and tostring(m.level) or "")
                     row.kickBtn:Show()
+                    row.moveBtn:Show()
                 else
+                    row.memberName = nil
+                    row.memberGroup = nil
                     row.roleBtn.memberName = nil
                     row.kickBtn.memberName = nil
+                    row.moveBtn.memberName = nil
+                    row.moveBtn.memberGroup = nil
                     row.nameFS:SetText("")
                     row.lvlFS:SetText("")
                     row.kickBtn:Hide()
+                    row.moveBtn:Hide()
                     SetRoleButton(row.roleBtn, "")
                     if i == 1 and #list == 0 then
                         row:Show()
@@ -624,6 +1073,12 @@ function RosterPanel.Start()
         if pendingKickVerify then
             CheckPendingKick()
         end
+        if pendingMoveVerify then
+            CheckPendingMove()
+        end
+        if dragging then
+            UpdateDrag()
+        end
         self._t = (self._t or 0) + (elapsed or 0)
         if self._t < 2 then
             return
@@ -642,4 +1097,12 @@ RosterPanel.ROLE_ORDER = ROLE_ORDER
 RosterPanel._TryKick = TryKick
 RosterPanel._CheckPendingKick = CheckPendingKick
 RosterPanel._GetPendingKickVerify = function() return pendingKickVerify end
-RosterPanel._ResetForTests = function() pendingKickVerify = nil end
+RosterPanel._TryMoveGroup = TryMoveGroup
+RosterPanel._CheckPendingMove = CheckPendingMove
+RosterPanel._GetPendingMoveVerify = function() return pendingMoveVerify end
+RosterPanel._GetDragState = function() return dragging end
+RosterPanel._ResetForTests = function()
+    pendingKickVerify = nil
+    pendingMoveVerify = nil
+    dragging = nil
+end

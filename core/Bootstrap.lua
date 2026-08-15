@@ -8,7 +8,7 @@ if type(AscensionLFM) ~= "table" then
     _G.AscensionLFM = AscensionLFM
 end
 
-AscensionLFM.VERSION = "0.4.85"
+AscensionLFM.VERSION = "0.4.99c"
 AscensionLFM.ADDON_NAME = "AscensionLFM"
 
 local function Print(msg)
@@ -215,6 +215,56 @@ local function RegisterSlash()
                 AscensionLFM.SpecRole.ApplyToSelf()
             else
                 Print("SpecRole module missing")
+            end
+            return
+        end
+        if msg == "mark" then
+            if AscensionLFM.MiniHUD and AscensionLFM.MiniHUD.ActionAutoMark then
+                AscensionLFM.MiniHUD.ActionAutoMark()
+            else
+                Print("MiniHUD module missing")
+            end
+            return
+        end
+        local blockName, blockReason = msg:match("^block%s+(%S+)%s*(.-)$")
+        if blockName then
+            if not AscensionLFM.Reject or not AscensionLFM.Reject.AddIgnore then
+                Print("Reject module missing")
+                return
+            end
+            AscensionLFM.Reject.AddIgnore(blockName, blockReason ~= "" and blockReason or nil)
+            Print("Blocked " .. blockName .. (blockReason ~= "" and (" (" .. blockReason .. ")") or "")
+                .. " - no future invites, private to you")
+            return
+        end
+        local unblockName = msg:match("^unblock%s+(%S+)")
+        if unblockName then
+            if not AscensionLFM.Reject or not AscensionLFM.Reject.RemoveIgnore then
+                Print("Reject module missing")
+                return
+            end
+            AscensionLFM.Reject.RemoveIgnore(unblockName)
+            Print("Unblocked " .. unblockName)
+            return
+        end
+        if msg == "shame" then
+            if not AscensionLFM.Reject or not AscensionLFM.Reject.GetHallOfShame then
+                Print("Reject module missing")
+                return
+            end
+            local list = AscensionLFM.Reject.GetHallOfShame()
+            if #list == 0 then
+                Print("Hall of shame is empty")
+                return
+            end
+            Print("Hall of shame (" .. #list .. ", private to you):")
+            for _, entry in ipairs(list) do
+                local age = ""
+                if entry.addedAt and type(GetTime) == "function" then
+                    local days = math.floor((GetTime() - entry.addedAt) / 86400)
+                    age = days > 0 and (" - " .. days .. "d ago") or " - today"
+                end
+                Print("  " .. tostring(entry.name) .. (entry.reason and (": " .. entry.reason) or "") .. age)
             end
             return
         end

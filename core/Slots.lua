@@ -174,6 +174,27 @@ function Slots.GetAssigned(name)
     return assigned[key]
 end
 
+--- Ordered (oldest-assigned first) lowercase names currently slotted to a
+-- role. Used by RaidMarks so "Tank 1" deterministically means the tank
+-- assigned longest ago, not whatever order Lua's pairs() happens to give.
+-- assignedAt isn't persisted across reloads, so this only stays strictly
+-- ordered within one session - acceptable for a marker-assignment order.
+function Slots.GetNamesForRole(role)
+    local db = DB()
+    EnsureDBSlots(db)
+    local map = (db and db.assignedRoles) or assigned
+    local out = {}
+    for key, r in pairs(map) do
+        if r == role then
+            table.insert(out, key)
+        end
+    end
+    table.sort(out, function(a, b)
+        return (assignedAt[a] or 0) < (assignedAt[b] or 0)
+    end)
+    return out
+end
+
 --- Whether name was (re)assigned within the last graceSeconds. Used to
 -- protect a just-invited applicant's role from being pruned by a resync
 -- that races ahead of them actually appearing in the live roster -

@@ -63,3 +63,12 @@ AddOns list not applied. Fix:
 7. As a last resort, delete a possibly-corrupted saved-variables file (this resets all
    AscensionLFM settings back to defaults, but never touches your character):
      WTF/Account/<YourAccount>/SavedVariables/AscensionLFMDB.lua
+
+
+Chrome debug (pixel tuning)
+---------------------------
+/alfmchrome              MainWindow nineslice dump
+/alfmchrome hud          MiniHUD nineslice dump
+/alfmchromeref           DragonUI bag reference dump
+/alfmchromeside          Side-by-side bag vs main UI
+/alfmchromeprofile       Print size/offset profiles

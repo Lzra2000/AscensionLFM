@@ -344,6 +344,30 @@ function MiniHUD.ActionReadyCheck()
     return false, "no ready API"
 end
 
+--- Marks current tank/healer assignments with raid target icons
+-- (Skull/Cross for tanks, Square/Moon/Triangle for healers - see
+-- core/RaidMarks.lua). Clears existing markers first so a reassigned
+-- member doesn't keep a stale icon from an earlier mark pass.
+function MiniHUD.ActionAutoMark()
+    if not AscensionLFM.RaidMarks or type(AscensionLFM.RaidMarks.AutoMark) ~= "function" then
+        Print("Mark: RaidMarks module missing")
+        return false, "module missing"
+    end
+    AscensionLFM.RaidMarks.ClearAllMarks()
+    local marked, skipped, err = AscensionLFM.RaidMarks.AutoMark()
+    if err then
+        Print("Mark: " .. tostring(err))
+        return false, err
+    end
+    if marked == 0 and skipped == 0 then
+        Print("Mark: no tanks/healers assigned yet")
+        return true, 0
+    end
+    Print(string.format("Mark: %d marked%s", marked,
+        skipped > 0 and (", " .. skipped .. " skipped (not in raid?)") or ""))
+    return true, marked
+end
+
 function MiniHUD.ActionOpenSettings()
     if AscensionLFM.MainWindow and AscensionLFM.MainWindow.Toggle then
         local ok, err = pcall(AscensionLFM.MainWindow.Toggle)
@@ -561,6 +585,64 @@ local function PruneDisplayToRoster(db)
             db.regroupDisplay[key] = nil
         end
     end
+    if type(db.regroupSeenAt) == "table" then
+        for key in pairs(db.regroupSeenAt) do
+            if not keep[key] then
+                db.regroupSeenAt[key] = nil
+            end
+        end
+    end
+end
+
+-- How long a name stays on the regroup watch list without being seen
+-- present again. Long enough to survive a DC or a dinner break mid-raid,
+-- short enough that people from an unrelated earlier raid don't linger
+-- for days and get invited into today's group by mistake.
+local REGROUP_STALE_SECONDS = 6 * 3600
+
+--- Drops any regroupRoster entry not seen present within
+-- REGROUP_STALE_SECONDS. This is what keeps the watch list meaning
+-- "people who were actually in THIS raid" instead of an ever-growing
+-- history capped only by REGROUP_MAX slots.
+local function PruneStaleRegroup(db)
+    if not db or type(db.regroupRoster) ~= "table" then
+        return
+    end
+    if type(db.regroupSeenAt) ~= "table" then
+        db.regroupSeenAt = {}
+    end
+    local now = Now()
+    local kept = {}
+    for _, n in ipairs(db.regroupRoster) do
+        if type(n) == "string" and n ~= "" then
+            local seenAt = db.regroupSeenAt[LowerName(n)]
+            -- No timestamp (pre-upgrade entry) counts as stale rather than
+            -- immortal, so old SavedVariables data ages out too.
+            if type(seenAt) == "number" and (now - seenAt) <= REGROUP_STALE_SECONDS then
+                table.insert(kept, n)
+            end
+        end
+    end
+    db.regroupRoster = kept
+    PruneDisplayToRoster(db)
+end
+
+--- Regroup watch list should only ever hold people from the CURRENT
+-- group, not carry over from a previous one that happened to be within
+-- the staleness window. wasGrouped starts as nil (unknown - e.g. addon
+-- just loaded mid-raid) on purpose: a reload while already in an ongoing
+-- raid must NOT look like "just formed a new group" and wipe a list that
+-- may still matter for that same raid. Only an actually OBSERVED
+-- solo -> grouped transition during this session counts as "new group".
+local wasGrouped = nil
+
+local function IsCurrentlyGrouped()
+    local raid = (type(GetNumRaidMembers) == "function" and GetNumRaidMembers()) or 0
+    if raid and raid > 0 then
+        return true
+    end
+    local party = (type(GetNumPartyMembers) == "function" and GetNumPartyMembers()) or 0
+    return (party or 0) > 0
 end
 
 --- Snapshot current party/raid into the regroup watch list (survives leavers).
@@ -577,19 +659,38 @@ function MiniHUD.RememberPresent()
     if type(db.regroupDisplay) ~= "table" then
         db.regroupDisplay = {}
     end
+    if type(db.regroupSeenAt) ~= "table" then
+        db.regroupSeenAt = {}
+    end
+
+    local nowGrouped = IsCurrentlyGrouped()
+    if nowGrouped and wasGrouped == false then
+        -- Went solo -> grouped during this session: this is a brand new
+        -- group, so the watch list starts empty instead of dragging in
+        -- whoever happened to still be within the staleness window from
+        -- the last one.
+        db.regroupRoster = {}
+        db.regroupDisplay = {}
+        db.regroupSeenAt = {}
+        Print("Regroup: new group started, watch list reset")
+    end
+    wasGrouped = nowGrouped
+
     local list = db.regroupRoster
     local present = CollectPresentSet()
+    local now = Now()
     local n = 0
     for key, name in pairs(present) do
         local me = PlayerName()
         if not me or key ~= LowerName(me) then
             list = MiniHUD.RememberName(list, name, REGROUP_MAX)
             db.regroupDisplay[key] = name
+            db.regroupSeenAt[key] = now
             n = n + 1
         end
     end
     db.regroupRoster = list
-    PruneDisplayToRoster(db)
+    PruneStaleRegroup(db)
     return n
 end
 
@@ -608,17 +709,77 @@ function MiniHUD.RememberPlayer(name)
     if type(db.regroupDisplay) ~= "table" then
         db.regroupDisplay = {}
     end
+    if type(db.regroupSeenAt) ~= "table" then
+        db.regroupSeenAt = {}
+    end
     db.regroupRoster = MiniHUD.RememberName(db.regroupRoster, name, REGROUP_MAX)
     db.regroupDisplay[LowerName(name)] = name
-    PruneDisplayToRoster(db)
+    db.regroupSeenAt[LowerName(name)] = Now()
+    PruneStaleRegroup(db)
     return true
 end
 
+--- Uninvites every other raid/party member (never self). Used by
+-- ActionRegroup to fully tear the group down before re-inviting from a
+-- fresh snapshot, instead of leaving stale slots/subgroups behind.
+-- Returns the number of UninviteUnit calls that didn't error - same
+-- "no error != it worked" caveat as everywhere else this addon calls
+-- Uninvite/SetRaidSubgroup, so callers shouldn't treat this as a
+-- guaranteed-empty group, only as "the kick calls went out".
+
+local function DisbandGroup()
+    if type(UninviteUnit) ~= "function" then
+        return 0, "UninviteUnit missing"
+    end
+    local me = PlayerName()
+    local meKey = me and LowerName(me)
+    local targets = {}
+    local raid = (type(GetNumRaidMembers) == "function" and GetNumRaidMembers()) or 0
+    if raid and raid > 0 then
+        for i = 1, raid do
+            local name
+            if type(GetRaidRosterInfo) == "function" then
+                name = GetRaidRosterInfo(i)
+            end
+            if type(name) == "string" and name ~= "" and (not meKey or LowerName(name) ~= meKey) then
+                table.insert(targets, name)
+            end
+        end
+    else
+        local party = (type(GetNumPartyMembers) == "function" and GetNumPartyMembers()) or 0
+        for i = 1, party do
+            if type(UnitName) == "function" then
+                local name = UnitName("party" .. i)
+                if type(name) == "string" and name ~= "" then
+                    table.insert(targets, name)
+                end
+            end
+        end
+    end
+    local n = 0
+    for _, name in ipairs(targets) do
+        local ok = pcall(UninviteUnit, name)
+        if ok then
+            n = n + 1
+        end
+    end
+    return n
+end
+
+--- Full regroup: warn -> disband the whole current group -> re-invite
+-- everyone from a freshly pruned snapshot (people actually seen in THIS
+-- raid within REGROUP_STALE_SECONDS, not old names from an unrelated
+-- earlier raid). This is destructive on purpose - it kicks the entire
+-- group, including people currently present - so it only runs with
+-- lead/assist privilege, same gate as the old invite-only version.
 function MiniHUD.ActionRegroup()
     if RateBlocked("regroup") then
         Print("Regrp rate limited - wait a moment")
         return false, "rate limited"
     end
+    -- Snapshot BEFORE disbanding: this is the only chance to see who was
+    -- actually present this tick, and it also ages out stale entries
+    -- from earlier, unrelated raids (PruneStaleRegroup runs inside it).
     MiniHUD.RememberPresent()
     local db = DB()
     local msg = MiniHUD.BuildRegroupMessage(db and db.regroupAnnounceMessage)
@@ -640,52 +801,85 @@ function MiniHUD.ActionRegroup()
 
     local canInvite, invKind = CanInviteOthers()
     if not canInvite then
-        Print("Regroup: need lead/assist to re-invite (warn still sent if above OK)")
+        Print("Regroup: need lead/assist to disband/re-invite (warn still sent if above OK)")
         if ok then
             return true, 0
         end
         return false, "no invite privilege"
     end
 
-    local present = CollectPresentSet()
-    local presentSet = {}
-    for k, _ in pairs(present) do
-        presentSet[k] = true
-    end
     local roster = (db and db.regroupRoster) or {}
     local display = (db and db.regroupDisplay) or {}
-    local missing = MiniHUD.SelectMissing(roster, presentSet, PlayerName(), REGROUP_INVITE_CAP)
-    local invited = 0
-    local failed = 0
-    for _, name in ipairs(missing) do
-        local inviteName = display[LowerName(name)] or name
-        local success, err = pcall(InviteUnit, inviteName)
+    if #roster == 0 then
+        Print("Regroup: watch list empty - group up first so names are remembered")
+        return ok, 0
+    end
+
+    local kicked = DisbandGroup()
+    if kicked > 0 then
+        Print("Regroup: disbanded " .. tostring(kicked) .. " member(s), re-inviting fresh...")
+    end
+
+    -- Group is (meant to be) empty now, so everyone on the fresh roster
+    -- gets invited fresh - no "already present" filtering needed like the
+    -- old invite-only flow had.
+    --
+    -- IMPORTANT: this whole block must run synchronously, inside this
+    -- same click handler - InviteUnit/UninviteUnit/ConvertToRaid are
+    -- protected-adjacent APIs that WoW's secure-execution model only
+    -- allows when called directly in response to a real hardware event.
+    -- An earlier version of this paced re-invites out one per MiniHUD
+    -- ticker tick; that got blocked in practice ("prevented the call of
+    -- the secure function 'UNKNOWN()'") because OnUpdate isn't a hardware
+    -- event. Raw InviteUnit (not Invite.InvitePlayer) is used here on
+    -- purpose too - InvitePlayer's per-name/global cooldown exists to
+    -- stop invite spam from chat parsing, not to throttle a deliberate
+    -- one-off admin bulk-reinvite, and pacing it out to respect that
+    -- cooldown is exactly what broke the secure-call requirement above.
+    --
+    -- Explicitly convert to raid BEFORE inviting if the fresh roster needs
+    -- raid-scale capacity: DisbandGroup() just dropped the group back to
+    -- solo, and InviteUnit from solo only ever forms a plain 5-person
+    -- party. Without this, invite #5+ would silently fail to join at all.
+    local cap = REGROUP_INVITE_CAP
+    local toInvite = {}
+    local meKey = LowerName(PlayerName() or "")
+    for i, name in ipairs(roster) do
+        if #toInvite >= cap then
+            break
+        end
+        -- Defensive: never invite yourself, even if the persisted roster
+        -- somehow contains your own name (RememberPresent won't add it,
+        -- but old SavedVariables data or a manual edit could).
+        if meKey == "" or LowerName(name) ~= meKey then
+            table.insert(toInvite, display[LowerName(name)] or name)
+        end
+    end
+    if #toInvite > 4 and type(GetNumRaidMembers) == "function"
+        and (GetNumRaidMembers() or 0) == 0 and type(ConvertToRaid) == "function" then
+        pcall(ConvertToRaid)
+    end
+
+    local invited, failed = 0, 0
+    for _, inviteName in ipairs(toInvite) do
+        local success = pcall(InviteUnit, inviteName)
         if success then
             invited = invited + 1
         else
             failed = failed + 1
-            if err then
-                Print("Regroup invite failed: " .. tostring(inviteName) .. " (" .. tostring(err) .. ")")
-            end
         end
     end
+
     if invited > 0 then
-        Print(string.format("Regroup invites: %d (privilege=%s)", invited, tostring(invKind)))
+        Print(string.format("Regroup: re-invited %d (privilege=%s)%s", invited, tostring(invKind),
+            #roster > cap and (" - " .. tostring(#roster - cap) .. " more queued, click Regroup again") or ""))
         if AscensionLFM.Activity and AscensionLFM.Activity.Push then
-            AscensionLFM.Activity.Push("regroup", "invited " .. tostring(invited))
+            AscensionLFM.Activity.Push("regroup", "disbanded+invited " .. tostring(invited))
         end
-    elseif #missing == 0 then
-        local watch = (db and type(db.regroupRoster) == "table" and #db.regroupRoster) or 0
-        if watch == 0 then
-            Print("Regroup: watch list empty - group up first so names are remembered")
-        else
-            Print("Regroup: everyone on the watch list is already here")
-        end
-    elseif failed > 0 and invited == 0 then
-        return false, "invites failed"
+    elseif failed > 0 then
+        Print("Regroup: all re-invites failed")
     end
-    -- Success if warn worked and/or at least one invite went out, or nothing to do.
-    if ok or invited > 0 or #missing == 0 then
+    if ok or invited > 0 then
         return true, invited
     end
     return false, tostring(ch or "warn failed")
@@ -872,6 +1066,7 @@ end
 
 local function MakeBtn(parent, label, width, onClick, danger)
     local btn = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+    if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(btn) end
     btn:SetSize(width or 40, 20)
     btn:SetText(label)
     btn:SetScript("OnClick", function()
@@ -921,92 +1116,12 @@ local function BuildFrame()
         SavePosition()
     end)
 
-    local bg = f:CreateTexture(nil, "BACKGROUND")
-    bg:SetAllPoints(f)
-    -- Real DragonUI asset, referenced by full path since AscensionLFM is
-    -- a separate addon (no Lua-level dependency on DragonUI's own code
-    -- having run - just needs the texture file to exist on disk, which
-    -- is more robust across addon load order than calling into
-    -- DragonUI's exposed _G.DragonUI table would be). Same texture path
-    -- confirmed this session for DragonUI's own bag/bank windows and the
-    -- TradeSkillFrame/SpellBookFrame reskins.
-    bg:SetTexture("Interface\\AddOns\\DragonUI\\Textures\\UI\\ui-background-rock")
-    bg:SetAlpha(0.97)
-
-    -- Real DragonUI metal nineslice border, compact profile (matches
-    -- DragonUI's own bags_skin.lua "compact" sizing - topSize/topHeight
-    -- 52, bottomSize 24 - more proportionate to this HUD's small size
-    -- than the full 75/75/32 profile used on bags/character panel/
-    -- TradeSkillFrame/SpellBookFrame).
-    local DUI_METAL = "Interface\\AddOns\\DragonUI\\Textures\\UI\\uiframemetal2x"
-    local DUI_METAL_H = "Interface\\AddOns\\DragonUI\\Textures\\UI\\uiframemetalhorizontal2x"
-    local DUI_METAL_V = "Interface\\AddOns\\DragonUI\\Textures\\UI\\uiframemetalvertical2x"
-
-    local function ConfigureTexture(texture, path, width, height, left, right, top, bottom)
-        texture:SetTexture(path)
-        texture:SetSize(width, height)
-        texture:SetTexCoord(left, right, top, bottom)
-    end
-
-    -- Real DragonUI metal nineslice border, scaled down further than
-    -- even DragonUI's own "compact" profile (52/52/24, tuned for taller
-    -- windows like the character panel) - this HUD is only 86px tall,
-    -- so 52px-tall corners would take up more than half that height and
-    -- risk the top/bottom corners visually overlapping. Roughly the
-    -- same proportion the full profile (75px corners on a ~450px-tall
-    -- bag window) keeps, applied to this frame's actual height instead.
-    local topSize, topHeight, bottomSize = 30, 30, 16
-    local topY, bottomY = 7, -1
-    local leftOffset, rightOffset = -6, 2
-
-    local chromeTopLeft = f:CreateTexture(nil, "OVERLAY")
-    ConfigureTexture(chromeTopLeft, DUI_METAL, topSize, topHeight, 0.00195312, 0.294922, 0.00195312, 0.294922)
-    chromeTopLeft:SetPoint("TOPLEFT", f, "TOPLEFT", leftOffset, topY)
-
-    local chromeTopRight = f:CreateTexture(nil, "OVERLAY")
-    ConfigureTexture(chromeTopRight, DUI_METAL, topSize, topHeight, 0.298828, 0.591797, 0.00195312, 0.294922)
-    chromeTopRight:SetPoint("TOPRIGHT", f, "TOPRIGHT", rightOffset, topY)
-
-    local chromeBottomLeft = f:CreateTexture(nil, "OVERLAY")
-    ConfigureTexture(chromeBottomLeft, DUI_METAL, bottomSize, bottomSize, 0.298828, 0.423828, 0.298828, 0.423828)
-    chromeBottomLeft:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", leftOffset, bottomY)
-
-    local chromeBottomRight = f:CreateTexture(nil, "OVERLAY")
-    ConfigureTexture(chromeBottomRight, DUI_METAL, bottomSize, bottomSize, 0.427734, 0.552734, 0.298828, 0.423828)
-    chromeBottomRight:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", rightOffset, bottomY)
-
-    local chromeTop = f:CreateTexture(nil, "OVERLAY")
-    ConfigureTexture(chromeTop, DUI_METAL_H, 32, topHeight, 0, 1, 0.00390625, 0.589844)
-    chromeTop:SetPoint("TOPLEFT", chromeTopLeft, "TOPRIGHT")
-    chromeTop:SetPoint("TOPRIGHT", chromeTopRight, "TOPLEFT")
-
-    local chromeBottom = f:CreateTexture(nil, "OVERLAY")
-    ConfigureTexture(chromeBottom, DUI_METAL_H, 16, bottomSize, 0, 0.5, 0.597656, 0.847656)
-    chromeBottom:SetPoint("TOPLEFT", chromeBottomLeft, "TOPRIGHT")
-    chromeBottom:SetPoint("TOPRIGHT", chromeBottomRight, "TOPLEFT")
-
-    local chromeLeft = f:CreateTexture(nil, "OVERLAY")
-    ConfigureTexture(chromeLeft, DUI_METAL_V, topSize, 16, 0.00195312, 0.294922, 0, 1)
-    chromeLeft:SetPoint("TOPLEFT", chromeTopLeft, "BOTTOMLEFT")
-    chromeLeft:SetPoint("BOTTOMLEFT", chromeBottomLeft, "TOPLEFT")
-
-    local chromeRight = f:CreateTexture(nil, "OVERLAY")
-    ConfigureTexture(chromeRight, DUI_METAL_V, topSize, 16, 0.298828, 0.591797, 0, 1)
-    chromeRight:SetPoint("TOPRIGHT", chromeTopRight, "BOTTOMRIGHT")
-    chromeRight:SetPoint("BOTTOMRIGHT", chromeBottomRight, "TOPRIGHT")
-
-    -- Stored so SetExpanded() can hide these when collapsed: the
-    -- collapsed HUD actually resizes the frame to 56x28 (not just
-    -- hides child content), and these are fixed-size textures (30x30
-    -- corners etc.) that don't auto-shrink with the frame - left
-    -- visible at that size they'd be wider than the whole collapsed
-    -- HUD. The background texture isn't in this list: it's anchored
-    -- via two stretched points (TOPLEFT+BOTTOMRIGHT), so it already
-    -- auto-adjusts to whatever size the frame becomes.
-    f.chromeBorderPieces = {
-        chromeTopLeft, chromeTopRight, chromeBottomLeft, chromeBottomRight,
-        chromeTop, chromeBottom, chromeLeft, chromeRight,
-    }
+    -- DragonUI chrome via shared helper (ui/Chrome.lua). Compact profile
+    -- scaled for this HUD's ~86px height. chromeBorderPieces is stored so
+    -- SetExpanded() can hide the fixed-size border textures on collapse
+    -- (collapsed frame is 56x28; 30x30 corners would overflow).
+    local borderPieces = AscensionLFM.Chrome and AscensionLFM.Chrome.ApplyMetalChrome(f, "compact")
+    f.chromeBorderPieces = borderPieces or {}
 
     local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     title:SetPoint("TOPLEFT", 8, -6)
@@ -1017,7 +1132,7 @@ local function BuildFrame()
     local chip = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     chip:SetPoint("LEFT", title, "RIGHT", 8, 0)
     chip:SetText("HOST")
-    chip:SetTextColor(0.85, 0.75, 0.4)
+    chip:SetTextColor(0.92, 0.84, 0.50)
     f.chipFS = chip
 
     -- Collapsed-state icon (raid-leader crown, Interface\GroupFrame\
@@ -1045,6 +1160,7 @@ local function BuildFrame()
     end)
 
     local collapse = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+    if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(collapse) end
     collapse:SetSize(20, 18)
     collapse:SetPoint("TOPRIGHT", -4, -4)
     collapse:SetText("x")
@@ -1131,6 +1247,11 @@ local function BuildFrame()
     end)
     place(buttons.ready)
 
+    buttons.mark = MakeBtn(f, "Mark", 44, function()
+        return MiniHUD.ActionAutoMark()
+    end)
+    place(buttons.mark)
+
     statusFS = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     -- Pushed further in than the original 8px: the DragonUI bottom
     -- corner chrome pieces (16x16, positioned slightly outside the
@@ -1144,7 +1265,7 @@ local function BuildFrame()
     if statusFS.SetHeight then statusFS:SetHeight(16) end
     if statusFS.SetWordWrap then statusFS:SetWordWrap(false) end
     statusFS:SetText("T-/H-/A-/D-")
-    statusFS:SetTextColor(0.65, 0.58, 0.4)
+    statusFS:SetTextColor(0.85, 0.78, 0.55)
 
     frame = f
     ApplyPosition()
@@ -1235,6 +1356,10 @@ function MiniHUD.IsShown()
     return frame and frame:IsShown() and true or false
 end
 
+function MiniHUD.GetFrame()
+    return frame
+end
+
 function MiniHUD.Ensure()
     if frame then
         MiniHUD.Refresh()
@@ -1292,42 +1417,16 @@ MiniHUD._SendGroupAnnounce = SendGroupAnnounce
 MiniHUD._CanInviteOthers = CanInviteOthers
 MiniHUD._SetExpanded = SetExpanded
 MiniHUD._GetFrame = function() return frame end
+MiniHUD._IsCurrentlyGrouped = IsCurrentlyGrouped
+MiniHUD._ResetGroupTrackingForTests = function() wasGrouped = nil end
 
 -- ============================================================================
 -- Diagnostic: /alfmhuddebug
 -- ============================================================================
--- Same generalized approach as DragonUI's own RealChrome.Debug
--- (chrome_shared.lua, this session) - reports texcoords and identifies
--- known DragonUI atlas pieces by matching them, rather than just
--- dumping raw sizes/positions. Duplicated here (not shared) since
--- AscensionLFM is a separate addon from DragonUI with no Lua-level
--- access to DragonUI's own module table.
-local KNOWN_PIECES = {
-    ["Interface\\AddOns\\DragonUI\\Textures\\UI\\uiframemetal2x"] = {
-        { "topLeft (uiframemetal2x)", 0.00195312, 0.294922, 0.00195312, 0.294922 },
-        { "topRight (uiframemetal2x)", 0.298828, 0.591797, 0.00195312, 0.294922 },
-        { "bottomLeft (uiframemetal2x)", 0.298828, 0.423828, 0.298828, 0.423828 },
-        { "bottomRight (uiframemetal2x)", 0.427734, 0.552734, 0.298828, 0.423828 },
-    },
-    ["Interface\\AddOns\\DragonUI\\Textures\\UI\\uiframemetalhorizontal2x"] = {
-        { "top edge (uiframemetalhorizontal2x)", 0, 1, 0.00390625, 0.589844 },
-        { "bottom edge (uiframemetalhorizontal2x)", 0, 0.5, 0.597656, 0.847656 },
-    },
-    ["Interface\\AddOns\\DragonUI\\Textures\\UI\\uiframemetalvertical2x"] = {
-        { "left edge (uiframemetalvertical2x)", 0.00195312, 0.294922, 0, 1 },
-        { "right edge (uiframemetalvertical2x)", 0.298828, 0.591797, 0, 1 },
-    },
-}
-
+-- Atlas identification lives in ui/Chrome.lua (shared with MainWindow).
 local function IdentifyPiece(tex, left, right, top, bottom)
-    local candidates = tex and KNOWN_PIECES[tex]
-    if not candidates or not left then return nil end
-    local EPS = 0.001
-    for _, piece in ipairs(candidates) do
-        if math.abs(left - piece[2]) < EPS and math.abs(right - piece[3]) < EPS
-            and math.abs(top - piece[4]) < EPS and math.abs(bottom - piece[5]) < EPS then
-            return piece[1]
-        end
+    if AscensionLFM.Chrome and AscensionLFM.Chrome.IdentifyPiece then
+        return AscensionLFM.Chrome.IdentifyPiece(tex, left, right, top, bottom)
     end
     return nil
 end

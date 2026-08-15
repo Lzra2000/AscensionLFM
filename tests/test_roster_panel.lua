@@ -24,6 +24,7 @@ _G.CreateFrame = function() error("RosterPanel tests are data-only - should neve
 
 dofile("core/Database.lua")
 dofile("core/Slots.lua")
+dofile("ui/Chrome.lua")
 dofile("ui/RosterPanel.lua")
 
 local AscensionLFM = _G.AscensionLFM

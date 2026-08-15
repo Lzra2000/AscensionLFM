@@ -79,6 +79,7 @@ local DEFAULTS = {
     messageRouting = {},
     regroupRoster = {}, -- display names remembered for regroup re-invite
     regroupDisplay = {}, -- [nameLower] = displayName for InviteUnit casing
+    regroupSeenAt = {}, -- [nameLower] = GetTime() last seen present; ages out old raids
     -- Mini Quick HUD (floating bar - no /alfm needed)
     miniHudShow = true,
     miniHudExpanded = true,
@@ -100,6 +101,7 @@ local DEFAULTS = {
     },
     rejectCooldown = 30,
     rejectIgnoreList = {}, -- [nameLower] = true
+    hallOfShame = {}, -- [nameLower] = { name=, reason=, addedAt= } - private, never posted anywhere
     rejectSessionIgnore = true, -- after one reject, skip further auto re-whispers this session
     -- Sounds (opt-in)
     soundOnMatch = false,
