@@ -766,12 +766,18 @@ local function DisbandGroup()
     return n
 end
 
+local REGROUP_CONFIRM_WINDOW = 6 -- seconds to click again to confirm
+local regroupConfirmArmedAt = nil
+
 --- Full regroup: warn -> disband the whole current group -> re-invite
 -- everyone from a freshly pruned snapshot (people actually seen in THIS
 -- raid within REGROUP_STALE_SECONDS, not old names from an unrelated
--- earlier raid). This is destructive on purpose - it kicks the entire
--- group, including people currently present - so it only runs with
--- lead/assist privilege, same gate as the old invite-only version.
+-- earlier raid). This is destructive - it kicks the entire group,
+-- including people currently present - so it requires two clicks: the
+-- first prints exactly what would happen and arms a confirm window, the
+-- second (within REGROUP_CONFIRM_WINDOW seconds) actually does it. Only
+-- the confirmed click sends the warning, disbands, or invites - a single
+-- misclick on the button no longer kicks the raid.
 function MiniHUD.ActionRegroup()
     if RateBlocked("regroup") then
         Print("Regrp rate limited - wait a moment")
@@ -782,6 +788,59 @@ function MiniHUD.ActionRegroup()
     -- from earlier, unrelated raids (PruneStaleRegroup runs inside it).
     MiniHUD.RememberPresent()
     local db = DB()
+    local roster = (db and db.regroupRoster) or {}
+    local display = (db and db.regroupDisplay) or {}
+
+    local canInvite, invKind = CanInviteOthers()
+    if not canInvite then
+        -- No disband/invite to gate behind a confirm - this click can
+        -- only ever warn, so just send it, same as before the confirm
+        -- step existed. Someone with raid-warn but not assign/invite
+        -- rights can still rally the raid to regroup manually.
+        regroupConfirmArmedAt = nil
+        local msg = MiniHUD.BuildRegroupMessage(db and db.regroupAnnounceMessage)
+        local ok, ch = SendGroupAnnounce(msg, "regroup")
+        if ok then
+            RateStamp("regroup")
+            Print("Regroup -> " .. tostring(ch) .. ": " .. msg)
+            if AscensionLFM.Activity and AscensionLFM.Activity.Push then
+                AscensionLFM.Activity.Push("regroup", msg)
+            end
+        else
+            Print("Regroup warn failed: " .. tostring(ch))
+        end
+        Print("Regroup: need lead/assist to disband/re-invite (warn still sent)")
+        if ok then
+            return true, 0
+        end
+        return false, "no invite privilege"
+    end
+    if #roster == 0 then
+        Print("Regroup: watch list empty - group up first so names are remembered")
+        regroupConfirmArmedAt = nil
+        return true, 0
+    end
+
+    local now = Now()
+    local isConfirming = regroupConfirmArmedAt and (now - regroupConfirmArmedAt) < REGROUP_CONFIRM_WINDOW
+    if not isConfirming then
+        regroupConfirmArmedAt = now
+        local meKey = LowerName(PlayerName() or "")
+        local n = 0
+        for _, name in ipairs(roster) do
+            if meKey == "" or LowerName(name) ~= meKey then
+                n = n + 1
+            end
+        end
+        n = math.min(n, REGROUP_INVITE_CAP)
+        Print(string.format(
+            "Regroup: will disband the group and re-invite %d - click Regrp again within %ds to confirm",
+            n, REGROUP_CONFIRM_WINDOW))
+        return true, 0
+    end
+    regroupConfirmArmedAt = nil
+
+    -- Confirmed: warn, then disband + re-invite.
     local msg = MiniHUD.BuildRegroupMessage(db and db.regroupAnnounceMessage)
     local ok, ch = SendGroupAnnounce(msg, "regroup")
     if ok then
@@ -797,22 +856,6 @@ function MiniHUD.ActionRegroup()
     if type(InviteUnit) ~= "function" then
         Print("Regroup: InviteUnit missing")
         return false, "InviteUnit missing"
-    end
-
-    local canInvite, invKind = CanInviteOthers()
-    if not canInvite then
-        Print("Regroup: need lead/assist to disband/re-invite (warn still sent if above OK)")
-        if ok then
-            return true, 0
-        end
-        return false, "no invite privilege"
-    end
-
-    local roster = (db and db.regroupRoster) or {}
-    local display = (db and db.regroupDisplay) or {}
-    if #roster == 0 then
-        Print("Regroup: watch list empty - group up first so names are remembered")
-        return ok, 0
     end
 
     local kicked = DisbandGroup()
@@ -1064,7 +1107,7 @@ local function SetExpanded(on)
     MiniHUD.Refresh()
 end
 
-local function MakeBtn(parent, label, width, onClick, danger)
+local function MakeBtn(parent, label, width, onClick, danger, tooltipFn)
     local btn = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
     if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(btn) end
     btn:SetSize(width or 40, 20)
@@ -1092,6 +1135,26 @@ local function MakeBtn(parent, label, width, onClick, danger)
         if fs and fs.SetTextColor then
             fs:SetTextColor(1, 0.55, 0.45)
         end
+    end
+    if type(tooltipFn) == "function" then
+        btn:SetScript("OnEnter", function(self)
+            if not GameTooltip then return end
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            local ok, lines = pcall(tooltipFn)
+            if ok and type(lines) == "table" then
+                for i, line in ipairs(lines) do
+                    if i == 1 then
+                        GameTooltip:SetText(line, 1, 0.82, 0.24)
+                    else
+                        GameTooltip:AddLine(line, 0.85, 0.8, 0.7, true)
+                    end
+                end
+            end
+            GameTooltip:Show()
+        end)
+        btn:SetScript("OnLeave", function()
+            if GameTooltip then GameTooltip:Hide() end
+        end)
     end
     return btn
 end
@@ -1212,6 +1275,15 @@ local function BuildFrame()
 
     buttons.regrp = MakeBtn(f, "Regrp", 52, function()
         return MiniHUD.ActionRegroup()
+    end, false, function()
+        local db = DB()
+        local roster = (db and db.regroupRoster) or {}
+        return {
+            "Regroup",
+            "Disbands the whole group and re-invites everyone on the watch list ("
+                .. #roster .. " remembered).",
+            "Click twice within " .. REGROUP_CONFIRM_WINDOW .. "s to confirm - the first click only previews it.",
+        }
     end)
     place(buttons.regrp)
 
@@ -1382,6 +1454,7 @@ end
 function MiniHUD._ResetForTests()
     lastAnnounceAt = {}
     expanded = true
+    regroupConfirmArmedAt = nil
 end
 
 --- Live debug snapshot for /alfm status (and tests).

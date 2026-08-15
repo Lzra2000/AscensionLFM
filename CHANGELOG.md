@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.4.100
+
+- **Regroup now requires confirmation before it disbands anything.** A
+  single click on Regrp previously kicked the entire group instantly on a
+  misclick. First click now only previews what would happen ("will
+  disband the group and re-invite N - click again within 6s to confirm")
+  and arms a 6-second window; only the second click actually warns,
+  disbands, and re-invites. Someone with raid-warn but not assign/invite
+  rights can still send the warning on a single click (nothing destructive
+  to gate for them).
+- Regrp button now has a tooltip explaining exactly what it does and how
+  many people are currently on the watch list.
+- `MakeBtn` (MiniHUD's button helper) gained optional tooltip support,
+  reusable for future buttons.
+
 ## 0.4.99c
 
 - **New: private "hall of shame" blocklist**, built on the existing

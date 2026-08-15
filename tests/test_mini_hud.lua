@@ -191,10 +191,30 @@ AscensionLFM.Database.Get().regroupRoster = { "Alice", "Bob", "Host" }
 -- RememberPresent/RememberPlayer, so mirror that here instead of
 -- seeding regroupRoster directly with no timestamp.
 AscensionLFM.Database.Get().regroupSeenAt = { alice = 1000, bob = 1000, host = 1000 }
-local ok2, nInv = MiniHUD.ActionRegroup()
+AscensionLFM.Database.Get().regroupSeenAt = { alice = 1000, bob = 1000, host = 1000 }
+MiniHUD.ActionRegroup() -- first click: preview only, arms the confirm window
+local ok2, nInv = MiniHUD.ActionRegroup() -- second click: confirmed, actually runs
 check("regroup ok", ok2 == true, tostring(ok2))
 check("regroup announced", _G._chats[1] and tostring(_G._chats[1].msg):find("REGROUP", 1, true) ~= nil)
 check("regroup invited missing", #invited == 2, table.concat(invited, ","))
+
+-- Regression: a single click must never disband/invite by itself - only
+-- preview + arm the confirm window. This is the actual point of the
+-- confirm step (a misclick on Regrp used to kick the whole raid instantly).
+MiniHUD._ResetForTests()
+_G._chats = {}
+local invited3 = {}
+_G.InviteUnit = function(name) table.insert(invited3, name) end
+local uninvited3 = {}
+_G.UninviteUnit = function(name) table.insert(uninvited3, name) end
+AscensionLFM.Database.Get().regroupRoster = { "Alice", "Bob", "Host" }
+AscensionLFM.Database.Get().regroupSeenAt = { alice = 1000, bob = 1000, host = 1000 }
+MiniHUD.ActionRegroup() -- single click only
+check("single click sends no warn", #_G._chats == 0, tostring(#_G._chats))
+check("single click disbands nobody", #uninvited3 == 0, tostring(#uninvited3))
+check("single click invites nobody", #invited3 == 0, tostring(#invited3))
+MiniHUD.ActionRegroup() -- confirm click
+check("confirm click actually invites", #invited3 == 2, table.concat(invited3, ","))
 
 -- Regression: after a full disband (see 0.4.99's ActionRegroup rewrite),
 -- the group is back to solo - re-inviting past 4 people must explicitly
@@ -217,7 +237,8 @@ end
 local db = AscensionLFM.Database.Get()
 db.regroupRoster = { "Alice", "Bob", "Carol", "Dave", "Eve" }
 db.regroupSeenAt = { alice = 1000, bob = 1000, carol = 1000, dave = 1000, eve = 1000 }
-MiniHUD.ActionRegroup()
+MiniHUD.ActionRegroup() -- preview click
+MiniHUD.ActionRegroup() -- confirm click
 check("regroup converts to raid past 5", convertCalled == true)
 check("regroup invites all 5 after conversion", #invited2 == 5, table.concat(invited2, ","))
 
