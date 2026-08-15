@@ -110,6 +110,21 @@ local function check(name, cond, detail)
     end
 end
 
+--- Regroup fires each invite REGROUP_INVITE_ATTEMPTS times (retry burst,
+-- see 0.4.101), so raw call-list length is an implementation detail -
+-- count distinct names actually targeted instead.
+local function uniqueCount(list)
+    local seen, n = {}, 0
+    for _, v in ipairs(list) do
+        local key = tostring(v):lower()
+        if not seen[key] then
+            seen[key] = true
+            n = n + 1
+        end
+    end
+    return n
+end
+
 check("need tank", MiniHUD.BuildNeedMessage("tank") == "LFM MS need Tank")
 check("need healer", MiniHUD.BuildNeedMessage("healer") == "LFM MS need Healer")
 check("need aura", MiniHUD.BuildNeedMessage("aura") == "LFM MS need Aura")
@@ -196,7 +211,8 @@ MiniHUD.ActionRegroup() -- first click: preview only, arms the confirm window
 local ok2, nInv = MiniHUD.ActionRegroup() -- second click: confirmed, actually runs
 check("regroup ok", ok2 == true, tostring(ok2))
 check("regroup announced", _G._chats[1] and tostring(_G._chats[1].msg):find("REGROUP", 1, true) ~= nil)
-check("regroup invited missing", #invited == 2, table.concat(invited, ","))
+check("regroup invited missing", uniqueCount(invited) == 2, table.concat(invited, ","))
+check("regroup retries each invite", #invited == 2 * MiniHUD.REGROUP_INVITE_ATTEMPTS, tostring(#invited))
 
 -- Regression: a single click must never disband/invite by itself - only
 -- preview + arm the confirm window. This is the actual point of the
@@ -214,7 +230,7 @@ check("single click sends no warn", #_G._chats == 0, tostring(#_G._chats))
 check("single click disbands nobody", #uninvited3 == 0, tostring(#uninvited3))
 check("single click invites nobody", #invited3 == 0, tostring(#invited3))
 MiniHUD.ActionRegroup() -- confirm click
-check("confirm click actually invites", #invited3 == 2, table.concat(invited3, ","))
+check("confirm click actually invites", uniqueCount(invited3) == 2, table.concat(invited3, ","))
 
 -- Regression: after a full disband (see 0.4.99's ActionRegroup rewrite),
 -- the group is back to solo - re-inviting past 4 people must explicitly
@@ -240,7 +256,7 @@ db.regroupSeenAt = { alice = 1000, bob = 1000, carol = 1000, dave = 1000, eve = 
 MiniHUD.ActionRegroup() -- preview click
 MiniHUD.ActionRegroup() -- confirm click
 check("regroup converts to raid past 5", convertCalled == true)
-check("regroup invites all 5 after conversion", #invited2 == 5, table.concat(invited2, ","))
+check("regroup invites all 5 after conversion", uniqueCount(invited2) == 5, table.concat(invited2, ","))
 
 -- Shared rate limit must not block different actions
 MiniHUD._ResetForTests()

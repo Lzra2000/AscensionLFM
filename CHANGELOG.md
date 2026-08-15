@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.101
+
+- **Regroup re-invites now retry.** Each person on the confirmed re-invite
+  list gets `InviteUnit` fired 10 times back-to-back (still all inside the
+  same confirmed click - no delay between attempts, since spreading them
+  out over time would need a timer/OnUpdate and re-trigger the secure-call
+  block from 0.4.99b). Covers the occasional invite that just doesn't land
+  (brief connectivity hiccup) without needing a second manual click.
+
 ## 0.4.100
 
 - **Regroup now requires confirmation before it disbands anything.** A

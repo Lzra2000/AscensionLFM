@@ -19,6 +19,11 @@ local ANNOUNCE_GAP = 2
 local RW_ANNOUNCE_GAP = 15 -- Role Check re-warn; was 2s and got spam-clicked mid-run
 local REGROUP_MAX = 40
 local REGROUP_INVITE_CAP = 15
+-- Each re-invite is fired this many times back-to-back (see the comment
+-- at the call site) instead of once, since an invite occasionally just
+-- doesn't land (brief connectivity hiccup, server hiccup) and a single
+-- shot has no way to notice or retry once the synchronous click is over.
+local REGROUP_INVITE_ATTEMPTS = 10
 
 local frame
 local expanded = true
@@ -904,9 +909,24 @@ function MiniHUD.ActionRegroup()
     end
 
     local invited, failed = 0, 0
+    -- Fire each invite REGROUP_INVITE_ATTEMPTS times back-to-back, all
+    -- still synchronously inside this same click - a spread-out retry
+    -- (waiting between attempts to see if the first landed) would need a
+    -- timer/OnUpdate, which is exactly what triggered the "prevented the
+    -- call of the secure function" block earlier this session. A tight
+    -- burst has no such delay, so it stays inside WoW's requirement that
+    -- these calls happen synchronously in the click's call stack.
+    -- InviteUnit on someone already-invited just re-sends/refreshes their
+    -- popup, so repeating it is harmless, not spammy toward them.
     for _, inviteName in ipairs(toInvite) do
-        local success = pcall(InviteUnit, inviteName)
-        if success then
+        local anySuccess = false
+        for attempt = 1, REGROUP_INVITE_ATTEMPTS do
+            local success = pcall(InviteUnit, inviteName)
+            if success then
+                anySuccess = true
+            end
+        end
+        if anySuccess then
             invited = invited + 1
         else
             failed = failed + 1
@@ -1483,6 +1503,7 @@ MiniHUD.DEFAULT_REGROUP = DEFAULT_REGROUP
 MiniHUD.ANNOUNCE_GAP = ANNOUNCE_GAP
 MiniHUD.REGROUP_MAX = REGROUP_MAX
 MiniHUD.REGROUP_INVITE_CAP = REGROUP_INVITE_CAP
+MiniHUD.REGROUP_INVITE_ATTEMPTS = REGROUP_INVITE_ATTEMPTS
 -- Test hooks
 MiniHUD._RateBlocked = RateBlocked
 MiniHUD._RateStamp = RateStamp
