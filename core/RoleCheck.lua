@@ -452,12 +452,22 @@ function RoleCheck.Resync()
     if groupSize > 0 then
         local newMap, rem, app = RoleCheck.ResyncAssigned(assignedMap, responses, present, protectedNames)
         removed, applied = rem, app
+        -- Preserve each survivor's real assignment age instead of
+        -- resetting everyone's RecentlyAssigned grace clock to "now" on
+        -- every resync - that used to make CountFilled()/leaver-pruning
+        -- treat a long-present member as "recently assigned" for a fresh
+        -- 20s after every Role Check, and reshuffled RaidMarks' oldest-
+        -- assigned-first ordering since all survivors got near-identical
+        -- timestamps in the same tick.
+        local prevAssignedAt = AscensionLFM.Slots and AscensionLFM.Slots.SnapshotAssignedAt
+            and AscensionLFM.Slots.SnapshotAssignedAt()
         if AscensionLFM.Slots and AscensionLFM.Slots.ClearAll then
             AscensionLFM.Slots.ClearAll()
         end
         for name, role in pairs(newMap) do
             if AscensionLFM.Slots and AscensionLFM.Slots.Assign then
-                AscensionLFM.Slots.Assign(name, role)
+                local prevT = prevAssignedAt and prevAssignedAt[LowerName(name)]
+                AscensionLFM.Slots.Assign(name, role, prevT)
             end
         end
     else

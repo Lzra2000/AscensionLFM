@@ -88,11 +88,17 @@ function Queue.Push(name, role, message, status, detail)
         return false
     end
     local key = LowerName(name)
-    local roleLabel = Queue.FormatRoleLabel(role, message)
     for i = 1, #q do
         if LowerName(q[i].name) == key then
             q[i].role = role or q[i].role
-            q[i].roleLabel = roleLabel or q[i].roleLabel or q[i].role
+            -- Recompute the label from the RESOLVED role (which may have
+            -- just kept the old value above), not the raw incoming `role`
+            -- param - otherwise a follow-up whisper with no primary role
+            -- of its own but a mentioned secondary one (e.g. "aura") could
+            -- overwrite roleLabel with text that no longer matches
+            -- q[i].role, showing one role in the Queue UI while Invite
+            -- (which reads q[i].role) still uses the other.
+            q[i].roleLabel = Queue.FormatRoleLabel(q[i].role, message) or q[i].roleLabel or q[i].role
             q[i].message = message or q[i].message
             q[i].status = status or q[i].status or "pending"
             q[i].detail = detail
@@ -103,6 +109,7 @@ function Queue.Push(name, role, message, status, detail)
             return true
         end
     end
+    local roleLabel = Queue.FormatRoleLabel(role, message)
     table.insert(q, 1, {
         name = name,
         role = role,

@@ -147,6 +147,17 @@ rem = RoleCheck.Resync()
 check("ghost cleared after grace period elapses", Slots.GetAssigned("Ghost") == nil,
     tostring(Slots.GetAssigned("Ghost")))
 
+-- Regression: Resync's ClearAll()+re-Assign() pattern used to stamp
+-- assignedAt = now for every SURVIVING present member too, not just
+-- genuinely new assignments - silently refreshing everyone's
+-- RecentlyAssigned grace window on every single resync. Alice was
+-- assigned at _now=2000 (25s ago at this point, well past the 20s
+-- default grace) and has been present the whole time - she must NOT
+-- read as "recently assigned" just because a resync happened to run.
+check("long-present member's assignment age survives a resync (not refreshed to 'now')",
+    Slots.RecentlyAssigned("Alice") == false,
+    "RecentlyAssigned(Alice) at t=" .. tostring(_G._now))
+
 -- Auto-resync on window end
 RoleCheck._ResetForTests()
 db.roleCheckAutoResync = true

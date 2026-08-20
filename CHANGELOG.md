@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.4.115
+
+- **Fix: RoleCheck.Resync silently refreshed every present member's
+  assignment-age grace clock.** `Resync()` rebuilds slot assignments via
+  `Slots.ClearAll()` + re-`Slots.Assign()` for every surviving member, not
+  just newly-invited ones - and `Slots.Assign()` always stamped `now`,
+  so a member who'd been assigned 30 minutes ago looked "recently
+  assigned" again after every single Role Check. That falsely protected
+  a leaver from being pruned for up to 20s post-resync, made a vacated
+  slot keep reporting as full (blocking a genuine new applicant), and
+  reshuffled `RaidMarks`' oldest-assigned-first ordering since survivors
+  all got near-identical timestamps in the same tick. `Slots.Assign()`
+  now takes an optional timestamp override; `Resync()` snapshots
+  everyone's real assignment age first (`Slots.SnapshotAssignedAt()`) and
+  passes it back in, so only genuinely new assignments get a fresh clock.
+- **Fix: Queue's displayed role label could drift from the role actually
+  used to invite.** A dedup-update whisper with no primary role of its
+  own but a mentioned secondary one (e.g. "also have aura") used to
+  overwrite `roleLabel` with text computed from the *raw* incoming
+  (possibly nil) role param, while `q[i].role` itself correctly kept the
+  prior value - the Queue UI could show "aura" while clicking Invite
+  still invited them as the original "tank". `roleLabel` is now always
+  derived from the same resolved role that ends up stored.
+- Both fixes ship with regression tests, verified to fail against the old
+  code first. New `tests/test_queue.lua` - `Queue.lua` had zero dedicated
+  test coverage before.
+- Found via a targeted review of `Slots.lua`/`Queue.lua`/`Presets.lua`,
+  the last core files without a dedicated pass this session;
+  `Presets.lua` had no real issues.
+
 ## 0.4.114
 
 - **Fix: title bar seam under DragonUI.** Reported live via screenshot -

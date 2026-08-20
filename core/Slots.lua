@@ -211,14 +211,31 @@ function Slots.RecentlyAssigned(name, graceSeconds)
     return (Now() - t) < (tonumber(graceSeconds) or 20)
 end
 
+--- Copy of the current [nameLower]=timestamp assignment-age map, so a
+-- caller that's about to ClearAll()+re-Assign() everyone (RoleCheck.Resync)
+-- can pass each name's original timestamp back into Assign() instead of
+-- silently refreshing everyone's RecentlyAssigned grace window.
+function Slots.SnapshotAssignedAt()
+    local out = {}
+    for k, v in pairs(assignedAt) do
+        out[k] = v
+    end
+    return out
+end
+
 --- Remember whisper role for a player (invite path).
-function Slots.Assign(name, role)
+-- @param assignedAtOverride optional - reuse an earlier timestamp instead
+--   of stamping "now" (see Slots.SnapshotAssignedAt / RoleCheck.Resync,
+--   which needs to re-Assign every present member without resetting the
+--   RecentlyAssigned grace clock for people who've been assigned for a
+--   while - only a genuinely new assignment should get a fresh "now").
+function Slots.Assign(name, role, assignedAtOverride)
     if type(name) ~= "string" or name == "" or type(role) ~= "string" then
         return false
     end
     local key = LowerName(name)
     assigned[key] = role
-    assignedAt[key] = Now()
+    assignedAt[key] = tonumber(assignedAtOverride) or Now()
     local db = DB()
     EnsureDBSlots(db)
     if db then
