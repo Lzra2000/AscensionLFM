@@ -87,7 +87,15 @@ local function IsDupe(leader, parsed, window)
 end
 
 local function Remember(leader, parsed)
-    recent[LowerName(leader)] = { t = Now(), fingerprint = Fingerprint(parsed) }
+    recent[LowerName(leader)] = {
+        t = Now(),
+        fingerprint = Fingerprint(parsed),
+        -- Kept for PARTY_INVITE_REQUEST context (see HandleInviteRequest) -
+        -- lets a seeker see which LFM/LFG line an incoming invite traces
+        -- back to, instead of just an unexplained group invite popup.
+        summary = parsed and parsed.summary,
+        isLFM = parsed and parsed.isManastormLFM and true or false,
+    }
 end
 
 local function SourceLabel(event)
@@ -530,6 +538,44 @@ local function HandleRoster()
     end
 end
 
+-- How long a seen LFM/LFG listing stays "recent" enough to explain/accept
+-- an incoming invite from that same leader (10 min - long enough to cover
+-- the walk-to-instance/whisper-back-and-forth delay, short enough that an
+-- invite from someone whose post you saw an hour ago still gets no context).
+local INVITE_CONTEXT_WINDOW = 600
+
+-- db.autoAcceptInvite existed as a saved setting since early versions but
+-- was never actually wired to anything - no PARTY_INVITE_REQUEST handler
+-- existed at all. Deliberately scoped narrower than "accept every invite
+-- that arrives": only auto-accepts (and only ever shows context for) an
+-- invite from someone whose LFM/LFG post was actually seen recently, via
+-- the same `recent` table NotifyMatch/Remember already populate - a bare
+-- "accept anything" toggle would be reckless for a seeking-mode player to
+-- leave on.
+local function HandleInviteRequest(inviter)
+    if type(inviter) ~= "string" or inviter == "" then
+        return
+    end
+    local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
+    if not db then
+        return
+    end
+    local entry = recent[LowerName(inviter)]
+    if not entry or (Now() - (entry.t or 0)) > INVITE_CONTEXT_WINDOW then
+        return
+    end
+    if AscensionLFM.Print and entry.summary then
+        AscensionLFM.Print("Invite from " .. tostring(inviter) .. " - they posted: " .. tostring(entry.summary))
+    end
+    if db.mode == "seeking" and db.autoAcceptInvite and entry.isLFM
+        and type(_G.AcceptGroup) == "function" then
+        pcall(_G.AcceptGroup)
+        if AscensionLFM.Print then
+            AscensionLFM.Print("auto-accepted invite from " .. tostring(inviter))
+        end
+    end
+end
+
 local frame
 
 function Scanner.Start()
@@ -543,9 +589,17 @@ function Scanner.Start()
     for _, ev in ipairs(ROSTER_EVENTS) do
         frame:RegisterEvent(ev)
     end
+    frame:RegisterEvent("PARTY_INVITE_REQUEST")
     frame:SetScript("OnEvent", function(_, event, message, sender)
         if event == "PARTY_MEMBERS_CHANGED" or event == "RAID_ROSTER_UPDATE" then
             HandleRoster()
+            return
+        end
+        if event == "PARTY_INVITE_REQUEST" then
+            -- This event's own 2nd arg is the inviter's name, not a chat
+            -- message - `message` here IS that name (only the dispatcher's
+            -- shared parameter names are chat-shaped, not this event).
+            HandleInviteRequest(message)
             return
         end
         if type(message) ~= "string" or message == "" then
@@ -595,3 +649,4 @@ Scanner._IsGroupChatEvent = IsGroupChatEvent
 Scanner._Fingerprint = Fingerprint
 Scanner._NextWhisperMessage = NextWhisperMessage
 Scanner._PreferredSeekRole = PreferredSeekRole
+Scanner._HandleInviteRequest = HandleInviteRequest

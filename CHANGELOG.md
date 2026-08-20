@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.4.110
+
+- **New: invite context + completed a long-dead setting.**
+  `db.autoAcceptInvite` ("seeking: opt-in auto-accept party/raid invites")
+  has existed since early versions but had zero wiring anywhere - no
+  `PARTY_INVITE_REQUEST` handler existed at all, and it wasn't even
+  exposed in Settings. Inspired by comparable addons (FrostSeek's "Group
+  Invite Context", RecruitRadar) that surface which recruitment post an
+  incoming invite traces back to instead of just an unexplained popup:
+  - Every LFM/LFG listing Scanner already logs is now remembered with its
+    summary text and kind for 10 minutes.
+  - On `PARTY_INVITE_REQUEST`, if the inviter matches a recently-seen
+    listing, prints "Invite from X - they posted: ...".
+  - If `autoAcceptInvite` is on (new checkbox, Settings -> Seeking ->
+    Invites, off by default) and that recent listing was a genuine LFM
+    (not just an LFG seeker sighting), auto-accepts via `AcceptGroup()`.
+    Deliberately scoped to only ever accept/react to an invite tied to a
+    listing actually seen recently - never a blind invite from a
+    stranger, regardless of the setting.
+  - New regression tests in `tests/test_v040_auto.lua`, verified to fail
+    against a broken recency-window check before the fix.
+
 ## 0.4.109
 
 - **AuraBalance race fix.** `Balance()` (aura-only, fired on nearly every

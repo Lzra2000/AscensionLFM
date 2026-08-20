@@ -591,6 +591,9 @@ local function SyncWidgetsFromDB()
     if widgets.autoWhisper and widgets.autoWhisper.SetChecked then
         widgets.autoWhisper:SetChecked(db.autoWhisper and true or false)
     end
+    if widgets.autoAcceptInvite and widgets.autoAcceptInvite.SetChecked then
+        widgets.autoAcceptInvite:SetChecked(db.autoAcceptInvite and true or false)
+    end
     if widgets.autoInvite and widgets.autoInvite.SetChecked then
         widgets.autoInvite:SetChecked(db.autoInvite and true or false)
     end
@@ -1501,7 +1504,7 @@ function MainWindow.Init()
     --------------------------------------------------------------------
     -- Seeking
     --------------------------------------------------------------------
-    local seeking = BuildCategoryPage(pageHost, CAT_SEEKING, 520)
+    local seeking = BuildCategoryPage(pageHost, CAT_SEEKING, 600)
     CreateSectionLabel(seeking, "My roles", -4)
 
     local seekRoles = CreateFrame("Frame", nil, seeking)
@@ -1640,6 +1643,15 @@ function MainWindow.Init()
         AscensionLFM.Database.RemoveLeaderBlacklist(name)
         blEdit:SetText("")
     end)
+
+    CreateSectionLabel(seeking, "Invites", -520)
+    widgets.autoAcceptInvite = CreateToggleRow(seeking, -538,
+        "Auto-accept invite from a seen LFM leader",
+        "Only accepts a party/raid invite from someone whose LFM post you saw in the last 10 min - never accepts blind invites from strangers. Off by default.",
+        false,
+        function(on)
+            AscensionLFM.Database.Get().autoAcceptInvite = on and true or false
+        end)
 
     --------------------------------------------------------------------
     -- Hosting

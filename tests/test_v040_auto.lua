@@ -383,6 +383,51 @@ AscensionLFM.Scanner._HandleWhisper("Suriana", "Please confirm your role?")
 check("follow-up reply allowed again once cooldown elapses", #followSent == 1, tostring(#followSent))
 _G.GetTime = function() return 1000 end
 
+--------------------------------------------------------------------
+-- PARTY_INVITE_REQUEST context/auto-accept (db.autoAcceptInvite existed
+-- as a saved setting for a long time but had no handler wired to it at
+-- all - new Scanner.HandleInviteRequest closes that gap). Deliberately
+-- scoped to only trust a recently-seen LFM leader, never a blind invite.
+--------------------------------------------------------------------
+local printed = {}
+AscensionLFM.Print = function(msg) table.insert(printed, tostring(msg)) end
+local accepted = 0
+_G.AcceptGroup = function() accepted = accepted + 1 end
+
+db.mode = "seeking"
+db.autoAcceptInvite = false
+_G.GetTime = function() return 2000 end
+AscensionLFM.Scanner._HandlePublicListing("Questgiver", "LFM MS 0/2 Tanks", "CHAT_MSG_SAY")
+
+printed = {}
+AscensionLFM.Scanner._HandleInviteRequest("Questgiver")
+check("invite context printed for a recently-seen LFM leader", #printed == 1, tostring(#printed))
+check("invite context mentions their post", printed[1] and printed[1]:find("posted:", 1, true) ~= nil,
+    printed[1])
+check("autoAcceptInvite off: no accept called", accepted == 0, tostring(accepted))
+
+db.autoAcceptInvite = true
+printed = {}
+AscensionLFM.Scanner._HandleInviteRequest("Questgiver")
+check("autoAcceptInvite on: AcceptGroup called for a seen LFM leader", accepted == 1, tostring(accepted))
+
+-- A stranger never seen posting anything gets no context and is never
+-- auto-accepted, even with the setting on - this is the actual safety
+-- scoping the feature is built around.
+printed = {}
+AscensionLFM.Scanner._HandleInviteRequest("TotalStranger")
+check("no context for an unseen inviter", #printed == 0, tostring(#printed))
+check("no auto-accept for an unseen inviter", accepted == 1, tostring(accepted)) -- unchanged
+
+-- Recency window: a leader seen too long ago (past the 10 min window)
+-- gets no context/accept either.
+_G.GetTime = function() return 2601 end -- 601s later, just past the 600s window
+printed = {}
+AscensionLFM.Scanner._HandleInviteRequest("Questgiver")
+check("stale LFM sighting (past window) gets no context", #printed == 0, tostring(#printed))
+check("stale LFM sighting gets no auto-accept", accepted == 1, tostring(accepted)) -- unchanged
+_G.GetTime = function() return 1000 end
+
 io.write(string.format("test_v040_auto: %d passed, %d failed\n", passed, failed))
 if failed > 0 then
     os.exit(1)
