@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>AscensionLFM — native WotLK settings (v0.4.5 overlap fix)</title>
+<style>
+  :root {
+    --ink: #1a1208;
+    --ink-soft: #3a2e1c;
+    --gold: #ffd100;
+    --gold-dim: #c8a03c;
+    --gold-line: #8a7028;
+    --muted: #5a4a30;
+    --ok: #2a7a3a;
+    --warn: #a87820;
+    --danger: #802020;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 22px 26px 48px;
+    font-family: "Friz Quadrata TT", "Trebuchet MS", serif;
+    color: var(--ink);
+    background:
+      radial-gradient(900px 480px at 70% -20%, #3a3020, transparent),
+      linear-gradient(180deg, #2a2218, #12100c 60%, #0a0906);
+  }
+  h1 { margin: 0 0 6px; font-size: 1.15rem; color: #f0e2c0; font-weight: normal; }
+  .lead { color: #9c927f; max-width: 72rem; line-height: 1.5; margin: 0 0 16px; font-size: .86rem; font-family: "Trebuchet MS", sans-serif; }
+  code { color: #edcd82; }
+  .stage { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
+
+  .dialog {
+    width: 720px; height: 560px;
+    background:
+      linear-gradient(180deg, rgba(255,220,120,.08), transparent 40%),
+      repeating-linear-gradient(0deg, #b8a47a 0 2px, #c4b088 2px 4px);
+    border: 3px solid #6a5420;
+    box-shadow:
+      inset 0 0 0 2px #d4c090,
+      inset 0 0 0 5px #3a3018,
+      0 0 0 2px #1a1408,
+      0 16px 40px rgba(0,0,0,.7);
+    border-radius: 2px;
+    padding: 10px 12px 10px;
+    display: flex; flex-direction: column;
+    position: relative; overflow: hidden;
+  }
+  .titlebar {
+    display: flex; flex-direction: column; gap: 2px;
+    background: linear-gradient(180deg, #4a3a1c, #2a2010);
+    border: 1px solid var(--gold-line);
+    margin: -2px -4px 0; padding: 8px 32px 8px 12px;
+    box-shadow: inset 0 1px 0 rgba(255,220,100,.25);
+  }
+  .titlebar h2 {
+    margin: 0; font-size: 1rem; color: var(--gold);
+    text-shadow: 0 1px 0 #000, 0 0 6px rgba(255,200,0,.3);
+    letter-spacing: .3px; font-weight: normal;
+  }
+  .titlebar .subhead {
+    margin: 0; font-size: .72rem; color: #c8b896;
+    font-family: "Trebuchet MS", sans-serif; line-height: 1.35;
+  }
+  .close {
+    position: absolute; top: 10px; right: 12px; width: 26px; height: 26px;
+    border-radius: 50%; border: 2px solid #8a7028;
+    background: radial-gradient(circle at 35% 30%, #6a3a2a, #2a1008);
+    color: #f0d9a0; font-size: .9rem; line-height: 22px; text-align: center;
+  }
+
+  .body {
+    flex: 1; min-height: 0; display: flex; gap: 0;
+    margin-top: 8px; border: 1px solid #6a5420;
+    background: linear-gradient(180deg, #d4c4a0, #b8a47a);
+    box-shadow: inset 0 0 20px rgba(80,50,10,.25);
+    overflow: hidden;
+  }
+
+  .sidebar {
+    width: 148px; flex: none;
+    background: linear-gradient(180deg, #3a3020, #241c10);
+    border-right: 2px solid #6a5420;
+    padding: 8px 6px;
+    display: flex; flex-direction: column; gap: 4px;
+    overflow: auto;
+  }
+  .side-lbl {
+    font-size: .62rem; color: #c8a03c; text-transform: uppercase;
+    letter-spacing: .08em; padding: 2px 4px 6px;
+    font-family: "Trebuchet MS", sans-serif;
+  }
+  .nav {
+    padding: 8px 10px; font-size: .78rem; color: #e8d8a8;
+    background: linear-gradient(180deg, #4a3a22, #2a2010);
+    border: 1px solid #6a5420; border-radius: 3px;
+    text-shadow: 0 1px 0 #000;
+    font-family: "Trebuchet MS", sans-serif;
+    cursor: default;
+  }
+  .nav.on {
+    color: #1a1208; font-weight: bold;
+    background: linear-gradient(180deg, #e8c860, #b89030);
+    border-color: #f0d060;
+    text-shadow: none;
+    box-shadow: inset 0 1px 0 rgba(255,255,180,.4), 0 0 0 1px #6a5420;
+  }
+
+  .main {
+    flex: 1; min-width: 0; min-height: 0;
+    display: flex; flex-direction: column; padding: 10px 12px 8px;
+    overflow: hidden;
+  }
+  .main-head { flex: none; margin-bottom: 10px; min-height: 42px; }
+  .main-head h3 {
+    margin: 0 0 4px; font-size: .98rem; color: #4a3008;
+    text-shadow: 0 1px 0 rgba(255,240,180,.4);
+  }
+  .main-head .sub {
+    margin: 0; font-size: .74rem; color: var(--ink-soft);
+    font-family: "Trebuchet MS", sans-serif; line-height: 1.4;
+    max-width: 100%;
+  }
+
+  .scroll {
+    flex: 1; min-height: 0; overflow: auto;
+    border: 1px solid #8a7028; background: rgba(255,248,220,.35);
+    box-shadow: inset 0 0 8px rgba(80,50,10,.2);
+    padding: 10px 12px 16px 10px;
+  }
+  .scroll::-webkit-scrollbar { width: 12px; }
+  .scroll::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #6a5428, #3a2a10);
+    border: 1px solid #8a7028;
+  }
+
+  .status {
+    border: 1px solid #8a7028;
+    background: rgba(250,240,210,.55);
+    padding: 8px 10px;
+    font-size: .78rem;
+    color: var(--ink-soft);
+    margin-bottom: 12px;
+    font-family: "Trebuchet MS", sans-serif;
+    line-height: 1.4;
+  }
+  .status strong { color: var(--ok); }
+  .status .mode { color: var(--warn); font-weight: bold; }
+
+  .sec {
+    font-size: .68rem; color: #6a4a18; text-transform: uppercase;
+    letter-spacing: .08em; margin: 16px 0 8px;
+    font-family: "Trebuchet MS", sans-serif; font-weight: bold;
+  }
+  .sec:first-child { margin-top: 0; }
+
+  .row {
+    display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center;
+    margin: 4px 0 12px; font-size: .76rem;
+    font-family: "Trebuchet MS", sans-serif;
+  }
+  .check {
+    display: inline-flex; align-items: center; gap: 6px; cursor: default;
+  }
+  .check .box {
+    width: 14px; height: 14px; border: 1px solid #6a5420;
+    background: linear-gradient(180deg, #f0e4c0, #d8c890);
+    box-shadow: inset 0 1px 0 #fff8e0;
+    position: relative;
+  }
+  .check.on .box::after {
+    content: ""; position: absolute; left: 3px; top: 1px;
+    width: 5px; height: 8px; border: solid #2a1808;
+    border-width: 0 2px 2px 0; transform: rotate(45deg);
+  }
+  .radio {
+    display: inline-flex; align-items: center; gap: 6px; font-size: .76rem;
+  }
+  .radio .dot {
+    width: 12px; height: 12px; border-radius: 50%;
+    border: 1px solid #6a5420; background: #e8dcb0;
+  }
+  .radio.on .dot {
+    background: radial-gradient(circle at 50% 50%, #2a1808 35%, #e8dcb0 40%);
+  }
+
+  /* v0.4.5: taller toggle rows + clear gap so title/desc never collide with next control */
+  .toggle {
+    display: flex; gap: 10px; align-items: flex-start;
+    padding: 10px 10px 12px;
+    margin-bottom: 10px;
+    min-height: 58px;
+    border: 1px solid #8a7028; background: rgba(255,248,220,.5);
+    box-shadow: inset 0 1px 0 rgba(255,255,220,.35);
+    font-family: "Trebuchet MS", sans-serif;
+  }
+  .toggle .tbox {
+    width: 18px; height: 18px; flex: none; margin-top: 1px;
+    border: 2px solid #6a5420; background: #1a1408;
+    box-shadow: inset 0 0 3px #000;
+    position: relative;
+  }
+  .toggle .tbox.on::after {
+    content: ""; position: absolute; inset: 2px;
+    background: linear-gradient(135deg, #f0d060, #c8a030);
+  }
+  .toggle .body-txt { flex: 1; min-width: 0; }
+  .toggle .t {
+    font-size: .82rem; color: #6a3a08; font-weight: bold;
+    line-height: 1.25; margin: 0 0 4px;
+  }
+  .toggle .d {
+    font-size: .72rem; color: var(--muted); margin: 0; line-height: 1.4;
+  }
+  .toggle.danger .t { color: var(--danger); }
+
+  input[type="text"] {
+    width: 200px; font-size: .74rem; padding: 3px 6px;
+    border: 1px solid #8a7028; background: #f8f0d8; color: var(--ink);
+    font-family: "Trebuchet MS", sans-serif;
+  }
+  input.tiny { width: 36px; text-align: center; }
+  .field-row {
+    display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center;
+    margin: 0 0 12px; font-size: .74rem;
+    font-family: "Trebuchet MS", sans-serif;
+  }
+  .hint { font-size: .68rem; color: var(--muted); margin: 0 0 10px; line-height: 1.45;
+    font-family: "Trebuchet MS", sans-serif; }
+  .filled { font-size: .74rem; color: var(--ink-soft); margin: 0 0 12px; line-height: 1.4;
+    font-family: "Trebuchet MS", sans-serif; }
+  .btn-row {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    margin: 0 0 12px;
+  }
+
+  .matches, .kicks {
+    border: 1px solid #8a7028; background: rgba(255,248,220,.5);
+    font-size: .72rem; font-family: "Trebuchet MS", sans-serif;
+  }
+  .match, .k {
+    padding: 6px 8px; border-bottom: 1px solid rgba(138,112,40,.35);
+  }
+  .match .who { color: #4a3010; font-weight: bold; margin-right: 8px; }
+  .match .when { color: var(--muted); font-size: .66rem; }
+  .match .comp { display: block; color: var(--ink-soft); margin-top: 2px; }
+  .k b { color: #4a3010; }
+
+  .qrow {
+    border: 1px solid #8a7028; background: rgba(255,248,220,.5);
+    padding: 8px; margin-bottom: 8px; min-height: 48px;
+    display: flex; justify-content: space-between; gap: 10px;
+    font-family: "Trebuchet MS", sans-serif; font-size: .74rem;
+  }
+  .qrow .actions { display: flex; flex-direction: column; gap: 4px; }
+
+  .footer {
+    flex: none; display: flex; align-items: center; gap: 8px;
+    margin-top: 8px; padding-top: 8px; border-top: 1px solid #8a7028;
+  }
+  .footer .status-txt {
+    flex: 1; font-size: .72rem; color: var(--muted);
+    font-family: "Trebuchet MS", sans-serif;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .btn {
+    min-width: 72px; padding: 5px 14px; font-size: .76rem;
+    color: #f0e2c0; text-shadow: 0 1px 0 #000;
+    background: linear-gradient(180deg, #6a5428, #3a2a10);
+    border: 1px solid #8a7028; border-radius: 3px;
+    box-shadow: inset 0 1px 0 rgba(255,220,100,.25);
+    font-family: "Trebuchet MS", sans-serif; text-align: center;
+  }
+
+  .aside {
+    width: 280px; font-size: .8rem; color: #9c927f; line-height: 1.45;
+    font-family: "Trebuchet MS", sans-serif;
+  }
+  .aside h3 { color: #c8a03c; font-size: .88rem; margin: 0 0 8px; }
+  .aside ul { margin: 0; padding-left: 1.1rem; }
+  .aside li { margin-bottom: 8px; }
+  .page { display: none; }
+  .page.on { display: block; padding-bottom: 8px; }
+  .badge {
+    display: inline-block; margin-left: 6px; padding: 1px 6px;
+    font-size: .62rem; color: #1a1208; background: #e8c860;
+    border: 1px solid #8a7028; border-radius: 2px;
+    font-family: "Trebuchet MS", sans-serif; vertical-align: middle;
+  }
+</style>
+</head>
+<body>
+  <h1>AscensionLFM — Categories sidebar settings (v0.4.5)</h1>
+  <p class="lead">
+    <strong>Overlap fix preview:</strong> taller toggle rows (58px+), 10px gaps between controls,
+    section labels with breathing room, Post status + hint on separate lines, and
+    <strong>scrollable</strong> category pages (Hosting / Seeking / Post grow past the dialog).
+    Native DialogFrame chrome kept. Slash: <code>/alfm</code>. Click nav to preview.
+  </p>
+
+  <div class="stage">
+    <div class="dialog" id="dlg">
+      <div class="titlebar">
+        <h2>AscensionLFM</h2>
+        <p class="subhead">Manastorm Level Run LFM/LFG · v0.4.5</p>
+      </div>
+      <div class="close">×</div>
+
+      <div class="body">
+        <nav class="sidebar" id="sidebar">
+          <div class="side-lbl">Categories</div>
+          <div class="nav" data-cat="general">General</div>
+          <div class="nav" data-cat="seeking">Seeking</div>
+          <div class="nav on" data-cat="hosting">Hosting</div>
+          <div class="nav" data-cat="post">Post</div>
+          <div class="nav" data-cat="queue">Queue</div>
+          <div class="nav" data-cat="kick">Kick</div>
+          <div class="nav" data-cat="log">Log</div>
+        </nav>
+
+        <div class="main">
+          <div class="main-head">
+            <h3 id="head-title">Hosting</h3>
+            <p class="sub" id="head-sub">Full Auto, slots, RW Role Check, reject re-whisper, presets, invite rules.</p>
+          </div>
+
+          <div class="scroll">
+            <!-- GENERAL -->
+            <div class="page" data-page="general">
+              <div class="status">
+                Status: <strong>Listening ON</strong> · Mode: <span class="mode">Hosting</span> · Kick59 off<br />
+                Last match: <em>Thrall</em> — MS 0/2 T · 1/3 H · 0/3 A · 2/7 D
+              </div>
+              <div class="sec">Mode</div>
+              <div class="row">
+                <span class="radio"><span class="dot"></span> Off</span>
+                <span class="radio"><span class="dot"></span> Notify only</span>
+                <span class="radio"><span class="dot"></span> Seeking</span>
+                <span class="radio on"><span class="dot"></span> Hosting</span>
+              </div>
+              <p class="hint">
+                <b>Off</b> — Listening OFF (no chat scan).<br />
+                <b>Notify</b> — Listening ON: print MS LFM/LFG to chat + Log (default).<br />
+                <b>Seeking</b> — match open roles; optional auto-whisper LFM leaders.<br />
+                <b>Hosting</b> — role whispers → invite only if accepted role + open slot.<br />
+                <b>Full Auto</b> — Hosting category master (default OFF): invite + scan + repost + reject.
+              </p>
+            </div>
+
+            <!-- SEEKING -->
+            <div class="page" data-page="seeking">
+              <div class="sec">My roles</div>
+              <div class="row">
+                <span class="check on"><span class="box"></span> Tank</span>
+                <span class="check on"><span class="box"></span> Healer</span>
+                <span class="check on"><span class="box"></span> Aura</span>
+                <span class="check on"><span class="box"></span> DPS</span>
+              </div>
+              <div class="sec">Seeking options</div>
+              <div class="toggle">
+                <div class="tbox on"></div>
+                <div class="body-txt">
+                  <div class="t">Scan LFG MS lines</div>
+                  <div class="d">Also notify on LFG Manastorm seekers (no auto-whisper to them).</div>
+                </div>
+              </div>
+              <div class="toggle">
+                <div class="tbox"></div>
+                <div class="body-txt">
+                  <div class="t">Auto-whisper LFM leader</div>
+                  <div class="d">Rate-limited whisper when a listing still needs one of your roles. Off by default.</div>
+                </div>
+              </div>
+              <div class="field-row">
+                <label>Whisper message <input type="text" value="inv ms tank" /></label>
+              </div>
+              <div class="toggle">
+                <div class="tbox on"></div>
+                <div class="body-txt">
+                  <div class="t">Rotate whisper variants ({role})</div>
+                  <div class="d">Cycles 2–3 templates below. {role} becomes tank/healer/aura/dps. Default ON.</div>
+                </div>
+              </div>
+              <div class="field-row"><label>V1 <input type="text" value="inv ms {role}" /></label></div>
+              <div class="field-row"><label>V2 <input type="text" value="ms {role} inv" /></label></div>
+              <div class="field-row"><label>V3 <input type="text" value="need invite ms {role}" /></label></div>
+              <div class="toggle">
+                <div class="tbox"></div>
+                <div class="body-txt">
+                  <div class="t">Sound on new match</div>
+                  <div class="d">Play a sound when a Manastorm listing is logged. Opt-in OFF.</div>
+                </div>
+              </div>
+              <div class="field-row">
+                <label>Blacklist leader <input type="text" style="width:120px;" /></label>
+                <div class="btn">Add</div>
+                <div class="btn">Remove</div>
+              </div>
+            </div>
+
+            <!-- HOSTING (default preview — densest page) -->
+            <div class="page on" data-page="hosting">
+              <div class="sec">Full Auto</div>
+              <div class="toggle">
+                <div class="tbox"></div>
+                <div class="body-txt">
+                  <div class="t">Full Auto Hosting (master)</div>
+                  <div class="d">ON: Hosting + accept T/H/A/D + whisper invite + LFG invite + scan + repost + reject-rewhisper. Default OFF.</div>
+                </div>
+              </div>
+
+              <div class="sec">Accept roles</div>
+              <div class="row">
+                <span class="check on"><span class="box"></span> Tank</span>
+                <span class="check on"><span class="box"></span> Healer</span>
+                <span class="check on"><span class="box"></span> Aura</span>
+                <span class="check on"><span class="box"></span> DPS</span>
+              </div>
+
+              <div class="sec">Invite + reject</div>
+              <div class="toggle">
+                <div class="tbox on"></div>
+                <div class="body-txt">
+                  <div class="t">Auto-invite matching role whispers</div>
+                  <div class="d">InviteUnit when role accepted + slot open. Full Auto turns this on.</div>
+                </div>
+              </div>
+              <div class="toggle">
+                <div class="tbox on"></div>
+                <div class="body-txt">
+                  <div class="t">Auto-invite LFG seekers (chat)</div>
+                  <div class="d">When someone posts LFG MS with a role you need + open slot → InviteUnit. Default ON while Hosting.</div>
+                </div>
+              </div>
+              <div class="toggle">
+                <div class="tbox on"></div>
+                <div class="body-txt">
+                  <div class="t">Require role in whisper / LFG</div>
+                  <div class="d">Default-deny whispers/LFG lines with no tank/heal/aura/dps cue.</div>
+                </div>
+              </div>
+              <div class="toggle">
+                <div class="tbox"></div>
+                <div class="body-txt">
+                  <div class="t">Reject re-whisper (slot/group full / no role)</div>
+                  <div class="d">Whisper templates with {role} {filled} {max}. Rate-limited; ignore list. Default OFF.</div>
+                </div>
+              </div>
+              <div class="field-row">
+                <label>Reject tmpl <input type="text" value="sorry full on {role}" style="width:280px;" /></label>
+              </div>
+              <div class="toggle">
+                <div class="tbox"></div>
+                <div class="body-txt">
+                  <div class="t">Sound on applicant whisper</div>
+                  <div class="d">Play TellMessage when a hosting whisper arrives. Opt-in OFF.</div>
+                </div>
+              </div>
+
+              <div class="sec">Presets</div>
+              <div class="btn-row">
+                <div class="btn">MS 2/3/3/7</div>
+                <div class="btn">MS 2/2/2/5</div>
+                <input type="text" value="My MS" style="width:80px;" />
+                <div class="btn">Save</div>
+              </div>
+              <p class="hint">Active preset: MS 2/3/3/7</p>
+
+              <div class="sec">Slots</div>
+              <div class="row">
+                <label>Max size <input class="tiny" type="text" value="15" /></label>
+                <label>Max T <input class="tiny" type="text" value="2" /></label>
+                <label>H <input class="tiny" type="text" value="3" /></label>
+                <label>A <input class="tiny" type="text" value="3" /></label>
+                <label>D <input class="tiny" type="text" value="7" /></label>
+              </div>
+              <div class="filled">Filled: T 1/2  ·  H 0/3  ·  A 1/3  ·  D 2/7</div>
+
+              <div class="sec">Role Check <span class="badge">scroll ↓</span></div>
+              <div class="toggle">
+                <div class="tbox on"></div>
+                <div class="body-txt">
+                  <div class="t">Auto-move Auras (1 per raid group)</div>
+                  <div class="d">Keep at most one Aura player in each raid group (1–8). Extra Auras are moved to empty groups. Default ON.</div>
+                </div>
+              </div>
+              <div class="toggle">
+                <div class="tbox on"></div>
+                <div class="body-txt">
+                  <div class="t">Auto-resync after listening window</div>
+                  <div class="d">When the window ends: remove leavers, apply whispered roles, refresh filled counts. Default ON.</div>
+                </div>
+              </div>
+              <div class="field-row">
+                <label>RW message <input type="text" value="ROLE CHECK — whisper tank / heal / aura / dps" style="width:300px;" /></label>
+              </div>
+              <div class="field-row">
+                <label>Window (sec) <input class="tiny" type="text" value="60" /></label>
+              </div>
+              <div class="btn-row">
+                <div class="btn">RW Role Check</div>
+                <div class="btn">Resync roles now</div>
+              </div>
+              <div class="filled">Role check idle</div>
+            </div>
+
+            <!-- POST -->
+            <div class="page" data-page="post">
+              <div class="sec">LFM message</div>
+              <div class="status" style="font-family:monospace;font-size:.72rem;">
+                LFM MS 1/2 Tanks 0/3 Healers 1/3 Aura 2/7 DPS
+              </div>
+              <div class="sec">Channel</div>
+              <div class="row">
+                <span class="radio on"><span class="dot"></span> Yell</span>
+                <span class="radio"><span class="dot"></span> Say</span>
+                <span class="radio"><span class="dot"></span> Guild</span>
+                <span class="radio"><span class="dot"></span> Channel</span>
+              </div>
+              <div class="field-row">
+                <label>Channel name <input type="text" value="" placeholder="optional" style="width:140px;" /></label>
+              </div>
+              <div class="btn-row">
+                <div class="btn">Rebuild</div>
+                <div class="btn">Scan raid/party</div>
+                <div class="btn">Post once</div>
+              </div>
+              <div class="btn-row">
+                <div class="btn">RW Role Check</div>
+                <div class="btn">Resync roles now</div>
+                <span class="filled" style="margin:0;">Role check idle</span>
+              </div>
+              <div class="sec">Auto-repost</div>
+              <div class="toggle">
+                <div class="tbox"></div>
+                <div class="body-txt">
+                  <div class="t">Enable auto-repost (Hosting only)</div>
+                  <div class="d">Rebuild LFM from slots each tick. Stops when full or disabled. Default OFF.</div>
+                </div>
+              </div>
+              <div class="toggle">
+                <div class="tbox"></div>
+                <div class="body-txt">
+                  <div class="t">Announce FULL when group is complete</div>
+                  <div class="d">One-shot yell when slots fill. Opt-in OFF.</div>
+                </div>
+              </div>
+              <div class="field-row">
+                <label>Interval (sec, min 30) <input class="tiny" type="text" value="60" /></label>
+              </div>
+              <!-- v0.4.5: status and hint on separate lines (were overlapping at ~same Y) -->
+              <div class="filled">Auto-repost OFF  ·  Last post: never  ·  Channel: YELL</div>
+              <p class="hint">Example: LFM MS 0/2 Tanks 0/3 Healers 0/3 Aura 0/7 DPS — filled from Hosting slots + Scan.</p>
+            </div>
+
+            <!-- QUEUE -->
+            <div class="page" data-page="queue">
+              <div class="sec">Recent applicant whispers</div>
+              <p class="hint">Hosting whispers land here. Invite uses InviteUnit; Reject sends re-whisper once.</p>
+              <div class="qrow">
+                <div><b>Thrall</b> · tank · 12s ago</div>
+                <div class="actions"><div class="btn">Invite</div><div class="btn">Reject+whisp</div></div>
+              </div>
+              <div class="qrow">
+                <div><b>Jaina</b> · heal · 48s ago</div>
+                <div class="actions"><div class="btn">Invite</div><div class="btn">Reject+whisp</div></div>
+              </div>
+            </div>
+
+            <!-- KICK -->
+            <div class="page" data-page="kick">
+              <div class="sec">Level-59 auto-kick</div>
+              <div class="toggle danger">
+                <div class="tbox"></div>
+                <div class="body-txt">
+                  <div class="t">Enable kick at level 59 + raid warning every 10s</div>
+                  <div class="d">Hosting only · leader/assist · ignores self · RW then UninviteUnit. Default OFF.</div>
+                </div>
+              </div>
+              <div class="sec">Recent kicks</div>
+              <div class="kicks">
+                <div class="k"><b>Bob</b> at level 59</div>
+                <div class="k"><b>Carl</b> at level 60</div>
+                <div class="k" style="color:var(--muted);">No more kicks.</div>
+              </div>
+            </div>
+
+            <!-- LOG -->
+            <div class="page" data-page="log">
+              <div class="sec">Recent matches</div>
+              <div class="matches">
+                <div class="match">
+                  <span class="who">Thrall</span><span class="when">12s ago · channel/lfm</span>
+                  <span class="comp">LFM MS 0/2 Tanks 0/3 Healers 0/3 Aura 0/7 DPS</span>
+                </div>
+                <div class="match">
+                  <span class="who">Jaina</span><span class="when">48s ago · yell/lfg</span>
+                  <span class="comp">lfg manastorm need heals</span>
+                </div>
+              </div>
+              <div class="sec">Activity (posts / invites / rejects / matches)</div>
+              <div class="matches">
+                <div class="match">posted LFM · yell</div>
+                <div class="match">invited Thrall (tank)</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="footer">
+            <span class="status-txt" id="foot">Listening ON · Mode Hosting · Kick59 off</span>
+            <div class="btn" id="clear-btn" style="display:none;">Clear</div>
+            <div class="btn">Close</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <aside class="aside">
+      <h3>v0.4.5 layout fixes</h3>
+      <ul>
+        <li><b>Toggle rows</b> — min-height 58px, title + desc stacked with 4px gap; 10px between rows</li>
+        <li><b>ScrollFrame</b> — Hosting / Seeking / Post content taller than the dialog scrolls instead of clipping</li>
+        <li><b>Post</b> — status line and example hint no longer share the same Y</li>
+        <li><b>Sections</b> — 16px top margin so labels never sit on the previous toggle</li>
+        <li><b>Dialog</b> — 560px tall (fits 768+ screens); native chrome unchanged</li>
+      </ul>
+      <p style="margin-top:14px;font-size:.74rem;color:#c8b896;">
+        Scroll the Hosting page to see Role Check below Slots — previously crushed into the same band.
+      </p>
+    </aside>
+  </div>
+
+<script>
+(function () {
+  var titles = {
+    general: ["General", "Mode and status. Default Notify = Listening ON. Full Auto Hosting is opt-in OFF."],
+    seeking: ["Seeking", "Roles, rotating whisper variants, leader blacklist, optional match sound."],
+    hosting: ["Hosting", "Full Auto, slots, RW Role Check, reject re-whisper, presets, invite rules."],
+    post: ["Post", "LFM compose, scan fills, RW Role Check, auto-repost + optional FULL announce."],
+    queue: ["Queue", "Recent applicant whispers — Invite or Reject+rewhisper."],
+    kick: ["Kick", "Opt-in level-59 auto-kick with raid warning. Dangerous — default OFF."],
+    log: ["Log", "Match history + activity (posts, invites, rejects, matches)."]
+  };
+  var navs = document.querySelectorAll("#sidebar .nav");
+  var pages = document.querySelectorAll(".page");
+  var headT = document.getElementById("head-title");
+  var headS = document.getElementById("head-sub");
+  var clearBtn = document.getElementById("clear-btn");
+  var foot = document.getElementById("foot");
+
+  function show(cat) {
+    for (var i = 0; i < navs.length; i++) {
+      navs[i].classList.toggle("on", navs[i].getAttribute("data-cat") === cat);
+    }
+    for (var j = 0; j < pages.length; j++) {
+      pages[j].classList.toggle("on", pages[j].getAttribute("data-page") === cat);
+    }
+    var info = titles[cat];
+    if (info) {
+      headT.textContent = info[0];
+      headS.textContent = info[1];
+    }
+    clearBtn.style.display = (cat === "log" || cat === "kick" || cat === "queue") ? "block" : "none";
+    foot.textContent = (cat === "kick")
+      ? "Kick log · Clear removes kick history"
+      : (cat === "log")
+        ? "Match log · Clear removes match history"
+        : (cat === "post")
+          ? "Post · Scan fills · Auto-repost opt-in"
+          : (cat === "queue")
+            ? "Queue · Invite or Reject applicants"
+            : "Listening ON · Mode Hosting · Kick59 off";
+  }
+
+  for (var k = 0; k < navs.length; k++) {
+    navs[k].addEventListener("click", function (ev) {
+      show(ev.currentTarget.getAttribute("data-cat"));
+    });
+  }
+})();
+</script>
+</body>
+</html>
