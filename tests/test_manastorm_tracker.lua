@@ -96,6 +96,89 @@ local nonZeroSummary = { invited = 2, rejected = 0, kicked = 0, matched = 1, pos
 line = Activity.FormatSessionSummary(nonZeroSummary)
 check("level stats appended when non-zero", line:find("3 levels cleared, 1 failed") ~= nil, line)
 
+--------------------------------------------------------------------
+-- WoW event wiring: the module-level `if type(CreateFrame) == "function"`
+-- block at the bottom of ManastormTracker.lua was never exercised by any
+-- test before (no CreateFrame mock existed in this file), so the
+-- MANASTORM_FAILED -> C_Manastorm.GetActiveLevel() fallback logic in
+-- particular had zero coverage. Mock CreateFrame now and re-dofile so
+-- that block actually runs, capturing the real OnEvent handler to drive
+-- directly - same "track real state" mocking convention AGENTS.md
+-- documents for test_ui_smoke.lua/test_mini_hud.lua.
+--------------------------------------------------------------------
+
+local registeredEvents = {}
+local onEventHandler = nil
+_G.CreateFrame = function()
+    local f = {}
+    function f:RegisterEvent(ev)
+        table.insert(registeredEvents, ev)
+    end
+    function f:SetScript(script, fn)
+        if script == "OnEvent" then
+            onEventHandler = fn
+        end
+    end
+    return f
+end
+
+dofile("core/ManastormTracker.lua")
+
+check("registers MANASTORM_LEVEL_COMPLETED", (function()
+    for _, ev in ipairs(registeredEvents) do
+        if ev == "MANASTORM_LEVEL_COMPLETED" then return true end
+    end
+    return false
+end)())
+check("registers MANASTORM_FAILED", (function()
+    for _, ev in ipairs(registeredEvents) do
+        if ev == "MANASTORM_FAILED" then return true end
+    end
+    return false
+end)())
+check("OnEvent handler captured", type(onEventHandler) == "function")
+
+Activity.ResetSession()
+
+-- MANASTORM_LEVEL_COMPLETED: payload level flows straight through.
+onEventHandler(nil, "MANASTORM_LEVEL_COMPLETED", 9)
+summary = Activity.GetSessionSummary()
+check("event wiring: level-completed increments cleared", summary.manastormCleared == 1,
+    tostring(summary.manastormCleared))
+
+-- MANASTORM_FAILED with its own payload level: used directly, no
+-- C_Manastorm fallback needed.
+_G.C_Manastorm = nil
+onEventHandler(nil, "MANASTORM_FAILED", 6)
+local log = AscensionLFM.Database.Get().activityLog
+check("event wiring: failed-with-payload uses that level directly",
+    log[1] and log[1].text == "Manastorm level 6 failed", log[1] and log[1].text)
+
+-- MANASTORM_FAILED with NO payload level: falls back to
+-- C_Manastorm.GetActiveLevel() when available.
+_G.C_Manastorm = { GetActiveLevel = function() return 13 end }
+onEventHandler(nil, "MANASTORM_FAILED", nil)
+log = AscensionLFM.Database.Get().activityLog
+check("event wiring: failed-without-payload falls back to C_Manastorm.GetActiveLevel()",
+    log[1] and log[1].text == "Manastorm level 13 failed", log[1] and log[1].text)
+
+-- C_Manastorm present but GetActiveLevel errors: caught, falls back to
+-- nil (no level) rather than propagating the error into the event handler.
+_G.C_Manastorm = { GetActiveLevel = function() error("not in a Manastorm run") end }
+local okCall = pcall(onEventHandler, nil, "MANASTORM_FAILED", nil)
+check("event wiring: GetActiveLevel error doesn't propagate", okCall == true)
+log = AscensionLFM.Database.Get().activityLog
+check("event wiring: GetActiveLevel error falls back to no level",
+    log[1] and log[1].text == "Manastorm run failed", log[1] and log[1].text)
+
+-- C_Manastorm entirely absent (Bronzebeard/Epoch variants): no fallback
+-- attempted, still handled gracefully.
+_G.C_Manastorm = nil
+onEventHandler(nil, "MANASTORM_FAILED", nil)
+log = AscensionLFM.Database.Get().activityLog
+check("event wiring: no C_Manastorm at all still handled gracefully",
+    log[1] and log[1].text == "Manastorm run failed", log[1] and log[1].text)
+
 io.write(string.format("manastorm_tracker tests: %d passed, %d failed\n", passed, failed))
 if failed > 0 then
     os.exit(1)
