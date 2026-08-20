@@ -76,7 +76,7 @@ function SpecRole.GuessFromActiveSpec()
         local bestPts, bestName = -1, nil
         local n = GetNumTalentTabs() or 0
         for i = 1, n do
-            local ok, name, _, points = pcall(GetTalentTabInfo, i)
+            local ok, name, _, _, points = pcall(GetTalentTabInfo, i)
             if ok and type(points) == "number" and points > bestPts then
                 bestPts = points
                 bestName = name

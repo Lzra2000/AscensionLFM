@@ -938,7 +938,8 @@ local function BuildAppearanceCategory(pageHost)
     local appearance = BuildCategoryPage(pageHost, CAT_APPEARANCE, 420)
     local y = -8
     local function uiChrome()
-        local db = DB()
+        local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
+        if type(db) ~= "table" then return {} end
         if type(db.uiChrome) ~= "table" then db.uiChrome = {} end
         return db.uiChrome
     end
