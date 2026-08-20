@@ -50,6 +50,15 @@ local function HasLFM(text)
     if text:find("lf%d+m") then
         return true
     end
+    -- German: a host announcing they still need people (matches "heiler"
+    -- already recognized as a role keyword below - role keywords already
+    -- had partial German support, the LFM/LFG signal words themselves
+    -- never did). Narrowed to "noch" (still) so it doesn't fire on
+    -- unrelated "suche"/"brauche" sentences with no recruiting intent.
+    if text:find("suche noch", 1, true) or text:find("sucht noch", 1, true)
+        or text:find("brauche noch", 1, true) or text:find("brauchen noch", 1, true) then
+        return true
+    end
     return false
 end
 
@@ -61,6 +70,11 @@ local function HasLFG(text)
         return true
     end
     if text:find("looking for a group", 1, true) then
+        return true
+    end
+    -- German: a seeker looking to join a group.
+    if text:find("suche gruppe", 1, true) or text:find("suche grp", 1, true)
+        or text:find("suche mitspieler", 1, true) then
         return true
     end
     return false

@@ -180,6 +180,42 @@ check("multiple negated roles: tank", negMulti.tank == true)
 local negNone = Parser.NegatedRoles("dps full loom lfg ms")
 check("no negation returns empty table", type(negNone) == "table" and next(negNone) == nil)
 
+--------------------------------------------------------------------
+-- German LFM/LFG phrasing. Role keyword aliases already had partial
+-- German support ("heiler" for healer) but the LFM/LFG signal words
+-- themselves never did - a host/seeker typing in German would never
+-- have been detected at all before this.
+--------------------------------------------------------------------
+p = Parser.Parse("suche noch ms tank")
+check("German LFM: 'suche noch' detected as recruiting", p and p.isManastormLFM == true, p and p.isManastormLFM)
+
+p = Parser.Parse("sucht noch ms heiler")
+check("German LFM: 'sucht noch' detected as recruiting", p and p.isManastormLFM == true)
+check("German LFM: 'heiler' still maps to healer role", p and p.roles.healer and p.roles.healer.open)
+
+p = Parser.Parse("brauche noch ms tank")
+check("German LFM: 'brauche noch' detected as recruiting", p and p.isManastormLFM == true)
+
+p = Parser.Parse("brauchen noch ms dps")
+check("German LFM: 'brauchen noch' detected as recruiting", p and p.isManastormLFM == true)
+
+p = Parser.Parse("suche gruppe ms tank")
+check("German LFG: 'suche gruppe' detected as seeking", p and p.isManastormLFG == true
+    and p.isManastormLFM == false)
+
+p = Parser.Parse("suche grp ms")
+check("German LFG: 'suche grp' detected as seeking", p and p.isManastormLFG == true)
+
+p = Parser.Parse("suche mitspieler fuer ms")
+check("German LFG: 'suche mitspieler' detected as seeking", p and p.isManastormLFG == true)
+
+-- Still gated on an actual Manastorm mention - an ordinary German
+-- sentence with "suche noch"/"suche gruppe" but no MS/manastorm word
+-- must NOT be treated as a listing (same rule as the English phrases).
+p = Parser.Parse("suche noch meine schluessel")
+check("German phrase without Manastorm mention is not a listing",
+    p == nil or (p.isManastormLFM ~= true and p.isManastormLFG ~= true))
+
 io.write(string.format("parser tests: %d passed, %d failed\n", passed, failed))
 if failed > 0 then
     os.exit(1)

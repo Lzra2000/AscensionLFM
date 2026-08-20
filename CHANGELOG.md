@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.4.119
+
+- **New: German LFM/LFG phrase recognition.** `Parser.lua`'s role
+  keywords already had partial German support ("heiler" for healer,
+  "kein/keine/keinen" negation handling), but the LFM/LFG signal words
+  themselves only ever recognized English phrasing - a German-speaking
+  host or seeker typing in German would never have been detected at all.
+  Added: "suche noch" / "sucht noch" / "brauche noch" / "brauchen noch"
+  (recruiting = LFM) and "suche gruppe" / "suche grp" / "suche
+  mitspieler" (seeking = LFG). Still gated on an actual Manastorm mention
+  like the English phrases, so this can't misfire on unrelated German
+  sentences. Pure text-matching, no client-API risk - 8 new regression
+  tests in `tests/test_parser.lua`, verified to fail against the old
+  English-only matching first.
+
 ## 0.4.118
 
 - **New: dedicated LFM/LFG chat tab (opt-in, off by default).** Inspired
