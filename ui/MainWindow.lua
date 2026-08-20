@@ -1504,7 +1504,7 @@ function MainWindow.Init()
     --------------------------------------------------------------------
     -- Seeking
     --------------------------------------------------------------------
-    local seeking = BuildCategoryPage(pageHost, CAT_SEEKING, 600)
+    local seeking = BuildCategoryPage(pageHost, CAT_SEEKING, 620)
     CreateSectionLabel(seeking, "My roles", -4)
 
     local seekRoles = CreateFrame("Frame", nil, seeking)

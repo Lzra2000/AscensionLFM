@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.111
+
+- **Fix: Seeking tab's new "Invites" section was clipped.** v0.4.110 added
+  the `autoAcceptInvite` toggle to the bottom of the Seeking page and
+  bumped its scroll height 520 -> 600, but undershot - the row's actual
+  bottom edge sits at y=-604 (label y=-538, minus `TOGGLE_ROW_H`=66), 4px
+  past the declared 600px scroll child, so the bottom sliver of the
+  checkbox/description was outside the reachable scroll range. Bumped to
+  620 for a real margin. Found via a fresh full read-through of
+  `ui/MainWindow.lua` that recomputed every category page's actual
+  content extent against its declared height - the exact bug class this
+  repo's own `AGENTS.md` warns about (v0.4.70/v0.4.72 both got this kind
+  of spacing math wrong before landing on symbolic constants).
+
 ## 0.4.110
 
 - **New: invite context + completed a long-dead setting.**
