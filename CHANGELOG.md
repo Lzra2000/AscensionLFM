@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.112
+
+- **Fix: Roster tab's ⇄ (move-to-group) button rendered as "?".** Reported
+  live via screenshot - every roster row's move button showed a "?" tofu
+  character instead of the intended arrows glyph. Root cause: the button
+  used U+2194 (arrows-left-right, `\226\135\132` UTF-8), which WotLK
+  3.3.5a's default UI font doesn't have a glyph for. Replaced with plain
+  ASCII `<>`, which always renders on this client. Grepped the rest of
+  the codebase for any other non-ASCII characters inside a `SetText()`
+  call - this was the only one.
+
 ## 0.4.111
 
 - **Fix: Seeking tab's new "Invites" section was clipped.** v0.4.110 added

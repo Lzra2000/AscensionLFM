@@ -925,7 +925,12 @@ local function EnsureCards(parent)
     if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(moveBtn) end
             moveBtn:SetSize(20, 18)
             moveBtn:SetPoint("RIGHT", kickBtn, "LEFT", -2, 0)
-            moveBtn:SetText("\226\135\132") -- U+2194 arrows-left-right glyph via UTF-8 bytes
+            -- Was U+2194 (arrows-left-right) - WotLK 3.3.5a's default UI
+            -- font doesn't have that glyph and rendered it as a "?" tofu
+            -- fallback (confirmed via a live screenshot: every roster row
+            -- showed "?" instead of the swap arrow). Plain ASCII always
+            -- renders on this client.
+            moveBtn:SetText("<>")
             moveBtn:SetScript("OnClick", function(self)
                 if self.memberName then
                     ShowGroupPicker(self, self.memberName, self.memberGroup)
