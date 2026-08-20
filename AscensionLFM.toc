@@ -1,0 +1,32 @@
+## Interface: 30300
+## Title: AscensionLFM
+## Notes: Manastorm LFM host helper for Ascension.gg
+## Author: Lazra
+## Version: 0.4.108
+## SavedVariables: AscensionLFMDB
+## DefaultState: enabled
+## X-Website: https://ascension.gg
+
+core\Database.lua
+core\Parser.lua
+core\ChatFilter.lua
+core\Slots.lua
+core\RaidMarks.lua
+core\SpecRole.lua
+core\Queue.lua
+core\Reject.lua
+core\Invite.lua
+core\Kick.lua
+core\AuraBalance.lua
+core\RoleCheck.lua
+core\Poster.lua
+core\Presets.lua
+core\Scanner.lua
+core\Activity.lua
+core\ManastormTracker.lua
+ui\Chrome.lua
+ui\MiniHUD.lua
+ui\MinimapButton.lua
+ui\RosterPanel.lua
+ui\MainWindow.lua
+core\Bootstrap.lua

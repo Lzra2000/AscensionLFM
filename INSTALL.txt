@@ -1,0 +1,74 @@
+AscensionLFM — Install / Installation
+=======================================
+
+ENGLISH
+-------
+1. Download AscensionLFM.zip from GitHub Releases (NOT the green "Code → Download ZIP"
+   / "Source code" archive — that unpacks as AscensionLFM-main and will NOT show in the
+   WoW AddOns list).
+2. Extract so you have exactly:
+
+     Interface/AddOns/AscensionLFM/AscensionLFM.toc
+
+   Folder name MUST match the .toc basename: AscensionLFM (classic 3.3.5a rule).
+3. Enable AscensionLFM in the character AddOns list, then login or /reload.
+4. Type /alfm (or /mslfm) to open settings. A Mini Quick HUD also appears for LFM/RW/Wipe/Need
+   clicks without typing /alfm. If nothing happens: check the AddOns list that
+   AscensionLFM is enabled (folder must be AscensionLFM), then /reload. Try /alfm status —
+   if that prints, the addon loaded. Default mode is Notify (Listening ON).
+5. Full Auto Hosting: /alfm → Hosting → enable the master toggle (default OFF). Kick59 stays OFF.
+6. Role Check / Aura: Hosting → RW Role Check (or Mini HUD **RW**); keep "Auto-move Auras" on.
+7. Optional: /alfm test injects a fake match so you can verify the Log UI. /alfm help lists commands.
+
+DEUTSCH
+-------
+1. Lade AscensionLFM.zip von GitHub Releases herunter (NICHT „Code → Download ZIP“ /
+   „Source code“ — das entpackt als AscensionLFM-main und erscheint NICHT in der
+   AddOns-Liste).
+2. Entpacken, sodass genau dieser Pfad entsteht:
+
+     Interface/AddOns/AscensionLFM/AscensionLFM.toc
+
+   Der Ordnername MUSS AscensionLFM heißen (Regel von WoW 3.3.5a).
+3. Addon in der Charakter-AddOns-Liste aktivieren, einloggen oder /reload.
+4. /alfm (oder /mslfm) öffnet die Einstellungen. Passiert nichts: AddOns-Liste prüfen
+   (Ordner AscensionLFM, Häkchen an), dann /reload. /alfm status muss eine Zeile drucken.
+5. Full Auto Hosting: /alfm → Hosting → Master-Schalter (Standard AUS). Kick59 bleibt AUS.
+6. Role Check / Aura: Hosting → RW Role Check; „Auto-move Auras (1 per raid group)“ AN lassen
+   (max. eine Aura pro Raid-Gruppe 1–8, Rest wird automatisch umgestellt).
+7. Optional: /alfm test · /alfm help
+
+TROUBLESHOOTING: "Loaded: Incompatible" or the AddOn seems to do nothing
+-------------------------------------------------------------------------
+This almost always means a stale/nested copy of the folder, or the character-select
+AddOns list not applied. Fix:
+
+1. Fully quit WoW/Ascension.
+2. DELETE the folder entirely:
+     <Ascension>/Interface/AddOns/AscensionLFM
+3. Unzip again so THIS exact file exists (one AscensionLFM folder, no nesting):
+     Interface/AddOns/AscensionLFM/AscensionLFM.toc
+4. Character select → AddOns:
+   - Tick "Allow Non-Launcher AddOns" (Ascension launcher-specific setting)
+   - Tick AscensionLFM
+   - Click APPLY (important — the list doesn't save itself)
+5. Enter world, then type: /alfm diag
+   This prints every module (Database, Parser, Slots, ..., MainWindow, MiniHUD,
+   RosterPanel) with OK or MISSING next to it — MISSING means that specific .lua
+   file failed to load; check the folder for a missing/corrupted file.
+6. Still "Incompatible"? Enable Lua errors and capture the exact message:
+   - Escape → Interface → Help/Options → enable Lua errors, or
+   - type: /console scriptErrors 1
+   - /reload and copy the red error text when it reappears.
+7. As a last resort, delete a possibly-corrupted saved-variables file (this resets all
+   AscensionLFM settings back to defaults, but never touches your character):
+     WTF/Account/<YourAccount>/SavedVariables/AscensionLFMDB.lua
+
+
+Chrome debug (pixel tuning)
+---------------------------
+/alfmchrome              MainWindow nineslice dump
+/alfmchrome hud          MiniHUD nineslice dump
+/alfmchromeref           DragonUI bag reference dump
+/alfmchromeside          Side-by-side bag vs main UI
+/alfmchromeprofile       Print size/offset profiles
