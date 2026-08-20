@@ -271,6 +271,15 @@ check("blacklist hit", AscensionLFM.Database.IsLeaderBlacklisted("SpamLord") == 
 AscensionLFM.Database.RemoveLeaderBlacklist("SpamLord")
 check("blacklist removed", AscensionLFM.Database.IsLeaderBlacklisted("SpamLord") == false)
 
+-- Favorite applicants (mirror image of leaderBlacklist)
+check("favorite unset by default", AscensionLFM.Database.IsFavoriteApplicant("GoodPlayer") == false)
+check("favorite add", AscensionLFM.Database.AddFavoriteApplicant("GoodPlayer") == true)
+check("favorite hit", AscensionLFM.Database.IsFavoriteApplicant("GoodPlayer") == true)
+check("favorite is case/realm insensitive", AscensionLFM.Database.IsFavoriteApplicant("goodplayer-Realmname") == true)
+check("favorite add rejects empty name", AscensionLFM.Database.AddFavoriteApplicant("") == false)
+AscensionLFM.Database.RemoveFavoriteApplicant("GoodPlayer")
+check("favorite removed", AscensionLFM.Database.IsFavoriteApplicant("GoodPlayer") == false)
+
 -- Whisper variants rotation (Scanner helper)
 dofile("core/Scanner.lua")
 db.useWhisperVariants = true

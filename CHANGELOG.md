@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.117
+
+- **New: favorite applicants list.** Inspired by "AutoInvite Plus"'s
+  favorite/blacklist lists - a known-good-players whitelist, the mirror
+  image of the existing leader blacklist. Add/remove a name under Queue
+  -> Favorite applicants; a favorited applicant gets a gold `*` star in
+  the Queue list so a host can spot a trusted returning player at a
+  glance. Deliberately informational only - doesn't change invite/accept
+  gating, computed fresh on every Queue refresh so it can't go stale.
+  `Database.AddFavoriteApplicant`/`RemoveFavoriteApplicant`/
+  `IsFavoriteApplicant`, new coverage in `tests/test_v040_auto.lua`.
+
 ## 0.4.116
 
 - **New: Log tab highlights listings that still need one of your own

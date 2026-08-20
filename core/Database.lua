@@ -47,6 +47,7 @@ local DEFAULTS = {
     useWhisperVariants = true,
     whisperVariantIndex = 1,
     leaderBlacklist = {}, -- [nameLower] = true - skip auto-whisper / seeking notify soft
+    favoriteApplicants = {}, -- [nameLower] = true - known-good applicants, starred in the Queue
     autoInvite = true, -- only used while mode == "hosting" (whisper applicants)
     autoInviteLfg = true, -- hosting: InviteUnit players who post LFG MS in chat
     lfgInviteWithoutRole = false, -- if LFG has no role, do not guess (default-deny)
@@ -352,6 +353,39 @@ function Database.RemoveLeaderBlacklist(name)
     if type(db.leaderBlacklist) == "table" then
         local key = tostring(name or ""):lower():gsub("%-.*$", "")
         db.leaderBlacklist[key] = nil
+    end
+end
+
+--- Favorite applicant helpers (hosting) - a known-good-players whitelist,
+-- the mirror image of leaderBlacklist. Purely informational (starred in
+-- the Queue UI) - does not change invite/accept gating.
+function Database.IsFavoriteApplicant(name)
+    local db = Database.Get()
+    if type(db.favoriteApplicants) ~= "table" then
+        return false
+    end
+    local key = tostring(name or ""):lower():gsub("%-.*$", "")
+    return db.favoriteApplicants[key] == true
+end
+
+function Database.AddFavoriteApplicant(name)
+    local db = Database.Get()
+    if type(db.favoriteApplicants) ~= "table" then
+        db.favoriteApplicants = {}
+    end
+    local key = tostring(name or ""):lower():gsub("%-.*$", "")
+    if key == "" then
+        return false
+    end
+    db.favoriteApplicants[key] = true
+    return true
+end
+
+function Database.RemoveFavoriteApplicant(name)
+    local db = Database.Get()
+    if type(db.favoriteApplicants) == "table" then
+        local key = tostring(name or ""):lower():gsub("%-.*$", "")
+        db.favoriteApplicants[key] = nil
     end
 end
 

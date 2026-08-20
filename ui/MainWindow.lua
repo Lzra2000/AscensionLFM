@@ -535,8 +535,15 @@ function MainWindow.RefreshQueue()
             if q then
                 local role = q.role and tostring(q.role) or nil
                 local st = tostring(q.status or "pending")
-                row.label:SetText(string.format("|cff4a3010%s|r  |cff5a4a30[%s]|r  %s\n%s",
-                    tostring(q.name or "?"), role or "?", st, tostring(q.message or ""):sub(1, 60)))
+                -- Star known-good applicants (inspired by comparable
+                -- addons' "favorite lists", mirroring the existing
+                -- leaderBlacklist) - purely informational, computed fresh
+                -- each refresh so it never goes stale if the list changes
+                -- while someone's already queued.
+                local star = (AscensionLFM.Database and AscensionLFM.Database.IsFavoriteApplicant
+                    and AscensionLFM.Database.IsFavoriteApplicant(q.name)) and "|cffffd200*|r " or ""
+                row.label:SetText(string.format("%s|cff4a3010%s|r  |cff5a4a30[%s]|r  %s\n%s",
+                    star, tostring(q.name or "?"), role or "?", st, tostring(q.message or ""):sub(1, 60)))
                 if row.icon then
                     local path = role and row.ROLE_ICONS and row.ROLE_ICONS[role]
                     row.icon:SetTexture(path or row.ROLE_ICON_UNKNOWN)
@@ -2423,6 +2430,44 @@ function MainWindow.Init()
         queueRows[i] = row
         qy = qy - 58
     end
+
+    -- Favorite applicants: a known-good-players whitelist (mirrors the
+    -- existing leaderBlacklist), starred in the rows above. Purely
+    -- informational - doesn't change invite/accept gating.
+    CreateSectionLabel(queue, "Favorite applicants", -338)
+    local favLbl = queue:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    favLbl:SetPoint("TOPLEFT", 4, -356)
+    favLbl:SetText("Name")
+    SetInk(favLbl, INK)
+    local favEdit = CreateFrame("EditBox", "AscensionLFMFavoriteEdit", queue, "InputBoxTemplate")
+    favEdit:SetSize(120, 18)
+    favEdit:SetPoint("LEFT", favLbl, "RIGHT", 6, 0)
+    favEdit:SetAutoFocus(false)
+    favEdit:SetMaxLetters(24)
+    local favAdd = CreateFrame("Button", nil, queue, "UIPanelButtonTemplate")
+    if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(favAdd) end
+    favAdd:SetSize(50, 20)
+    favAdd:SetPoint("LEFT", favEdit, "RIGHT", 4, 0)
+    favAdd:SetText("Add")
+    favAdd:SetScript("OnClick", function()
+        local name = favEdit:GetText() or ""
+        if AscensionLFM.Database.AddFavoriteApplicant(name) then
+            favEdit:SetText("")
+            MainWindow.RefreshQueue()
+            if AscensionLFM.Print then AscensionLFM.Print("favorited " .. name) end
+        end
+    end)
+    local favRem = CreateFrame("Button", nil, queue, "UIPanelButtonTemplate")
+    if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(favRem) end
+    favRem:SetSize(64, 20)
+    favRem:SetPoint("LEFT", favAdd, "RIGHT", 4, 0)
+    favRem:SetText("Remove")
+    favRem:SetScript("OnClick", function()
+        local name = favEdit:GetText() or ""
+        AscensionLFM.Database.RemoveFavoriteApplicant(name)
+        favEdit:SetText("")
+        MainWindow.RefreshQueue()
+    end)
 
     --------------------------------------------------------------------
     -- Kick
