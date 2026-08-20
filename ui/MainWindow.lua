@@ -696,6 +696,9 @@ local function SyncWidgetsFromDB()
     if widgets.minimapIcon and widgets.minimapIcon.SetChecked then
         widgets.minimapIcon:SetChecked(db.minimapIconShown ~= false)
     end
+    if widgets.lfmChatTab and widgets.lfmChatTab.SetChecked then
+        widgets.lfmChatTab:SetChecked(db.lfmChatTabEnabled == true)
+    end
     if widgets.useVariants and widgets.useVariants.SetChecked then
         widgets.useVariants:SetChecked(db.useWhisperVariants ~= false)
     end
@@ -1337,7 +1340,7 @@ function MainWindow.Init()
     --------------------------------------------------------------------
     -- General
     --------------------------------------------------------------------
-    local general = BuildCategoryPage(pageHost, CAT_GENERAL, 700)
+    local general = BuildCategoryPage(pageHost, CAT_GENERAL, 800)
 
     local statusBox = CreateFrame("Frame", nil, general)
     statusBox:SetPoint("TOPLEFT", 0, 0)
@@ -1511,6 +1514,19 @@ function MainWindow.Init()
                 AscensionLFM.MinimapButton.SetShown(on)
             else
                 AscensionLFM.Database.Get().minimapIconShown = on and true or false
+            end
+        end)
+
+    CreateSectionLabel(general, "Chat Tab", ry - 194)
+    widgets.lfmChatTab = CreateToggleRow(general, ry - 212,
+        "Dedicated LFM/LFG chat tab",
+        "Creates a separate chat tab that only receives matched Manastorm LFM/LFG lines - inspired by GroupBulletinBoard. Uses this client's normal chat-window API; if it doesn't behave as expected, disable and use the Log tab instead. Off by default.",
+        false,
+        function(on)
+            if AscensionLFM.LfmChatTab and AscensionLFM.LfmChatTab.SetEnabled then
+                AscensionLFM.LfmChatTab.SetEnabled(on)
+            else
+                AscensionLFM.Database.Get().lfmChatTabEnabled = on and true or false
             end
         end)
 

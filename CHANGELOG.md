@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.4.118
+
+- **New: dedicated LFM/LFG chat tab (opt-in, off by default).** Inspired
+  by GroupBulletinBoard's `/gbb chat organize` - creates a separate chat
+  window/tab that only receives matched Manastorm LFM/LFG lines, the
+  opposite direction from the existing chat declutter filter (which
+  hides matches from the normal chat frames instead). Toggle via
+  Settings -> General -> Chat Tab, or `/alfmchattab [on|off]`.
+  **Caveat**: this uses this client's chat-window API
+  (`FCF_OpenNewWindow`/`GetChatWindowInfo`), which couldn't be verified
+  against a live 3.3.5a client this session - every call is guarded and
+  pcall-wrapped, so if anything about the API doesn't match, the feature
+  silently no-ops instead of erroring or breaking the rest of the addon.
+  New `tests/test_lfm_chat_tab.lua` against a mocked chat-window API (14
+  checks, including that a broken cache is caught) - real in-game
+  behavior still needs a live test.
+
 ## 0.4.117
 
 - **New: favorite applicants list.** Inspired by "AutoInvite Plus"'s

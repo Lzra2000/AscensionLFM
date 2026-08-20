@@ -174,6 +174,9 @@ local function NotifyMatch(leader, parsed, source)
     if AscensionLFM.Print then
         AscensionLFM.Print(line)
     end
+    if AscensionLFM.LfmChatTab and AscensionLFM.LfmChatTab.Post then
+        AscensionLFM.LfmChatTab.Post(line)
+    end
     if AscensionLFM.Database and AscensionLFM.Database.PushMatch then
         AscensionLFM.Database.PushMatch({
             leader = leader,

@@ -8,7 +8,7 @@ if type(AscensionLFM) ~= "table" then
     _G.AscensionLFM = AscensionLFM
 end
 
-AscensionLFM.VERSION = "0.4.117"
+AscensionLFM.VERSION = "0.4.118"
 AscensionLFM.ADDON_NAME = "AscensionLFM"
 
 local function Print(msg)
@@ -358,6 +358,7 @@ local function StartModules()
     SafeStart("MainWindow.Init", AscensionLFM.MainWindow and AscensionLFM.MainWindow.Init)
     SafeStart("MiniHUD.Start", AscensionLFM.MiniHUD and AscensionLFM.MiniHUD.Start)
     SafeStart("MinimapButton.Start", AscensionLFM.MinimapButton and AscensionLFM.MinimapButton.Start)
+    SafeStart("LfmChatTab.Start", AscensionLFM.LfmChatTab and AscensionLFM.LfmChatTab.Start)
     SafeStart("RosterPanel.Start", AscensionLFM.RosterPanel and AscensionLFM.RosterPanel.Start)
     local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
     local mode = (db and db.mode) or "notify"
