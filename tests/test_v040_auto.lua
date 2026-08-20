@@ -302,6 +302,20 @@ db.roles.healer = true
 AscensionLFM.Scanner._HandlePublicListing("AcceptedRoleLeader", "LFG MS heal", "CHAT_MSG_SAY")
 check("accepted role LFG still logged", #db.matchHistory == beforeCount + 1, tostring(#db.matchHistory))
 
+-- Regression/coverage: matchHistory entries now carry the parsed role
+-- data too, not just the display text - the Log tab's "[NEEDS YOU]"
+-- highlight (MainWindow.RefreshMatches -> Parser.NeedsAnyRole) depends on
+-- this being present so it can tell whether a logged listing still needs
+-- one of the player's own configured roles, without re-parsing the raw
+-- text at render time.
+db.roles = { tank = true, healer = false, aura = false, dps = false }
+AscensionLFM.Scanner._HandlePublicListing("TankNeeded", "LFM MS need tank", "CHAT_MSG_SAY")
+local topEntry = db.matchHistory[1]
+check("matchHistory entry carries parsed roles data", topEntry and type(topEntry.roles) == "table",
+    topEntry and type(topEntry.roles) or "none")
+local neededByMe = topEntry and AscensionLFM.Parser.NeedsAnyRole({ roles = topEntry.roles }, db.roles)
+check("NeedsAnyRole reads the stored roles data correctly", neededByMe == true, tostring(neededByMe))
+
 --------------------------------------------------------------------
 -- Seeking: auto-reply to a host's own follow-up questions (level, and
 -- role+aura) after we already auto-whispered them — the Suriana-style

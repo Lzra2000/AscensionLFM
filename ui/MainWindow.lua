@@ -436,7 +436,16 @@ function MainWindow.RefreshMatches()
             local m = history[i]
             if m then
                 local kind = m.kind and ("/" .. tostring(m.kind)) or ""
-                fs:SetText(string.format("|cff4a3010%s|r  |cff5a4a30(%s%s)|r\n%s",
+                -- Inspired by comparable addons' "organized, not just
+                -- chronological" LFM lists (GBB/RaidBrowser): tag entries
+                -- that still need one of the player's own configured
+                -- roles so they stand out in a flat 5-entry list instead
+                -- of requiring the player to read every line.
+                local needsMe = m.roles and AscensionLFM.Parser and AscensionLFM.Parser.NeedsAnyRole
+                    and AscensionLFM.Parser.NeedsAnyRole({ roles = m.roles }, db.roles)
+                local tag = needsMe and "|cff30d030[NEEDS YOU] |r" or ""
+                fs:SetText(string.format("%s|cff4a3010%s|r  |cff5a4a30(%s%s)|r\n%s",
+                    tag,
                     tostring(m.leader or "?"),
                     tostring(m.source or "chat"),
                     kind,

@@ -181,6 +181,11 @@ local function NotifyMatch(leader, parsed, source)
             summary = parsed.summary,
             source = source,
             kind = parsed.listingKind or (parsed.isManastormLFG and "lfg" or "lfm"),
+            -- Kept so the Log tab can highlight entries that still need
+            -- one of the player's own configured roles (MainWindow.
+            -- RefreshMatches -> Parser.NeedsAnyRole), instead of every
+            -- entry looking equally relevant in a flat chronological list.
+            roles = parsed.roles,
             t = time and time() or 0,
         })
     end

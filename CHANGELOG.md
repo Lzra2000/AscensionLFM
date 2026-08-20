@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.4.116
+
+- **New: Log tab highlights listings that still need one of your own
+  roles.** Inspired by comparable addons (GBB, RaidBrowser) that present
+  detected LFM/LFG postings as an organized/filterable list instead of a
+  flat chronological dump. AscensionLFM's Log tab stays flat (only 5
+  visible entries, avoided restructuring that fixed-layout page further
+  after two spacing-math bugs already found there this session), but
+  each entry's parsed role-need data is now carried into `matchHistory`
+  and checked against your own configured Seeking roles - a listing that
+  still needs you gets a green `[NEEDS YOU]` tag, so it stands out
+  instead of requiring you to read every line. New coverage in
+  `tests/test_v040_auto.lua`, verified to fail against the old entry
+  shape (missing `roles` field) first.
+
 ## 0.4.115
 
 - **Fix: RoleCheck.Resync silently refreshed every present member's
