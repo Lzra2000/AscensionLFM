@@ -98,9 +98,18 @@ function RaidMarks.CanMark()
     return false
 end
 
---- Clears every one of the 8 raid target icons currently in use (not just
--- the ones AutoMark would set) - useful before a re-mark so a tank who
--- got reassigned to dps doesn't keep an old Skull.
+--- Clears only the raid-target icons this addon's own tank/healer set uses
+-- (Skull/Cross/Square/Moon/Triangle) - useful before a re-mark so a tank
+-- who got reassigned to dps doesn't keep an old Skull. Deliberately leaves
+-- every other icon (Star/Circle/Diamond, or any of the five above if a
+-- raid leader placed it by hand for an unrelated encounter mechanic like
+-- an interrupt/kill-priority marker) untouched - previously this cleared
+-- all 8 icons raid-wide unconditionally, wiping any manually-placed
+-- mechanic markers as a side effect of refreshing tank/healer icons.
+local OWNED_ICONS = {}
+for _, icon in ipairs(RaidMarks.TANK_ICONS) do OWNED_ICONS[icon] = true end
+for _, icon in ipairs(RaidMarks.HEALER_ICONS) do OWNED_ICONS[icon] = true end
+
 function RaidMarks.ClearAllMarks()
     if type(SetRaidTarget) ~= "function" or type(GetNumRaidMembers) ~= "function" then
         return 0
@@ -111,9 +120,13 @@ function RaidMarks.ClearAllMarks()
     end
     local cleared = 0
     for i = 1, n do
-        local ok = pcall(SetRaidTarget, "raid" .. i, 0)
-        if ok then
-            cleared = cleared + 1
+        local unit = "raid" .. i
+        local current = type(GetRaidTargetIndex) == "function" and GetRaidTargetIndex(unit)
+        if current and OWNED_ICONS[current] then
+            local ok = pcall(SetRaidTarget, unit, 0)
+            if ok then
+                cleared = cleared + 1
+            end
         end
     end
     return cleared

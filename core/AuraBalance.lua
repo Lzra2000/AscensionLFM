@@ -15,7 +15,17 @@ AscensionLFM.AuraBalance = AuraBalance
 local GROUP_CAP = 5
 local SETTLE_TIMEOUT = 2.0
 
-local waitingFor = nil -- { name=, to=, kind=, t0= }
+-- Balance() (aura-only, fired on nearly every roster event via Scanner/
+-- Slots) and BalanceAll() (tank->healer->aura, fired once per Role Check
+-- resync) used to share one `waitingFor` variable. Balance() runs far
+-- more often, so it would almost always observe the settle first and
+-- clear it out from under BalanceAll() - silently dropping BalanceAll()'s
+-- still-queued healer/aura passes after only the tank move applied, with
+-- nothing left to ever retry them. Separate state per caller fixes the
+-- race; the ticker below (AuraBalance.Start) gives BalanceAll() an actual
+-- owner to advance its queue instead of relying on another Role Check.
+local waitingForAura = nil -- { name=, to=, kind=, t0= } - Balance()
+local waitingForAll = nil -- { name=, to=, kind=, t0= } - BalanceAll()
 local lastPlanFingerprint = ""
 
 local function LowerName(name)
@@ -394,8 +404,24 @@ function AuraBalance.ApplyMoves(moves)
     return n
 end
 
-local function ClearWait()
-    waitingFor = nil
+local function ClearWaitAura()
+    waitingForAura = nil
+end
+
+local function ClearWaitAll()
+    waitingForAll = nil
+end
+
+--- Has this pending move settled (target actually landed, or timed out)?
+local function HasSettled(wait, members)
+    if not wait then
+        return true
+    end
+    local m = FindByName(members, wait.name)
+    if m and tonumber(m.subgroup) == tonumber(wait.to) then
+        return true
+    end
+    return (Now() - (wait.t0 or 0)) > SETTLE_TIMEOUT
 end
 
 --- Scan roster + assignedRoles and auto-move so each subgroup has <=1 aura.
@@ -404,7 +430,7 @@ end
 function AuraBalance.Balance()
     local db = DB()
     if db and db.autoMoveAura == false then
-        ClearWait()
+        ClearWaitAura()
         return 0, 0
     end
     if not CanMoveRaid() then
@@ -413,16 +439,13 @@ function AuraBalance.Balance()
 
     local members = CollectRaidMembers()
     if #members == 0 then
-        ClearWait()
+        ClearWaitAura()
         return 0, 0
     end
 
-    if waitingFor then
-        local m = FindByName(members, waitingFor.name)
-        if m and tonumber(m.subgroup) == tonumber(waitingFor.to) then
-            ClearWait()
-        elseif (Now() - (waitingFor.t0 or 0)) > SETTLE_TIMEOUT then
-            ClearWait()
+    if waitingForAura then
+        if HasSettled(waitingForAura, members) then
+            ClearWaitAura()
         else
             return 0, 0
         end
@@ -432,14 +455,14 @@ function AuraBalance.Balance()
     local fp = Fingerprint(members)
     if #plan == 0 then
         lastPlanFingerprint = fp
-        ClearWait()
+        ClearWaitAura()
         return 0, 0
     end
 
     local first = plan[1]
     local ok = AuraBalance.ApplyOne(first, members)
     if ok then
-        waitingFor = {
+        waitingForAura = {
             name = first.name,
             to = first.to,
             kind = first.kind or "set",
@@ -469,16 +492,13 @@ function AuraBalance.BalanceAll()
 
     local members = CollectRaidMembers()
     if #members == 0 then
-        ClearWait()
+        ClearWaitAll()
         return 0, 0
     end
 
-    if waitingFor then
-        local m = FindByName(members, waitingFor.name)
-        if m and tonumber(m.subgroup) == tonumber(waitingFor.to) then
-            ClearWait()
-        elseif (Now() - (waitingFor.t0 or 0)) > SETTLE_TIMEOUT then
-            ClearWait()
+    if waitingForAll then
+        if HasSettled(waitingForAll, members) then
+            ClearWaitAll()
         else
             return 0, 0
         end
@@ -500,7 +520,7 @@ function AuraBalance.BalanceAll()
                 local first = plan[1]
                 local ok = AuraBalance.ApplyOne(first, members)
                 if ok then
-                    waitingFor = {
+                    waitingForAll = {
                         name = first.name,
                         to = first.to,
                         kind = first.kind or "set",
@@ -512,8 +532,32 @@ function AuraBalance.BalanceAll()
         end
     end
 
-    ClearWait()
+    ClearWaitAll()
     return 0, 0
+end
+
+-- Drives BalanceAll()'s tank->healer->aura queue to completion. Resync()
+-- only calls BalanceAll() once (when a Role Check ends), and BalanceAll()
+-- itself only applies one move per call by design (see doc comment above)
+-- - without this ticker nothing ever made the "call again once settled"
+-- half of that design actually happen, so only the first role's move ever
+-- landed per Role Check in live play.
+local tickerFrame
+function AuraBalance.Start()
+    if tickerFrame or type(CreateFrame) ~= "function" then
+        return
+    end
+    tickerFrame = CreateFrame("Frame")
+    tickerFrame:SetScript("OnUpdate", function(self, elapsed)
+        self._t = (self._t or 0) + (elapsed or 0)
+        if self._t < 0.5 then
+            return
+        end
+        self._t = 0
+        if waitingForAll then
+            AuraBalance.BalanceAll()
+        end
+    end)
 end
 
 --- True if subgroup already has an assigned aura (for invite gating helpers).
@@ -531,7 +575,8 @@ function AuraBalance.SubgroupHasAura(subgroup, members)
 end
 
 function AuraBalance._ResetForTests()
-    ClearWait()
+    ClearWaitAura()
+    ClearWaitAll()
     lastPlanFingerprint = ""
 end
 

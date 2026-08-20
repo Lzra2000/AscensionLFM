@@ -258,6 +258,54 @@ _G.GetTime = function() return 6009 end
 local m4 = AB.BalanceAll()
 check("BalanceAll settles with nothing left to do", m4 == 0, tostring(m4))
 
+-- Regression: Balance() (aura-only, fired on almost every roster event)
+-- and BalanceAll() (tank->healer->aura, fired once per Role Check resync)
+-- used to share ONE `waitingFor` variable. A still-unsettled BalanceAll()
+-- move (tank not yet landed) used to also block Balance() from doing its
+-- own, completely unrelated aura-balance work - Balance() couldn't tell
+-- "not settled because it's my own pending move" from "not settled
+-- because it's someone else's". Separate waitingForAura/waitingForAll
+-- variables fix this: an interleaved Balance() call must succeed on its
+-- own unrelated aura excess even while BalanceAll()'s tank move is still
+-- pending.
+AB._ResetForTests()
+local roster5 = {
+    { name = "T1", sub = 1, role = "tank" },
+    { name = "T2", sub = 1, role = "tank" }, -- excess tank
+    { name = "A1", sub = 2, role = "aura" },
+    { name = "A2", sub = 2, role = "aura" }, -- excess aura, unrelated to the tank move
+}
+_G.GetNumRaidMembers = function() return #roster5 end
+_G.GetRaidRosterInfo = function(i)
+    local r = roster5[i]
+    if not r then return end
+    return r.name, nil, r.sub
+end
+-- Simulates the tank's SetRaidSubgroup never landing within the
+-- observation window (still-pending settle), while any other move (the
+-- aura swap) applies normally.
+_G.SetRaidSubgroup = function(i, to)
+    local r = roster5[i]
+    if r and r.name ~= "T2" then
+        r.sub = to
+    end
+end
+_G.SwapRaidSubgroup = function() end
+local db5 = AscensionLFM.Database.Get()
+db5.assignedRoles = { t1 = "tank", t2 = "tank", a1 = "aura", a2 = "aura" }
+db5.autoMoveTank = true
+db5.autoMoveHealer = true
+db5.autoMoveAura = true
+
+_G.GetTime = function() return 9000 end
+local rm1 = AB.BalanceAll()
+check("regression: BalanceAll starts the (still-pending) tank move", rm1 == 1, tostring(rm1))
+
+_G.GetTime = function() return 9000.2 end -- well within SETTLE_TIMEOUT, tank move still unsettled
+local rm2 = select(1, AB.Balance())
+check("regression: interleaved Balance() still fixes its own unrelated aura excess",
+    rm2 == 1, tostring(rm2))
+
 -- Toggle off: autoMoveTank=false skips tank pass entirely.
 AB._ResetForTests()
 local roster3 = {

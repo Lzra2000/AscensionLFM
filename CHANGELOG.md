@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.4.109
+
+- **AuraBalance race fix.** `Balance()` (aura-only, fired on nearly every
+  roster event via Scanner/Slots) and `BalanceAll()` (tank->healer->aura,
+  fired once per Role Check resync) shared one `waitingFor` settle-wait
+  variable. Since `Balance()` runs far more often, a still-unsettled
+  `BalanceAll()` move used to block `Balance()`'s own unrelated aura work
+  too, and once settled either side could clear/overwrite the other's
+  state - net effect, only the tank pass reliably applied per Role Check;
+  the queued healer/aura passes had nothing to ever retry them. Split
+  into separate `waitingForAura`/`waitingForAll` variables, and gave
+  `BalanceAll()` an actual owner (`AuraBalance.Start()`, a 0.5s ticker
+  that re-drives it while a move is pending) instead of relying on
+  another Role Check to advance its queue. Regression test added and
+  verified to fail against the old shared-state code before the fix.
+- **RaidMarks.ClearAllMarks() no longer wipes unrelated markers.**
+  Previously cleared all 8 raid-target icons unconditionally before every
+  re-mark, including ones a raid leader placed by hand for an unrelated
+  encounter mechanic (interrupt/kill-priority Star/Circle/Diamond etc).
+  Now only clears icons from this addon's own tank/healer set
+  (Skull/Cross/Square/Moon/Triangle), checked via `GetRaidTargetIndex`
+  before clearing. New `tests/test_raid_marks.lua` - this module had zero
+  test coverage before.
+- Found via a targeted review of the four files that hadn't had a
+  dedicated pass yet (`RaidMarks.lua`, `ManastormTracker.lua`,
+  `Reject.lua`, a second look at `AuraBalance.lua`); `Reject.lua` had no
+  real issues.
+
 ## 0.4.108
 
 - **New: keystone-level filter.** Optional (off by default, "Min level to
