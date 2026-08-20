@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.4.114
+
+- **Fix: title bar seam under DragonUI.** Reported live via screenshot -
+  the title/subtitle area stood out as a visibly lighter 260x34 rectangle
+  against the rest of the window. Root cause: `titleBg` drew its own
+  second copy of the same rock background texture (own alpha 0.97) on
+  top of the window's already-rock-textured chrome, so that exact
+  rectangle got double-composited and came out lighter than its
+  surroundings. Removed - titleBg is now purely a text-positioning
+  anchor, title/subtitle sit directly on the window's own background in
+  both the DragonUI and classic-fallback cases (the classic case had
+  already been fixed this way in v0.4.105 for a different symptom - a
+  warped capsule shape - but the DragonUI case still had its own copy of
+  this texture until now).
+
 ## 0.4.113
 
 - **Fix: Roster tab's 8-group card grid clipped by 20px.** Found via a

@@ -1176,20 +1176,17 @@ function MainWindow.Init()
         -- Above chrome host (+20) so title text is not covered by metal.
         titleBg:SetFrameLevel((frame:GetFrameLevel() or 0) + 22)
     end
-    -- Rock title strip only under DragonUI, where it's sized/tuned to sit
-    -- inside the metal nineslice chrome. Without DragonUI there's no metal
-    -- border to blend into, and stretching the same full-dialog background
-    -- texture across this small 260x34 box just warps it into a distorted
-    -- gold/tan capsule that clashes with the frame's own classic dialog
-    -- background - so leave titleBg transparent there and let the title
-    -- text sit directly on frame's own background instead.
-    if AscensionLFM.Chrome and AscensionLFM.Chrome.HasDragonUI and AscensionLFM.Chrome.HasDragonUI() then
-        local tbg = titleBg:CreateTexture(nil, "BACKGROUND")
-        tbg:SetTexture(RockPath())
-        tbg:SetAllPoints(titleBg)
-        tbg:SetAlpha(0.97)
-        tbg._duiOwned = true
-    end
+    -- No separate background texture here at all - titleBg is purely a
+    -- positioning anchor for the title/subtitle text, which sits directly
+    -- on the main window's own rock background instead. A second rock
+    -- layer used to be drawn here under DragonUI (own alpha 0.97, drawn
+    -- above the chrome host) - since it's the SAME texture as the window
+    -- background layered a second time on top of it, the double alpha
+    -- compositing made this exact 260x34 rectangle visibly lighter than
+    -- its surroundings, a seam reported live via screenshot ("not
+    -- uniform"). Without DragonUI, stretching that same full-dialog
+    -- texture across this small box also warped it into a distorted
+    -- gold/tan capsule - so removing it fixes both cases at once.
     if titleBg.SetBackdrop then
         titleBg:SetBackdrop(nil)
     end
