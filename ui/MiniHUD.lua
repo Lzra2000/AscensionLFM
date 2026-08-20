@@ -1065,7 +1065,7 @@ local function SetExpanded(on)
     end
     if expanded then
         frame:SetWidth(440)
-        frame:SetHeight(86)
+        frame:SetHeight(100)
         if frame.titleFS then
             frame.titleFS:SetText("AscensionLFM")
             frame.titleFS:Show()
@@ -1194,7 +1194,13 @@ local function BuildFrame()
     local f = CreateFrame("Frame", FRAME_NAME, UIParent)
     f:SetFrameStrata("HIGH")
     f:SetWidth(440)
-    f:SetHeight(86)
+    -- 86 wasn't tall enough for both button rows plus statusFS at the
+    -- bottom: row 2's buttons (y -53 to -73) overlapped statusFS's top
+    -- edge (86-21=65) by 8px - the two button rows plus the status line
+    -- simply don't fit in 86px of height no matter how the internal gaps
+    -- are tuned (confirmed via exact arithmetic this session). 100 gives
+    -- real clearance.
+    f:SetHeight(100)
     f:SetMovable(true)
     f:EnableMouse(true)
     f:RegisterForDrag("LeftButton")

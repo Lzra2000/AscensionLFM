@@ -2421,7 +2421,7 @@ function MainWindow.Init()
     --------------------------------------------------------------------
     -- Kick
     --------------------------------------------------------------------
-    local roster = BuildCategoryPage(pageHost, CAT_ROSTER, 720)
+    local roster = BuildCategoryPage(pageHost, CAT_ROSTER, 750)
     local rosterBar = CreateFrame("Frame", nil, roster)
     rosterBar:SetPoint("TOPLEFT", 0, -2)
     rosterBar:SetPoint("TOPRIGHT", 0, -2)

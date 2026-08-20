@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.4.113
+
+- **Fix: Roster tab's 8-group card grid clipped by 20px.** Found via a
+  layout-math review pass (same method that caught v0.4.111's Seeking-tab
+  bug) applied to `ui/MiniHUD.lua`/`ui/RosterPanel.lua`. With all 8
+  subgroups populated, the last card row (Groups 7/8) needs 690px but the
+  Roster page only declared 720px content height with a 50px header
+  offset (670px available) - 20px overflow, cutting off the bottom of the
+  5th member row in the last two cards. Bumped to 750.
+- **Fix: MiniHUD's second button row overlapped the slot-status text by
+  8px**, every time the HUD is expanded (not a transient state - always
+  present). The 86px expanded frame height was too short to fit both
+  button rows plus the "T-/H-/A-/D-" status line no matter how the
+  internal gaps were tuned (worked out the exact minimum needed - 86px
+  genuinely can't fit it). Bumped to 100px.
+
 ## 0.4.112
 
 - **Fix: Roster tab's ⇄ (move-to-group) button rendered as "?".** Reported
