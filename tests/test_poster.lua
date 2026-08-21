@@ -123,6 +123,23 @@ check("BuildMessage 5th arg ms suppresses mplus fields",
     Poster.BuildMessage(mixedSnap, false, "Deadmines", 14, "ms") == "LFM MS | 1/3 Healers | 4/7 DPS",
     Poster.BuildMessage(mixedSnap, false, "Deadmines", 14, "ms"))
 
+-- Group-reward bonus tag (confirmed real via Ascension's own client
+-- source, Ascension_Manastorm/Manastorm.lua's objective tracker): only
+-- shown when a genuine bonus is active, never a guess or a baseline value.
+check("reward bonus prefix silent when nil", Poster.RewardBonusPrefix(nil) == "",
+    Poster.RewardBonusPrefix(nil))
+check("reward bonus prefix silent when zero/negative", Poster.RewardBonusPrefix(0) == ""
+    and Poster.RewardBonusPrefix(-5) == "")
+check("reward bonus prefix format", Poster.RewardBonusPrefix(50) == "[+50% Loot] ",
+    Poster.RewardBonusPrefix(50))
+check("BuildMessage 6th arg adds reward bonus tag before content prefix",
+    Poster.BuildMessage(mixedSnap, false, "Deadmines", 14, "raid", 50)
+        == "[+50% Loot] [RAID] LFM MS | 1/3 Healers | 4/7 DPS",
+    Poster.BuildMessage(mixedSnap, false, "Deadmines", 14, "raid", 50))
+check("BuildMessage 6th arg omitted stays unchanged (back-compat)",
+    Poster.BuildMessage(mixedSnap, false, "Deadmines", 14, "raid")
+        == "[RAID] LFM MS | 1/3 Healers | 4/7 DPS")
+
 -- Disabled roles (max<=0) are never shown even with showAll=true.
 local withDisabled = {
     tank = { filled = 2, max = 2 },
@@ -350,6 +367,45 @@ check("disabled role max not leaked", disabledMsg:find("0/3 Healers", 1, true) =
 local disabledStatus = Poster.GetStatus()
 check("GetStatus message also filtered", disabledStatus.message:find("Healers", 1, true) == nil,
     disabledStatus.message)
+
+-- Live reward-bonus resolver (RefreshMessage/GetStatus/Tick all wire it
+-- through): only tags the message when C_Manastorm actually reports a
+-- real active group-reward bonus (> 1), mirroring the exact gate
+-- Ascension's own tracker uses - never on the always-populated base
+-- reward multiplier, and never when C_Manastorm/the run isn't real.
+db.roles = { tank = true, healer = true, aura = true, dps = true }
+db.slotMax = { tank = 2, healer = 3, aura = 3, dps = 7 }
+Slots.ClearAll()
+
+_G.C_Manastorm = nil
+local noBonusMsg = Poster.RefreshMessage()
+check("no C_Manastorm -> no reward bonus tag", noBonusMsg:find("Loot", 1, true) == nil, noBonusMsg)
+
+_G.C_Manastorm = {
+    GetActiveManastormID = function() return nil end,
+    GetRewardModifier = function() return 1, 1, 1, 1 end,
+}
+local notInRunMsg = Poster.RefreshMessage()
+check("not inside a manastorm (nil id) -> no tag", notInRunMsg:find("Loot", 1, true) == nil, notInRunMsg)
+
+_G.C_Manastorm = {
+    GetActiveManastormID = function() return 42 end,
+    GetRewardModifier = function() return 1, 1, 1, 1 end, -- base multiplier only, no real bonus
+}
+local baseOnlyMsg = Poster.RefreshMessage()
+check("base reward multiplier (not > 1) -> no tag", baseOnlyMsg:find("Loot", 1, true) == nil, baseOnlyMsg)
+
+_G.C_Manastorm = {
+    GetActiveManastormID = function() return 42 end,
+    GetRewardModifier = function() return 1, 1, 1.5, 1 end, -- real 50% group bonus
+}
+local bonusMsg = Poster.RefreshMessage()
+check("real group reward bonus -> tag shown", bonusMsg:find("[+50% Loot]", 1, true) ~= nil, bonusMsg)
+local bonusStatus = Poster.GetStatus()
+check("GetStatus reflects live reward bonus too",
+    bonusStatus.message:find("[+50% Loot]", 1, true) ~= nil, bonusStatus.message)
+
+_G.C_Manastorm = nil
 
 --------------------------------------------------------------------
 -- Channel resolution: no silent YELL fallback on failure (was posting to

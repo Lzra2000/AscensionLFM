@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.4.125
+
+- **LFM posts now auto-tag an active Manastorm group-reward bonus** (e.g.
+  `[+50% Loot] LFM MS ...`) when one is genuinely active - a real
+  recruiting signal (a run with bonus loot fills faster) that previously
+  required alt-tabbing to Ascension's own in-run tracker to even notice.
+  - Confirmed real via Ascension's own client source
+    (`Ascension_Manastorm/Manastorm.lua`'s objective tracker):
+    `C_Manastorm.GetRewardModifier(manastormID)` returns `endReward,
+    encounterReward, groupEndReward, groupEncounterReward`; the tracker
+    only shows its own "group reward multiplier" line when
+    `max(groupEndReward, groupEncounterReward) > 1` - this mirrors that
+    exact gate, not the always-populated base reward multiplier (which
+    would just be noise at its default 100%).
+  - `Poster.RewardBonusPrefix(percent)` (pure, testable) builds the tag;
+    a new live resolver reads `C_Manastorm.GetActiveManastormID()` +
+    `GetRewardModifier()` and is wired into all three places the LFM
+    text gets built (`RefreshMessage`, `GetStatus`, `Tick`) - so it shows
+    up automatically in the Post tab preview and every repost, no new
+    setting needed.
+  - Silent (no tag) whenever `C_Manastorm` is missing, no run is active,
+    or the reward modifier isn't actually above baseline - this can only
+    ever add a tag when a real bonus is confirmed live, never guess one.
+  - Regression-tested: reverted the fix, confirmed
+    `tests/test_poster.lua`'s new reward-bonus tests fail against the old
+    code (missing function), then restored the fix and confirmed all
+    pass, including the live-resolver gating (no `C_Manastorm`, no
+    active run, base-only multiplier, and a real 50% bonus all handled
+    correctly).
+
 ## 0.4.124
 
 - **Regroup no longer re-invites level-capped players.** The "Regrp"

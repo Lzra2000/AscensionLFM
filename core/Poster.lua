@@ -104,7 +104,20 @@ function Poster.ContentPrefix(contentType, mplusDungeon, mplusLevel)
     return Poster.MPlusPrefix(mplusDungeon, mplusLevel)
 end
 
-function Poster.BuildMessage(snapshot, showAll, mplusDungeon, mplusLevel, contentType)
+--- Pure: "[+50% Loot] " tag for an active Manastorm group-reward bonus,
+-- or "" when there's no real bonus (nil/<=0 percent). Advertising this in
+-- the LFM text is a genuine recruiting signal (a run with bonus loot
+-- fills faster) and only ever appears when the live resolver confirms an
+-- actual bonus is active - never a guess.
+function Poster.RewardBonusPrefix(percent)
+    percent = tonumber(percent)
+    if not percent or percent <= 0 then
+        return ""
+    end
+    return string.format("[+%d%% Loot] ", percent)
+end
+
+function Poster.BuildMessage(snapshot, showAll, mplusDungeon, mplusLevel, contentType, rewardBonusPercent)
     snapshot = snapshot or {}
     local bits = { "LFM MS" }
     for _, role in ipairs(ROLE_ORDER) do
@@ -119,7 +132,7 @@ function Poster.BuildMessage(snapshot, showAll, mplusDungeon, mplusLevel, conten
             table.insert(bits, string.format("%d/%d %s", filled, max, ROLE_LABELS[role]))
         end
     end
-    local prefix = Poster.ContentPrefix(contentType, mplusDungeon, mplusLevel)
+    local prefix = Poster.RewardBonusPrefix(rewardBonusPercent) .. Poster.ContentPrefix(contentType, mplusDungeon, mplusLevel)
     if #bits == 1 then
         return prefix .. "LFM MS - full"
     end
@@ -266,6 +279,35 @@ local function LiveUnassignedCount()
     return 0
 end
 
+--- Live group-reward bonus percent for the Manastorm the host is
+-- currently inside, or nil when none is active. Confirmed real via
+-- Ascension's own client source (Ascension_Manastorm/Manastorm.lua's
+-- objective tracker): C_Manastorm.GetRewardModifier(manastormID) returns
+-- endReward, encounterReward, groupEndReward, groupEncounterReward - the
+-- tracker only shows MANASTORM_GROUP_REWARD_MULTIPLIER when
+-- max(groupEndReward, groupEncounterReward) > 1, so this mirrors that
+-- exact gate rather than always showing the (always-populated) base
+-- reward multiplier, which would just be noise at its default 100%.
+local function LiveRewardBonusPercent()
+    if type(C_Manastorm) ~= "table" or type(C_Manastorm.GetActiveManastormID) ~= "function"
+        or type(C_Manastorm.GetRewardModifier) ~= "function" then
+        return nil
+    end
+    local ok, manastormID = pcall(C_Manastorm.GetActiveManastormID)
+    if not ok or not manastormID then
+        return nil
+    end
+    local ok2, _, _, groupEndReward, groupEncounterReward = pcall(C_Manastorm.GetRewardModifier, manastormID)
+    if not ok2 then
+        return nil
+    end
+    local groupRewardMulti = math.max(tonumber(groupEndReward) or 1, tonumber(groupEncounterReward) or 1)
+    if groupRewardMulti <= 1 then
+        return nil
+    end
+    return math.floor((groupRewardMulti - 1) * 100 + 0.5)
+end
+
 --- Zero out a role's filled/max/open when the host has turned off accepting
 -- it (db.roles[role] == false), even if db.slotMax still has a leftover
 -- positive cap left over from before it was disabled. Without this, the
@@ -297,7 +339,7 @@ end
 function Poster.RefreshMessage()
     local db = DB()
     lastMessage = Poster.BuildMessage(FilterAcceptedRoles(LiveSnapshot(), db), db and db.postShowAllRoles,
-        db and db.mplusDungeon, db and db.mplusLevel, db and db.contentType)
+        db and db.mplusDungeon, db and db.mplusLevel, db and db.contentType, LiveRewardBonusPercent())
     return lastMessage
 end
 
@@ -432,7 +474,7 @@ function Poster.GetStatus()
         isFull = full,
         fullReason = fullReason,
         status = lastStatus,
-        message = lastMessage ~= "" and lastMessage or Poster.BuildMessage(snap, false, db and db.mplusDungeon, db and db.mplusLevel, db and db.contentType),
+        message = lastMessage ~= "" and lastMessage or Poster.BuildMessage(snap, false, db and db.mplusDungeon, db and db.mplusLevel, db and db.contentType, LiveRewardBonusPercent()),
         channel = NormalizeChannel(db and db.postChannel),
         channelName = (db and db.postChannelName) or "",
     }
@@ -448,7 +490,7 @@ function Poster.Tick(now)
     end
 
     local snap = FilterAcceptedRoles(LiveSnapshot(), db)
-    lastMessage = Poster.BuildMessage(snap, false, db.mplusDungeon, db.mplusLevel, db.contentType)
+    lastMessage = Poster.BuildMessage(snap, false, db.mplusDungeon, db.mplusLevel, db.contentType, LiveRewardBonusPercent())
     local full, fullReason = Poster.IsFull(snap, LiveGroupSize(), db.maxPartySize, LiveUnassignedCount())
     local ok, reason = Poster.ShouldRepost(
         now,
