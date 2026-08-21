@@ -574,6 +574,112 @@ check("regroup restores tank role across the disband/reinvite gap",
 check("regroup restores healer role across the disband/reinvite gap",
     AscensionLFM.Slots.GetAssigned("Bob") == "healer", tostring(AscensionLFM.Slots.GetAssigned("Bob")))
 
+-- Regression: DisbandGroup() (Regroup's own confirmed step) always drops
+-- the host to solo for a moment, then the FIRST re-invited member to
+-- actually rejoin used to be misread as "a brand new raid just started"
+-- and wipe the watch list - losing everyone else still mid-invite from
+-- that very regroup. Reported live: "Regroup: new group started, watch
+-- list reset" firing repeatedly right after a regroup, each time
+-- shrinking the remembered roster down to whoever rejoined first.
+MiniHUD._ResetForTests()
+AscensionLFM.Slots.ClearAll()
+_G._chats = {}
+_G.InviteUnit = function() end
+_G.UninviteUnit = function() end
+_G.ConvertToRaid = function() end
+_G.UnitName = function(u)
+    if u == "player" then return "Host" end
+    if u == "raid1" then return "Host" end
+    if u == "raid2" then return "Alice" end
+    if u == "raid3" then return "Bob" end
+    return nil
+end
+_G.IsRaidLeader = function() return true end
+_G.IsRaidOfficer = function() return false end
+local dbWatch = AscensionLFM.Database.Get()
+dbWatch.regroupRoster = {}
+dbWatch.regroupDisplay = {}
+dbWatch.regroupSeenAt = {}
+dbWatch.regroupLevel = {}
+
+-- Step 1: a real 3-person raid is up and remembered (wasGrouped -> true).
+_G.GetTime = function() return 200 end
+_G.GetNumRaidMembers = function() return 3 end
+_G.GetNumPartyMembers = function() return 0 end
+_G.GetRaidRosterInfo = function(i)
+    local rows = { "Host", "Alice", "Bob" }
+    return rows[i]
+end
+MiniHUD.RememberPresent()
+check("watch list has both non-host members before regroup",
+    #dbWatch.regroupRoster == 2, tostring(#dbWatch.regroupRoster))
+
+-- Step 2: Regroup runs (preview + confirm) - DisbandGroup() stamps the
+-- suppression window.
+_G.GetTime = function() return 210 end
+MiniHUD.ActionRegroup() -- preview
+MiniHUD.ActionRegroup() -- confirm: disbands, stamps regroupDisbandedAt
+
+-- Step 3: the disband actually lands (queued roster-update event fires
+-- once WoW's event loop resumes) - group reads solo for a tick.
+_G.GetTime = function() return 211 end
+_G.GetNumRaidMembers = function() return 0 end
+_G.GetNumPartyMembers = function() return 0 end
+MiniHUD.RememberPresent()
+
+-- Step 4: Alice (only) has rejoined so far - Bob's invite is still
+-- in-flight. This solo->grouped blip is OUR OWN regroup landing, not a
+-- new raid - the watch list must NOT reset and lose Bob.
+_G.GetTime = function() return 212 end
+_G.GetNumRaidMembers = function() return 0 end
+_G.GetNumPartyMembers = function() return 1 end
+_G.UnitName = function(u)
+    if u == "player" then return "Host" end
+    if u == "party1" then return "Alice" end
+    return nil
+end
+MiniHUD.RememberPresent()
+
+check("watch list survives the regroup's own solo->grouped blip (Bob not lost)",
+    dbWatch.regroupDisplay.bob == "Bob", tostring(dbWatch.regroupDisplay.bob))
+
+-- Regroup's preview click warns when inside a Manastorm - re-invites can
+-- fail with "Cannot find player" for anyone deep in the instance
+-- (observed live). Silent when C_Manastorm says otherwise or is absent.
+MiniHUD._ResetForTests()
+local printed = {}
+AscensionLFM.Print = function(msg) table.insert(printed, tostring(msg)) end
+_G.GetNumRaidMembers = function() return 1 end
+_G.GetNumPartyMembers = function() return 0 end
+_G.GetRaidRosterInfo = function(i) if i == 1 then return "Host" end end
+dbWatch.regroupRoster = { "Alice" }
+dbWatch.regroupSeenAt = { alice = 1000 }
+_G.GetTime = function() return 1000 end
+_G.C_Manastorm = { IsInManastorm = function() return true end }
+MiniHUD.ActionRegroup() -- preview click
+local sawWarning = false
+for _, m in ipairs(printed) do
+    if m:find("Cannot find player", 1, true) then
+        sawWarning = true
+    end
+end
+check("regroup preview warns about in-instance re-invite risk", sawWarning, table.concat(printed, " | "))
+
+MiniHUD._ResetForTests()
+printed = {}
+dbWatch.regroupRoster = { "Alice" }
+dbWatch.regroupSeenAt = { alice = 1000 }
+_G.C_Manastorm = { IsInManastorm = function() return false end }
+MiniHUD.ActionRegroup() -- preview click
+sawWarning = false
+for _, m in ipairs(printed) do
+    if m:find("Cannot find player", 1, true) then
+        sawWarning = true
+    end
+end
+check("no in-instance warning when not in a Manastorm", not sawWarning, table.concat(printed, " | "))
+_G.C_Manastorm = nil
+
 io.write(string.format("mini_hud tests: %d passed, %d failed\n", passed, failed))
 if failed > 0 then
     os.exit(1)

@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.4.128
+
+- **Fixed Regroup's watch list wiping itself out mid-regroup.** Reported
+  live: after confirming a Regrp click for a full raid, chat filled with
+  "Regroup: new group started, watch list reset" repeating over and over,
+  each time shrinking the remembered roster down to just 1 person -
+  along with a wall of "Cannot find player" errors for several members
+  who should have been re-invited.
+  - Root cause: `DisbandGroup()` (Regroup's own confirmed step) always
+    drops the host to solo for a moment. The very next `RememberPresent()`
+    call (fired on the next roster-update event, once the first
+    re-invited member actually rejoins) saw that solo->grouped blip and
+    read it as "a brand new raid just started," wiping the whole watch
+    list before the rest of that same regroup's invite batch had landed -
+    so only whoever happened to rejoin first was left, and everyone else
+    got dropped from the list entirely.
+  - Fixed with a 30-second suppression window stamped the moment
+    `DisbandGroup()` runs: a solo->grouped transition inside that window
+    is recognized as "our own regroup landing," not a new raid, and no
+    longer resets the list.
+  - Regression-tested: reverted the fix, confirmed
+    `tests/test_mini_hud.lua`'s new "watch list survives the regroup's
+    own solo->grouped blip" check fails against the old code (the
+    still-pending member's entry comes back `nil`), then restored the fix
+    and confirmed it passes.
+- **New: Regroup's preview click now warns when you're inside a
+  Manastorm** that re-invites can fail with "Cannot find player" for
+  anyone deep in the instance (exactly what was seen live) - and suggests
+  having them leave the instance and whisper you to rejoin manually if it
+  happens. This mirrors how the competing "Manastormer" addon's own
+  coordinated regroup explicitly asks non-users to leave-and-whisper
+  instead of trusting a blind reinvite - a real, structural limitation of
+  `InviteUnit`-by-name across instance/phase boundaries that isn't fully
+  fixable from this addon alone.
+
 ## 0.4.127
 
 - **Fixed the "prevented the call of the secure function 'UNKNOWN()'"

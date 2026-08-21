@@ -648,6 +648,19 @@ end
 -- solo -> grouped transition during this session counts as "new group".
 local wasGrouped = nil
 
+-- Regression: DisbandGroup() (ActionRegroup's own confirmed step) always
+-- drops the host to solo for a moment, then the FIRST re-invited member
+-- to actually rejoin flips the group back to "grouped" - which the
+-- solo->grouped check above used to read as "a brand new raid just
+-- started" and wipe the watch list, losing everyone else still mid-invite
+-- from that very regroup. Reported live: "Regroup: new group started,
+-- watch list reset" firing repeatedly right after a regroup, each time
+-- shrinking the list down to whoever happened to rejoin first. Stamped
+-- right when DisbandGroup() runs; suppresses the reset for a window long
+-- enough for the whole re-invite batch to actually land.
+local regroupDisbandedAt = nil
+local REGROUP_SUPPRESS_RESET_SECONDS = 30
+
 local function IsCurrentlyGrouped()
     local raid = (type(GetNumRaidMembers) == "function" and GetNumRaidMembers()) or 0
     if raid and raid > 0 then
@@ -679,16 +692,24 @@ function MiniHUD.RememberPresent()
     end
 
     local nowGrouped = IsCurrentlyGrouped()
+    local suppressReset = regroupDisbandedAt
+        and (Now() - regroupDisbandedAt) < REGROUP_SUPPRESS_RESET_SECONDS
     if nowGrouped and wasGrouped == false then
-        -- Went solo -> grouped during this session: this is a brand new
-        -- group, so the watch list starts empty instead of dragging in
-        -- whoever happened to still be within the staleness window from
-        -- the last one.
-        db.regroupRoster = {}
-        db.regroupDisplay = {}
-        db.regroupSeenAt = {}
-        db.regroupLevel = {}
-        Print("Regroup: new group started, watch list reset")
+        if suppressReset then
+            -- This solo->grouped blip is our OWN regroup's re-invite batch
+            -- landing, not a genuinely new raid - don't wipe the list
+            -- while the rest of the batch is still mid-invite.
+        else
+            -- Went solo -> grouped during this session: this is a brand new
+            -- group, so the watch list starts empty instead of dragging in
+            -- whoever happened to still be within the staleness window from
+            -- the last one.
+            db.regroupRoster = {}
+            db.regroupDisplay = {}
+            db.regroupSeenAt = {}
+            db.regroupLevel = {}
+            Print("Regroup: new group started, watch list reset")
+        end
     end
     wasGrouped = nowGrouped
 
@@ -799,6 +820,21 @@ local function DisbandGroup()
         end
     end
     return n
+end
+
+-- Same signal Poster.lua/Invite.lua use to detect an active Manastorm run
+-- (confirmed real via Ascension's own client source). Regroup's disband
+-- step can leave a re-invited member unresolvable ("Cannot find player")
+-- if they're still deep inside the instance when uninvited - observed
+-- live, and matches how the competing "Manastormer" addon's own
+-- coordinated regroup explicitly asks non-users to leave the instance and
+-- whisper for a manual invite instead of trusting a blind reinvite.
+local function IsInsideManastorm()
+    if type(C_Manastorm) == "table" and type(C_Manastorm.IsInManastorm) == "function" then
+        local ok, inManastorm = pcall(C_Manastorm.IsInManastorm)
+        return ok and inManastorm and true or false
+    end
+    return false
 end
 
 local REGROUP_CONFIRM_WINDOW = 6 -- seconds to click again to confirm
@@ -915,6 +951,11 @@ function MiniHUD.ActionRegroup()
         Print(string.format(
             "Regroup: will disband the group and re-invite %d%s - click Regrp again within %ds to confirm",
             n, capped > 0 and (" (" .. capped .. " skipped, level-capped)") or "", REGROUP_CONFIRM_WINDOW))
+        if IsInsideManastorm() then
+            Print("Regroup: you're inside a Manastorm - re-invites can fail with "
+                .. "\"Cannot find player\" for anyone deep in the instance. If that "
+                .. "happens, have them leave the instance and whisper you to rejoin.")
+        end
         return true, 0
     end
     regroupConfirmArmedAt = nil
@@ -937,6 +978,7 @@ function MiniHUD.ActionRegroup()
         return false, "InviteUnit missing"
     end
 
+    regroupDisbandedAt = Now()
     local kicked = DisbandGroup()
     if kicked > 0 then
         Print("Regroup: disbanded " .. tostring(kicked) .. " member(s), re-inviting fresh...")
@@ -1588,6 +1630,8 @@ function MiniHUD._ResetForTests()
     lastAnnounceAt = {}
     expanded = true
     regroupConfirmArmedAt = nil
+    regroupDisbandedAt = nil
+    wasGrouped = nil
 end
 
 --- Live debug snapshot for /alfm status (and tests).
