@@ -294,7 +294,7 @@ local function RefreshStatus()
     end
     local db = AscensionLFM.Database.Get()
     local listeningOn = db.mode ~= "off"
-    local listening = listeningOn and "|cff2a7a3aListening ON|r" or "|cff802020Listening OFF|r"
+    local listening = listeningOn and "|cff2a7a3aListening ON|r" or "|cffff6b52Listening OFF|r"
     local last = ""
     if db.matchHistory and db.matchHistory[1] then
         local m = db.matchHistory[1]
@@ -444,7 +444,7 @@ function MainWindow.RefreshMatches()
                 local needsMe = m.roles and AscensionLFM.Parser and AscensionLFM.Parser.NeedsAnyRole
                     and AscensionLFM.Parser.NeedsAnyRole({ roles = m.roles }, db.roles)
                 local tag = needsMe and "|cff30d030[NEEDS YOU] |r" or ""
-                fs:SetText(string.format("%s|cff4a3010%s|r  |cff5a4a30(%s%s)|r\n%s",
+                fs:SetText(string.format("%s|cfff5ebd1%s|r  |cffd1c299(%s%s)|r\n%s",
                     tag,
                     tostring(m.leader or "?"),
                     tostring(m.source or "chat"),
@@ -454,7 +454,7 @@ function MainWindow.RefreshMatches()
             else
                 fs:SetText("")
                 if i == 1 then
-                    fs:SetText("|cff5a4a30No matches yet.|r")
+                    fs:SetText("|cffd1c299No matches yet.|r")
                     fs:Show()
                 else
                     fs:Hide()
@@ -475,17 +475,17 @@ function MainWindow.RefreshKicks()
             if k then
                 local reason = k.reason
                 if reason and reason ~= "" then
-                    fs:SetText(string.format("|cff4a3010%s|r - |cff802020%s|r",
+                    fs:SetText(string.format("|cfff5ebd1%s|r - |cffff6b52%s|r",
                         tostring(k.name or "?"), tostring(reason)))
                 else
-                    fs:SetText(string.format("|cff4a3010%s|r at level |cff802020%s|r",
+                    fs:SetText(string.format("|cfff5ebd1%s|r at level |cffff6b52%s|r",
                         tostring(k.name or "?"), tostring(k.level or "?")))
                 end
                 fs:Show()
             else
                 fs:SetText("")
                 if i == 1 then
-                    fs:SetText("|cff5a4a30No kicks yet.|r")
+                    fs:SetText("|cffd1c299No kicks yet.|r")
                     fs:Show()
                 else
                     fs:Hide()
@@ -505,13 +505,13 @@ function MainWindow.RefreshActivity()
             if a then
                 local text = tostring(a.text or "")
                 if #text > 72 then text = text:sub(1, 69) .. "..." end
-                fs:SetText(string.format("|cff6a4a10[%s]|r %s",
+                fs:SetText(string.format("|cffffdb47[%s]|r %s",
                     tostring(a.kind or "?"), text))
                 fs:Show()
             else
                 fs:SetText("")
                 if i == 1 then
-                    fs:SetText("|cff5a4a30No activity yet.|r")
+                    fs:SetText("|cffd1c299No activity yet.|r")
                     fs:Show()
                 else
                     fs:Hide()
@@ -542,7 +542,7 @@ function MainWindow.RefreshQueue()
                 -- while someone's already queued.
                 local star = (AscensionLFM.Database and AscensionLFM.Database.IsFavoriteApplicant
                     and AscensionLFM.Database.IsFavoriteApplicant(q.name)) and "|cffffd200*|r " or ""
-                row.label:SetText(string.format("%s|cff4a3010%s|r  |cff5a4a30[%s]|r  %s\n%s",
+                row.label:SetText(string.format("%s|cfff5ebd1%s|r  |cffd1c299[%s]|r  %s\n%s",
                     star, tostring(q.name or "?"), role or "?", st, tostring(q.message or ""):sub(1, 60)))
                 if row.icon then
                     local path = role and row.ROLE_ICONS and row.ROLE_ICONS[role]
@@ -554,7 +554,7 @@ function MainWindow.RefreshQueue()
                 if row.rejectBtn then row.rejectBtn:Show() end
             else
                 row.name = nil
-                row.label:SetText(i == 1 and "|cff5a4a30No applicants yet.|r" or "")
+                row.label:SetText(i == 1 and "|cffd1c299No applicants yet.|r" or "")
                 if row.icon then
                     row.icon:SetTexture(i == 1 and row.ROLE_ICON_UNKNOWN or nil)
                 end
@@ -1016,6 +1016,10 @@ local function BuildAppearanceCategory(pageHost)
         edit:SetSize(64, 20)
         edit:SetPoint("RIGHT", -12, 0)
         edit:SetAutoFocus(false)
+        -- Explicit, not relying on InputBoxTemplate's own default (reported
+        -- live: the "Corner size (topSize)" box specifically rendered with
+        -- no visible text against its dark background).
+        edit:SetTextColor(INK[1], INK[2], INK[3], INK[4])
         local cur = tonumber(uiChrome()[key]) or default
         edit:SetText(tostring(cur))
         edit:SetScript("OnEnterPressed", function(self)
@@ -2818,6 +2822,14 @@ function MainWindow.Init()
     sessionSummaryFS:SetPoint("TOPLEFT", 4, -250)
     sessionSummaryFS:SetPoint("RIGHT", -110, 0)
     sessionSummaryFS:SetJustifyH("LEFT")
+    -- Explicit, not relying on the default - reported live: the summary
+    -- line got cut off mid-word ("...97 le...") once the "X levels
+    -- cleared, Y failed" suffix made it long enough to need a 2nd line.
+    -- Fixed height leaves room for 2 lines without overlapping "Activity"
+    -- below it (32px gap to that section's label).
+    if sessionSummaryFS.SetWordWrap then sessionSummaryFS:SetWordWrap(true) end
+    if sessionSummaryFS.SetNonSpaceWrap then sessionSummaryFS:SetNonSpaceWrap(true) end
+    sessionSummaryFS:SetHeight(30)
     SetInk(sessionSummaryFS, INK)
     sessionSummaryFS:SetText("Session (0m): 0 invited, 0 rejected, 0 kicked, 0 matches, 0 posts")
 

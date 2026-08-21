@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.4.121
+
+Three fixes reported live via screenshots (v0.4.119) - first real in-game
+confirmation this session, and it paid off immediately.
+
+- **Fix: Appearance tab's "Corner size (topSize)" field rendered with no
+  visible text**, while the five other chroma-size fields right next to
+  it displayed their numbers fine. Root cause not fully pinned down from
+  code alone (the row's layout math checks out, no geometric overlap
+  with the DragonUI corner pieces), so applied the safe, defensible fix:
+  explicit text color on every Appearance-tab number field instead of
+  relying on `InputBoxTemplate`'s own default.
+- **Fix: Log/Kick/Activity/Queue tab text was barely readable** - leader
+  names, kick reasons, activity tags, and "No X yet" placeholders still
+  used dark parchment-era ink colors (`|cff4a3010` etc.) left over from
+  before the DragonUI dark-rock reskin, the same class of bug already
+  fixed for the title text in v0.4.105. Replaced with the existing
+  INK/MUTED/GOLD/DANGER palette used everywhere else in the window.
+- **Fix: session summary text got cut off mid-word** ("...97 le...") once
+  the "X levels cleared, Y failed" suffix made the line long enough to
+  need a 2nd line. Explicit word-wrap + a fixed 2-line height instead of
+  relying on defaults - still fits above the "Activity" section below it
+  (32px gap, computed to comfortably fit 2 lines).
+
 ## 0.4.120
 
 - **Fix: Roster tab's ⇄ move button too narrow for its own text.**
