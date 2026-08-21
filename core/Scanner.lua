@@ -600,6 +600,7 @@ function Scanner.Start()
         frame:RegisterEvent(ev)
     end
     frame:RegisterEvent("PARTY_INVITE_REQUEST")
+    frame:RegisterEvent("CHAT_MSG_SYSTEM")
     frame:SetScript("OnEvent", function(_, event, message, sender)
         if event == "PARTY_MEMBERS_CHANGED" or event == "RAID_ROSTER_UPDATE" then
             HandleRoster()
@@ -610,6 +611,16 @@ function Scanner.Start()
             -- message - `message` here IS that name (only the dispatcher's
             -- shared parameter names are chat-shaped, not this event).
             HandleInviteRequest(message)
+            return
+        end
+        if event == "CHAT_MSG_SYSTEM" then
+            -- No `sender` for system messages - "X declines your group
+            -- invitation.", "Cannot find player 'X'.", etc. Lets a failed
+            -- invite free its slot immediately instead of waiting out
+            -- Invite.lua's 5s verify-delay fallback.
+            if AscensionLFM.Invite and AscensionLFM.Invite.HandleSystemMessage then
+                AscensionLFM.Invite.HandleSystemMessage(message)
+            end
             return
         end
         if type(message) ~= "string" or message == "" then

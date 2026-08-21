@@ -197,6 +197,65 @@ local function EnsureRaidIfNeeded()
     end
 end
 
+-- CHAT_MSG_SYSTEM patterns for a failed invite, confirmed real via
+-- Ascension's own extracted client GlobalStrings.lua (enUS):
+--   ERR_ALREADY_IN_GROUP_S       = "%s is already in a group."
+--   ERR_BAD_PLAYER_NAME_S        = "Cannot find player '%s'."
+--   ERR_CHAT_PLAYER_NOT_FOUND_S  = "No player named '%s' is currently playing."
+--   ERR_DECLINE_GROUP_S          = "%s declines your group invitation."
+local INVITE_FAILURE_PATTERNS = {
+    { pattern = "^(.-) is already in a group%.$", reason = "already_in_group" },
+    { pattern = "^Cannot find player '(.-)'%.$", reason = "not_found" },
+    { pattern = "^No player named '(.-)' is currently playing%.$", reason = "offline" },
+    { pattern = "^(.-) declines your group invitation%.$", reason = "declined" },
+}
+
+--- Pure: match a CHAT_MSG_SYSTEM string against known invite-failure
+-- patterns. @return name, reason OR nil if it's not a recognized failure.
+function Invite.ParseInviteFailure(msg)
+    if type(msg) ~= "string" or msg == "" then
+        return nil
+    end
+    for _, p in ipairs(INVITE_FAILURE_PATTERNS) do
+        local name = msg:match(p.pattern)
+        if type(name) == "string" and name ~= "" then
+            return name, p.reason
+        end
+    end
+    return nil
+end
+
+--- Live: react to a CHAT_MSG_SYSTEM message. If it's a recognized invite
+-- failure for someone we're actively waiting to verify (pendingInviteVerify),
+-- free their slot immediately instead of waiting out INVITE_VERIFY_DELAY -
+-- same end result Invite.Tick()'s timeout fallback reaches, just without
+-- the up-to-5s lag. Anyone not currently pending is ignored (a system
+-- message mentioning an unrelated player is a harmless no-op here).
+function Invite.HandleSystemMessage(msg)
+    local name, reason = Invite.ParseInviteFailure(msg)
+    if not name then
+        return false
+    end
+    local key = LowerName(name)
+    for i, v in ipairs(pendingInviteVerify) do
+        if LowerName(v.name) == key then
+            table.remove(pendingInviteVerify, i)
+            if AscensionLFM.Slots and AscensionLFM.Slots.ClearName then
+                AscensionLFM.Slots.ClearName(v.name)
+            end
+            if AscensionLFM.MainWindow and AscensionLFM.MainWindow.RefreshSlots then
+                AscensionLFM.MainWindow.RefreshSlots()
+            end
+            if AscensionLFM.Print then
+                AscensionLFM.Print("invite to " .. tostring(v.name) .. " failed (" .. reason
+                    .. ") - slot freed")
+            end
+            return true
+        end
+    end
+    return false
+end
+
 function Invite.RememberRole(name, role)
     if type(name) == "string" and name ~= "" and type(role) == "string" and role ~= "" then
         lastKnownRoles[LowerName(name)] = role

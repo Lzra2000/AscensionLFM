@@ -392,6 +392,61 @@ check("C_Manastorm takes priority: actual Manastorm does pause", ok == false and
 _G.C_Manastorm = nil
 _G.IsInInstance = nil
 
+--------------------------------------------------------------------
+-- New: CHAT_MSG_SYSTEM invite-failure detection frees a slot immediately
+-- instead of waiting out the 5s verify-delay fallback. Patterns confirmed
+-- real via Ascension's own extracted client GlobalStrings.lua (enUS).
+--------------------------------------------------------------------
+
+check("parses ERR_ALREADY_IN_GROUP_S",
+    select(1, Invite.ParseInviteFailure("Mighty is already in a group.")) == "Mighty")
+check("parses ERR_ALREADY_IN_GROUP_S reason", select(2, Invite.ParseInviteFailure("Mighty is already in a group.")) == "already_in_group")
+check("parses ERR_BAD_PLAYER_NAME_S",
+    select(1, Invite.ParseInviteFailure("Cannot find player 'Doriofran'.")) == "Doriofran")
+check("parses ERR_BAD_PLAYER_NAME_S reason",
+    select(2, Invite.ParseInviteFailure("Cannot find player 'Doriofran'.")) == "not_found")
+check("parses ERR_CHAT_PLAYER_NOT_FOUND_S",
+    select(1, Invite.ParseInviteFailure("No player named 'Stingz' is currently playing.")) == "Stingz")
+check("parses ERR_CHAT_PLAYER_NOT_FOUND_S reason",
+    select(2, Invite.ParseInviteFailure("No player named 'Stingz' is currently playing.")) == "offline")
+check("parses ERR_DECLINE_GROUP_S",
+    select(1, Invite.ParseInviteFailure("Addicted declines your group invitation.")) == "Addicted")
+check("parses ERR_DECLINE_GROUP_S reason",
+    select(2, Invite.ParseInviteFailure("Addicted declines your group invitation.")) == "declined")
+check("unrelated system text does not match", Invite.ParseInviteFailure("Looting changed to Group Loot.") == nil)
+check("nil/empty input does not match", Invite.ParseInviteFailure(nil) == nil and Invite.ParseInviteFailure("") == nil)
+
+-- Live path: an active invite's pendingInviteVerify entry is cleared and
+-- the slot freed the instant the matching system message arrives -
+-- before the 5s verify-delay would otherwise have caught it.
+Invite._ResetForTests()
+AscensionLFM.Slots.ClearAll()
+Invite._ResetCooldowns()
+db.roles = { tank = true, healer = true, aura = true, dps = true }
+db.slotMax = { tank = 2, healer = 3, aura = 3, dps = 7 }
+invited = {}
+local ok3 = Invite.InvitePlayer("Moltenuke", "dps")
+check("invite sent for immediate-failure test", ok3 == true and invited[1] == "Moltenuke")
+check("slot shows assigned right after invite", AscensionLFM.Slots.GetAssigned("Moltenuke") == "dps")
+
+local printed = {}
+AscensionLFM.Print = function(m) table.insert(printed, tostring(m)) end
+local handled = Invite.HandleSystemMessage("Cannot find player 'Moltenuke'.")
+check("system message recognized as this pending invite", handled == true)
+check("slot freed immediately (not waiting for the 5s verify)",
+    AscensionLFM.Slots.GetAssigned("Moltenuke") == nil)
+local sawFreedMsg = false
+for _, m in ipairs(printed) do
+    if m:find("Moltenuke", 1, true) and m:find("slot freed", 1, true) then
+        sawFreedMsg = true
+    end
+end
+check("prints the specific failure reason", sawFreedMsg, table.concat(printed, " | "))
+
+-- An unrelated name (nothing pending for them) is a harmless no-op.
+local handled2 = Invite.HandleSystemMessage("Cannot find player 'NobodyWeInvited'.")
+check("unrelated name is a no-op", handled2 == false)
+
 io.write(string.format("invite tests: %d passed, %d failed\n", passed, failed))
 if failed > 0 then
     os.exit(1)

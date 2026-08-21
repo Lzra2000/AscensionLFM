@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.4.130
+
+- **New: failed invites free their slot immediately** instead of waiting
+  out the existing 5s verify-delay fallback. Adopted from `MSBuilder`
+  (competitor research): it parses `CHAT_MSG_SYSTEM` for the exact
+  failure reason and reopens the slot the instant WoW reports it, rather
+  than only discovering it via timeout.
+  - Patterns confirmed real via Ascension's own extracted client
+    `GlobalStrings.lua` (enUS): `ERR_ALREADY_IN_GROUP_S` ("%s is already
+    in a group."), `ERR_BAD_PLAYER_NAME_S` ("Cannot find player '%s'." -
+    exactly what showed up live in the user's own hosting log),
+    `ERR_CHAT_PLAYER_NOT_FOUND_S` ("No player named '%s' is currently
+    playing."), `ERR_DECLINE_GROUP_S` ("%s declines your group
+    invitation.").
+  - New `Invite.ParseInviteFailure(msg)` (pure) and
+    `Invite.HandleSystemMessage(msg)` in `core/Invite.lua`; `CHAT_MSG_SYSTEM`
+    now registered and dispatched from `core/Scanner.lua`'s existing
+    central event handler.
+  - Only acts on someone we actually have a pending invite for
+    (`pendingInviteVerify`) - a system message mentioning an unrelated
+    player is a harmless no-op. Removes the pending-verify entry too, so
+    the old 5s timeout fallback doesn't also fire a duplicate "slot
+    freed" message for the same invite.
+  - Regression-tested: reverted the fix, confirmed
+    `tests/test_invite.lua`'s new checks fail (crash: missing
+    `ParseInviteFailure`) against the old code, then restored the fix and
+    confirmed all pass.
+
 ## 0.4.129
 
 - **Regroup now hard-blocks while you're inside a Manastorm**, instead of
