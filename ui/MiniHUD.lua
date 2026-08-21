@@ -597,6 +597,13 @@ local function PruneDisplayToRoster(db)
             end
         end
     end
+    if type(db.regroupLevel) == "table" then
+        for key in pairs(db.regroupLevel) do
+            if not keep[key] then
+                db.regroupLevel[key] = nil
+            end
+        end
+    end
 end
 
 -- How long a name stays on the regroup watch list without being seen
@@ -667,6 +674,9 @@ function MiniHUD.RememberPresent()
     if type(db.regroupSeenAt) ~= "table" then
         db.regroupSeenAt = {}
     end
+    if type(db.regroupLevel) ~= "table" then
+        db.regroupLevel = {}
+    end
 
     local nowGrouped = IsCurrentlyGrouped()
     if nowGrouped and wasGrouped == false then
@@ -677,9 +687,22 @@ function MiniHUD.RememberPresent()
         db.regroupRoster = {}
         db.regroupDisplay = {}
         db.regroupSeenAt = {}
+        db.regroupLevel = {}
         Print("Regroup: new group started, watch list reset")
     end
     wasGrouped = nowGrouped
+
+    -- Level lookup for the level-cap re-invite filter below (Kick.lua's
+    -- own hardened UnitLevel/roster-level resolver, reused rather than
+    -- duplicated).
+    local levelByKey = {}
+    if AscensionLFM.Kick and AscensionLFM.Kick.BuildRoster then
+        for _, m in ipairs(AscensionLFM.Kick.BuildRoster()) do
+            if type(m.name) == "string" and m.name ~= "" then
+                levelByKey[LowerName(m.name)] = tonumber(m.level)
+            end
+        end
+    end
 
     local list = db.regroupRoster
     local present = CollectPresentSet()
@@ -691,6 +714,13 @@ function MiniHUD.RememberPresent()
             list = MiniHUD.RememberName(list, name, REGROUP_MAX)
             db.regroupDisplay[key] = name
             db.regroupSeenAt[key] = now
+            -- Only overwrite with a freshly-resolved level (> 0) - keep the
+            -- last known one rather than clobbering it with "unknown" on a
+            -- tick where the roster scan came up empty.
+            local lvl = levelByKey[key]
+            if type(lvl) == "number" and lvl > 0 then
+                db.regroupLevel[key] = lvl
+            end
             n = n + 1
         end
     end
@@ -774,6 +804,25 @@ end
 local REGROUP_CONFIRM_WINDOW = 6 -- seconds to click again to confirm
 local regroupConfirmArmedAt = nil
 
+--- True if this name's last-known level (from RememberPresent's snapshot)
+-- is at/above the kick-level cap (db.kickLevel, default 59 - same
+-- threshold Kick.lua's own auto-kick uses). Regroup's re-invite step
+-- shouldn't drag level-capped players back in right after Kick59 (or a
+-- host manually removing them) got rid of them. Unknown level (never
+-- resolved, e.g. a name only ever seen via chat) is NOT excluded - this
+-- only blocks names we actually observed at/above the cap.
+local function IsLevelCapped(db, key)
+    if not db or type(db.regroupLevel) ~= "table" then
+        return false
+    end
+    local lvl = tonumber(db.regroupLevel[key])
+    if not lvl then
+        return false
+    end
+    local cap = (AscensionLFM.Kick and tonumber(db.kickLevel or AscensionLFM.Kick.DEFAULT_LEVEL)) or 59
+    return lvl >= cap
+end
+
 --- Full regroup: warn -> disband the whole current group -> re-invite
 -- everyone from a freshly pruned snapshot (people actually seen in THIS
 -- raid within REGROUP_STALE_SECONDS, not old names from an unrelated
@@ -831,16 +880,21 @@ function MiniHUD.ActionRegroup()
     if not isConfirming then
         regroupConfirmArmedAt = now
         local meKey = LowerName(PlayerName() or "")
-        local n = 0
+        local n, capped = 0, 0
         for _, name in ipairs(roster) do
-            if meKey == "" or LowerName(name) ~= meKey then
-                n = n + 1
+            local key = LowerName(name)
+            if meKey == "" or key ~= meKey then
+                if IsLevelCapped(db, key) then
+                    capped = capped + 1
+                else
+                    n = n + 1
+                end
             end
         end
         n = math.min(n, REGROUP_INVITE_CAP)
         Print(string.format(
-            "Regroup: will disband the group and re-invite %d - click Regrp again within %ds to confirm",
-            n, REGROUP_CONFIRM_WINDOW))
+            "Regroup: will disband the group and re-invite %d%s - click Regrp again within %ds to confirm",
+            n, capped > 0 and (" (" .. capped .. " skipped, level-capped)") or "", REGROUP_CONFIRM_WINDOW))
         return true, 0
     end
     regroupConfirmArmedAt = nil
@@ -891,17 +945,26 @@ function MiniHUD.ActionRegroup()
     -- party. Without this, invite #5+ would silently fail to join at all.
     local cap = REGROUP_INVITE_CAP
     local toInvite = {}
+    local skippedCapped = {}
     local meKey = LowerName(PlayerName() or "")
     for i, name in ipairs(roster) do
         if #toInvite >= cap then
             break
         end
+        local key = LowerName(name)
         -- Defensive: never invite yourself, even if the persisted roster
         -- somehow contains your own name (RememberPresent won't add it,
         -- but old SavedVariables data or a manual edit could).
-        if meKey == "" or LowerName(name) ~= meKey then
-            table.insert(toInvite, display[LowerName(name)] or name)
+        if meKey == "" or key ~= meKey then
+            if IsLevelCapped(db, key) then
+                table.insert(skippedCapped, display[key] or name)
+            else
+                table.insert(toInvite, display[key] or name)
+            end
         end
+    end
+    if #skippedCapped > 0 then
+        Print("Regroup: not re-inviting (level-capped): " .. table.concat(skippedCapped, ", "))
     end
     if #toInvite > 4 and type(GetNumRaidMembers) == "function"
         and (GetNumRaidMembers() or 0) == 0 and type(ConvertToRaid) == "function" then

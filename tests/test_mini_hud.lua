@@ -87,6 +87,7 @@ _G.SendChatMessage = function(msg, ch)
 end
 
 dofile("core/Database.lua")
+dofile("core/Kick.lua")
 dofile("core/Slots.lua")
 dofile("core/Poster.lua")
 dofile("ui/Chrome.lua")
@@ -471,6 +472,52 @@ check("disabled route sends nothing", sentE == false and chE == "disabled" and #
     tostring(sentE) .. "/" .. tostring(chE))
 
 db.messageRouting = {}
+
+-- Regression: Regroup's re-invite step must not drag level-capped players
+-- (Kick.lua's own threshold, db.kickLevel/DEFAULT_LEVEL=59) back into the
+-- group right after Kick59 (or a manual removal) got rid of them.
+-- RememberPresent() (called at the top of every ActionRegroup click) now
+-- also snapshots each present member's level via Kick.BuildRoster(), and
+-- the confirmed re-invite step skips anyone at/above the cap.
+MiniHUD._ResetForTests()
+_G._chats = {}
+local invitedLvl = {}
+_G.InviteUnit = function(name) table.insert(invitedLvl, name) end
+_G.UninviteUnit = function() end
+_G.ConvertToRaid = function() end
+_G.GetNumRaidMembers = function() return 3 end
+_G.GetNumPartyMembers = function() return 0 end
+_G.GetRaidRosterInfo = function(i)
+    local rows = {
+        { "Host", nil, 1, 60 },
+        { "Alice", nil, 1, 59 }, -- at the cap, must NOT be re-invited
+        { "Bob", nil, 1, 45 },
+    }
+    local r = rows[i]
+    if not r then return end
+    return r[1], r[2], r[3], r[4]
+end
+_G.UnitName = function(u)
+    if u == "player" or u == "raid1" then return "Host" end
+    if u == "raid2" then return "Alice" end
+    if u == "raid3" then return "Bob" end
+    return nil
+end
+_G.UnitLevel = function(u)
+    if u == "raid1" then return 60 end
+    if u == "raid2" then return 59 end
+    if u == "raid3" then return 45 end
+    return 0
+end
+local dbLvl = AscensionLFM.Database.Get()
+dbLvl.regroupRoster = {}
+dbLvl.regroupDisplay = {}
+dbLvl.regroupSeenAt = {}
+dbLvl.regroupLevel = {}
+MiniHUD.ActionRegroup() -- preview click: snapshots present members + levels, arms confirm
+MiniHUD.ActionRegroup() -- confirm click: disband + re-invite
+check("level-capped Alice not re-invited", uniqueCount(invitedLvl) == 1 and invitedLvl[1] == "Bob",
+    table.concat(invitedLvl, ","))
 
 io.write(string.format("mini_hud tests: %d passed, %d failed\n", passed, failed))
 if failed > 0 then

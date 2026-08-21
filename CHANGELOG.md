@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.4.124
+
+- **Regroup no longer re-invites level-capped players.** The "Regrp"
+  button (disband + re-invite everyone from the watch list) previously
+  had no concept of level at all, so it would happily re-invite someone
+  Kick59 (or a host manually) had just removed for being level 59 -
+  right back into the run one click later. User-reported.
+  - `MiniHUD.RememberPresent()` now also snapshots each present member's
+    level (via `Kick.BuildRoster()`'s existing hardened UnitLevel/roster-
+    level resolver, not duplicated) into a new `db.regroupLevel` table,
+    keyed by lowercase name, kept in sync with `regroupRoster` by the
+    existing prune helpers (`PruneDisplayToRoster`/`PruneStaleRegroup`).
+  - `MiniHUD.ActionRegroup()`'s confirmed re-invite step now skips anyone
+    whose last-known level is at/above `db.kickLevel` (falls back to
+    `Kick.DEFAULT_LEVEL` = 59, the same threshold Kick59 itself uses) and
+    prints who got skipped. The preview click's "will re-invite N" count
+    is adjusted to match so it doesn't overpromise.
+  - A name only ever seen via chat (`RememberPlayer`, no level data
+    available) is NOT excluded - this only blocks names actually observed
+    at/above the cap, so it can't accidentally block a legitimate invite
+    on missing data.
+  - Regression-tested: reverted the fix, confirmed
+    `tests/test_mini_hud.lua`'s new "level-capped Alice not re-invited"
+    check fails against the old code (a level-59 Alice gets re-invited
+    alongside Bob), then restored the fix and confirmed it passes.
+
 ## 0.4.123
 
 - **Tank/Healer/Aura auto-balance is now confined to specific groups, not
