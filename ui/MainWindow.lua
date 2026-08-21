@@ -1885,27 +1885,27 @@ function MainWindow.Init()
     presetRow:SetPoint("TOPLEFT", 0, presetSecY - 18)
     presetRow:SetPoint("TOPRIGHT", 0, presetSecY - 18)
     presetRow:SetHeight(24)
-    local load2337 = CreateFrame("Button", nil, presetRow, "UIPanelButtonTemplate")
-    if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(load2337) end
-    load2337:SetSize(100, 20)
-    load2337:SetPoint("LEFT", 0, 0)
-    load2337:SetText("MS 2/3/3/7")
-    load2337:SetScript("OnClick", function()
-        if AscensionLFM.Presets then AscensionLFM.Presets.Load("MS 2/3/3/7") end
+    local loadStd = CreateFrame("Button", nil, presetRow, "UIPanelButtonTemplate")
+    if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(loadStd) end
+    loadStd:SetSize(100, 20)
+    loadStd:SetPoint("LEFT", 0, 0)
+    loadStd:SetText("MS 2/3/3/10")
+    loadStd:SetScript("OnClick", function()
+        if AscensionLFM.Presets then AscensionLFM.Presets.Load("MS 2/3/3/10") end
         SyncWidgetsFromDB()
     end)
-    local load2255 = CreateFrame("Button", nil, presetRow, "UIPanelButtonTemplate")
-    if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(load2255) end
-    load2255:SetSize(100, 20)
-    load2255:SetPoint("LEFT", load2337, "RIGHT", 4, 0)
-    load2255:SetText("MS 2/2/2/5")
-    load2255:SetScript("OnClick", function()
-        if AscensionLFM.Presets then AscensionLFM.Presets.Load("MS 2/2/2/5") end
+    local loadSmall = CreateFrame("Button", nil, presetRow, "UIPanelButtonTemplate")
+    if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(loadSmall) end
+    loadSmall:SetSize(100, 20)
+    loadSmall:SetPoint("LEFT", loadStd, "RIGHT", 4, 0)
+    loadSmall:SetText("MS 2/2/2/7")
+    loadSmall:SetScript("OnClick", function()
+        if AscensionLFM.Presets then AscensionLFM.Presets.Load("MS 2/2/2/7") end
         SyncWidgetsFromDB()
     end)
     local pName = CreateFrame("EditBox", "AscensionLFMPresetName", presetRow, "InputBoxTemplate")
     pName:SetSize(80, 18)
-    pName:SetPoint("LEFT", load2255, "RIGHT", 8, 0)
+    pName:SetPoint("LEFT", loadSmall, "RIGHT", 8, 0)
     pName:SetAutoFocus(false)
     pName:SetMaxLetters(24)
     pName:SetText("My MS")
@@ -2623,13 +2623,17 @@ function MainWindow.Init()
             rNote:SetPoint("TOPRIGHT", 0, 0)
             rNote:SetJustifyH("LEFT")
             SetInk(rNote, INK)
-            rNote:SetText("Tags the LFM post [RAID]. Pick a size to set Tank/Healer/Aura/DPS caps (editable individually afterward on Hosting):")
+            rNote:SetText("Tags the LFM post [RAID]. Pick a size to set Tank/Healer/DPS seat caps plus an aura coverage target (editable individually afterward on Hosting):")
             if rNote.SetWordWrap then rNote:SetWordWrap(true) end
 
+            -- tank+healer+dps must equal the raid size; the aura figure is a
+            -- coverage target on top of those seats, not a fourth seat block
+            -- (v0.4.133 - these used to be short by exactly the aura count,
+            -- e.g. 10-man was 2+2+5 = 9 seats and could never fill).
             local presets = {
-                { label = "10-man", tank = 2, healer = 2, aura = 1, dps = 5 },
-                { label = "25-man", tank = 3, healer = 5, aura = 2, dps = 15 },
-                { label = "40-man", tank = 4, healer = 8, aura = 3, dps = 25 },
+                { label = "10-man", tank = 2, healer = 2, aura = 1, dps = 6 },
+                { label = "25-man", tank = 3, healer = 5, aura = 2, dps = 17 },
+                { label = "40-man", tank = 4, healer = 8, aura = 3, dps = 28 },
             }
             local btnY = -34
             for _, p in ipairs(presets) do
@@ -2639,7 +2643,7 @@ function MainWindow.Init()
                 end
                 pbtn:SetSize(180, 24)
                 pbtn:SetPoint("TOPLEFT", 0, btnY)
-                pbtn:SetText(string.format("%s (T%d/H%d/A%d/D%d)", p.label, p.tank, p.healer, p.aura, p.dps))
+                pbtn:SetText(string.format("%s (T%d/H%d/D%d + %d aura)", p.label, p.tank, p.healer, p.dps, p.aura))
                 pbtn:SetScript("OnClick", function()
                     if not AscensionLFM.Slots then
                         return

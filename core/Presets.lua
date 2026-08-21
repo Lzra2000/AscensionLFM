@@ -1,5 +1,5 @@
 -- AscensionLFM: core/Presets.lua
--- Save/load host slot caps + post settings (MS 2/3/3/7 built-in).
+-- Save/load host slot caps + post settings (MS 2/3/3/10 built-in).
 
 local AscensionLFM = _G.AscensionLFM
 if type(AscensionLFM) ~= "table" then
@@ -11,17 +11,21 @@ local Presets = {}
 AscensionLFM.Presets = Presets
 
 -- Built-in presets (not stored in SV; always available)
+-- Preset names read "tank/healer/aura/dps", but since v0.4.131 only tank,
+-- healer and dps are SEATS - they must sum to maxPartySize. The aura number
+-- is a coverage target riding on top of those seats, which is why 2/3/3/10
+-- is a 15-man raid and not an 18-man one.
 local BUILTIN = {
-    ["MS 2/3/3/7"] = {
-        slotMax = { tank = 2, healer = 3, aura = 3, dps = 7 },
+    ["MS 2/3/3/10"] = {
+        slotMax = { tank = 2, healer = 3, aura = 3, dps = 10 },
         maxPartySize = 15,
         postChannel = "YELL",
         postChannelName = "",
         repostInterval = 60,
         roles = { tank = true, healer = true, aura = true, dps = true },
     },
-    ["MS 2/2/2/5"] = {
-        slotMax = { tank = 2, healer = 2, aura = 2, dps = 5 },
+    ["MS 2/2/2/7"] = {
+        slotMax = { tank = 2, healer = 2, aura = 2, dps = 7 },
         maxPartySize = 11,
         postChannel = "YELL",
         postChannelName = "",
@@ -200,7 +204,7 @@ end
 --- Ordered list of preset names (builtins first, then user).
 function Presets.List()
     local names = {}
-    local builtinOrder = { "MS 2/3/3/7", "MS 2/2/2/5", "MS tanks+heals" }
+    local builtinOrder = { "MS 2/3/3/10", "MS 2/2/2/7", "MS tanks+heals" }
     for _, n in ipairs(builtinOrder) do
         if BUILTIN[n] then
             table.insert(names, n)

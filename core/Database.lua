@@ -14,7 +14,7 @@ AscensionLFM.Database = Database
 -- Default "notify": Log fills from public LFM/LFG MS lines; kick/auto-invite stay off.
 local DEFAULTS = {
     mode = "notify",
-    defaultsRev = 7, -- bumped when shipping default-mode / stock-copy changes
+    defaultsRev = 8, -- bumped when shipping default-mode / stock-copy changes
     roles = {
         tank = true,
         healer = false,
@@ -26,16 +26,16 @@ local DEFAULTS = {
         aura = false,
         dps = true,
     },
-    -- Manastorm level-run style defaults (2/3/3/7). NOTE: `aura` is NOT a
-    -- seat cap like the other three - it's the aura COVERAGE TARGET (how
-    -- many raid members should carry an XP aura, ideally one per subgroup).
-    -- Aura is an orthogonal tag on top of tank/healer/dps, not a role of
-    -- its own, so it never consumes a seat. See core/Slots.lua.
+    -- Manastorm level-run defaults. tank+healer+dps must sum to the raid
+    -- size (2+3+10 = 15); `aura` is NOT a seat cap like the other three -
+    -- it's the aura COVERAGE TARGET (how many raid members should carry an
+    -- XP aura, ideally one per subgroup). Aura is an orthogonal tag on top
+    -- of tank/healer/dps, so it never consumes a seat. See core/Slots.lua.
     slotMax = {
         tank = 2,
         healer = 3,
         aura = 3,
-        dps = 7,
+        dps = 10,
     },
     assignedRoles = {}, -- [nameLower] = combat role ("tank"/"healer"/"dps")
     auraFlags = {}, -- [nameLower] = true when that player carries an XP aura
@@ -266,6 +266,27 @@ function Database.Init()
             end
             _G.AscensionLFMDB.defaultsRev = 7
             rev = 7
+        end
+        -- v0.4.133: rev 7 turned aura into a tag but left the seat caps at
+        -- the old 2/3/3/7 split, where aura's 3 entries used to BE seats.
+        -- The raid therefore capped at tank+healer+dps = 12 and could never
+        -- reach 15 - reported live as "D 8/7", "12 total", and applicants
+        -- rejected with "dps is full (7/7)" while the group was only 12
+        -- strong. Give those 3 seats to DPS (2+3+10 = 15).
+        --
+        -- Only rewrites a slotMax that still looks exactly like the old
+        -- stock split; anyone who tuned their own numbers keeps them, since
+        -- we cannot tell which of their seats were meant to absorb aura.
+        if rev < 8 then
+            local sm = _G.AscensionLFMDB.slotMax
+            if type(sm) == "table"
+                and tonumber(sm.tank) == 2
+                and tonumber(sm.healer) == 3
+                and tonumber(sm.dps) == 7 then
+                sm.dps = 10
+            end
+            _G.AscensionLFMDB.defaultsRev = 8
+            rev = 8
         end
     end
 end

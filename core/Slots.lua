@@ -23,12 +23,20 @@ local ROLE_ORDER = { "tank", "healer", "aura", "dps" }
 -- does this applicant take" must iterate COMBAT_ROLES, not ROLE_ORDER.
 local COMBAT_ROLES = { "tank", "healer", "dps" }
 
+-- The three seat caps must add up to the raid size you actually want.
+-- Before v0.4.131 aura was a fourth SEAT and the split was 2/3/3/7 = 15.
+-- Making aura a tag silently deleted those 3 seats, so the raid capped at
+-- 2+3+7 = 12 and could never reach 15 (reported live: "D 8/7", "12 total",
+-- and applicants rejected with "dps is full (7/7)" at only 12 people).
+-- Those 3 seats belong to DPS now: 2+3+10 = 15. Same blueprint the
+-- competing ManastormRecruiter documents (2 Tanks, 3 Healers, 10 DPS,
+-- plus 3 Auras as a coverage target rather than seats).
 local DEFAULT_MAX = {
     tank = 2,
     healer = 3,
     -- Not a seat cap: the aura COVERAGE TARGET (ideally one per subgroup).
     aura = 3,
-    dps = 7,
+    dps = 10,
 }
 
 -- Runtime maps (also mirrored into SavedVariables via Database when available)

@@ -33,8 +33,8 @@ local Presets = assert(AscensionLFM.Presets)
 --------------------------------------------------------------------
 -- IsBuiltin
 --------------------------------------------------------------------
-check("builtin MS 2/3/3/7 is builtin", Presets.IsBuiltin("MS 2/3/3/7") == true)
-check("builtin MS 2/2/2/5 is builtin", Presets.IsBuiltin("MS 2/2/2/5") == true)
+check("builtin MS 2/3/3/10 is builtin", Presets.IsBuiltin("MS 2/3/3/10") == true)
+check("builtin MS 2/2/2/7 is builtin", Presets.IsBuiltin("MS 2/2/2/7") == true)
 check("builtin MS tanks+heals is builtin", Presets.IsBuiltin("MS tanks+heals") == true)
 check("unknown name is not builtin", Presets.IsBuiltin("TotallyMadeUp") == false)
 check("empty name is not builtin", Presets.IsBuiltin("") == false)
@@ -43,14 +43,14 @@ check("nil name is not builtin", Presets.IsBuiltin(nil) == false)
 --------------------------------------------------------------------
 -- Get
 --------------------------------------------------------------------
-local got, isBuiltin = Presets.Get("MS 2/3/3/7")
+local got, isBuiltin = Presets.Get("MS 2/3/3/10")
 check("Get returns the builtin preset", got and got.slotMax and got.slotMax.tank == 2)
 check("Get flags it as builtin", isBuiltin == true)
 
 -- Get's builtin result is a copy, not a live reference - mutating it
 -- must not corrupt the real builtin table for later lookups.
 got.slotMax.tank = 999
-local got2 = Presets.Get("MS 2/3/3/7")
+local got2 = Presets.Get("MS 2/3/3/10")
 check("Get returns an isolated copy (builtin)", got2.slotMax.tank == 2, tostring(got2.slotMax.tank))
 
 local missing, missingIsBuiltin = Presets.Get("NoSuchPreset")
@@ -112,9 +112,9 @@ check("loaded rejectRewhisper applied", db.rejectRewhisper == true)
 --------------------------------------------------------------------
 -- Delete
 --------------------------------------------------------------------
-local delOk, delWhy = Presets.Delete("MS 2/3/3/7")
+local delOk, delWhy = Presets.Delete("MS 2/3/3/10")
 check("cannot delete a builtin preset", delOk == false and delWhy == "builtin", tostring(delWhy))
-check("builtin preset still exists after failed delete", Presets.Get("MS 2/3/3/7") ~= nil)
+check("builtin preset still exists after failed delete", Presets.Get("MS 2/3/3/10") ~= nil)
 
 delOk, delWhy = Presets.Delete("NoSuchPreset")
 check("deleting an unknown preset fails", delOk == false and delWhy == "not found", tostring(delWhy))
@@ -137,7 +137,7 @@ ok, why = Presets.Save("")
 check("cannot save with an empty name", ok == false and why == "empty name", tostring(why))
 ok, why = Presets.Save("   ")
 check("cannot save with a whitespace-only name", ok == false and why == "empty name", tostring(why))
-ok, why = Presets.Save("MS 2/2/2/5")
+ok, why = Presets.Save("MS 2/2/2/7")
 check("cannot save over a builtin name", ok == false and why == "builtin name", tostring(why))
 
 io.write(string.format("test_presets: %d passed, %d failed\n", passed, failed))

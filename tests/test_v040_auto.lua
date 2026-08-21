@@ -210,18 +210,25 @@ check("mode seeking clears repost", db.autoRepost == false)
 
 -- Presets
 local names = Presets.List()
-check("builtin MS 2/3/3/7 listed", names[1] == "MS 2/3/3/7")
+check("builtin MS 2/3/3/10 listed", names[1] == "MS 2/3/3/10")
 db.slotMax = { tank = 1, healer = 1, aura = 1, dps = 1 }
 db.maxPartySize = 5
-ok = Presets.Load("MS 2/3/3/7")
+ok = Presets.Load("MS 2/3/3/10")
 check("load preset ok", ok == true)
 check("preset tank 2", db.slotMax.tank == 2)
 check("preset healer 3", db.slotMax.healer == 3)
 check("preset aura 3", db.slotMax.aura == 3)
-check("preset dps 7", db.slotMax.dps == 7)
+-- v0.4.133: tank+healer+dps are the only SEATS and must sum to the raid
+-- size, so the stock preset is 2+3+10 = 15. The aura 3 is a coverage
+-- target riding on those seats, not a fourth block of seats.
+check("preset dps 10 (seats sum to 15)", db.slotMax.dps == 10, tostring(db.slotMax.dps))
+check("preset seats sum to maxPartySize",
+    db.slotMax.tank + db.slotMax.healer + db.slotMax.dps == db.maxPartySize,
+    string.format("%d+%d+%d vs %d", db.slotMax.tank, db.slotMax.healer,
+        db.slotMax.dps, db.maxPartySize))
 check("preset maxParty 15", db.maxPartySize == 15)
 
-ok, why = Presets.Save("MS 2/3/3/7")
+ok, why = Presets.Save("MS 2/3/3/10")
 check("cannot overwrite builtin", ok == false)
 
 db.slotMax.tank = 4
@@ -247,7 +254,7 @@ db.announceFull = true
 db.fullAnnounceMessage = "LFM MS FULL — thanks!"
 db.postChannel = "YELL"
 db.maxPartySize = 15
-Presets.Load("MS 2/3/3/7")
+Presets.Load("MS 2/3/3/10")
 Slots.ClearAll()
 Slots.SetMax("tank", 2)
 Slots.SetMax("healer", 3)

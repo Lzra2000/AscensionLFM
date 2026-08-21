@@ -22,10 +22,14 @@ local GLOBAL_GAP = 2.5 -- min seconds between any reject whispers
 local DEFAULT_TEMPLATES = {
     ["slot full"] = "Sorry, {role} is full ({filled}/{max}).",
     full = "Group is full - thanks!",
-    ["no role"] = "Please whisper a role: tank / heal / aura / dps.",
-    ["no parse"] = "Please whisper a role: tank / heal / aura / dps.",
+    -- Since v0.4.131 aura is a tag, not a seat you can apply for: telling
+    -- applicants to whisper "aura" as their role asks for something the
+    -- addon can no longer honour (it seats them as dps anyway).
+    ["no role"] = "Please whisper a role: tank / heal / dps - add 'aura' if you bring one.",
+    ["no parse"] = "Please whisper a role: tank / heal / dps - add 'aura' if you bring one.",
     ["role filtered"] = "Not looking for {role} right now - thanks!",
-    ["prefer support seat"] = "Saving the last couple seats for tank/heal/aura - try again if one opens up!",
+    ["prefer support seat"] = "Saving the last seats for tank/heal or an aura carrier - try again if one opens up!",
+    ["dps seat reserved for aura"] = "DPS seats are held for aura carriers right now - whisper again with 'aura' if you have one!",
 }
 
 local REJECTABLE = {
@@ -35,6 +39,10 @@ local REJECTABLE = {
     ["no parse"] = true,
     ["role filtered"] = true,
     ["prefer support seat"] = true,
+    -- A held-back DPS applicant is a real, understood block (same class as
+    -- "prefer support seat"), so they get told why instead of being
+    -- silently dropped - and the reply tells them how to get in.
+    ["dps seat reserved for aura"] = true,
 }
 
 local function Now()

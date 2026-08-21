@@ -29,7 +29,7 @@ Database.Init()
 local db = Database.Get()
 
 check("default mode is notify", db.mode == "notify")
-check("defaultsRev is 7", tonumber(db.defaultsRev) == 7)
+check("defaultsRev is 8", tonumber(db.defaultsRev) == 8)
 check("autoKick still off", db.autoKickLevel59 == false)
 check("autoWhisper still off", db.autoWhisper == false)
 check("autoRepost still off", db.autoRepost == false)
@@ -52,7 +52,7 @@ _G.AscensionLFMDB = {
 }
 Database.Init()
 check("migrate off→notify", Database.Get().mode == "notify")
-check("migrate sets defaultsRev 7", tonumber(Database.Get().defaultsRev) == 7)
+check("migrate sets defaultsRev 8", tonumber(Database.Get().defaultsRev) == 8)
 
 -- Do not re-flip after user sets Off post-migration
 Database.SetMode("off")
@@ -89,7 +89,7 @@ _G.AscensionLFMDB = {
 }
 Database.Init()
 local migrated = Database.Get()
-check("full auto migrate rev 7", tonumber(migrated.defaultsRev) == 7)
+check("full auto migrate rev 8", tonumber(migrated.defaultsRev) == 8)
 check("full auto migrate healer on", migrated.roles.healer == true)
 check("full auto migrate aura on", migrated.roles.aura == true)
 
@@ -170,7 +170,7 @@ _G.AscensionLFMDB = {
 }
 Database.Init()
 local m7 = Database.Get()
-check("rev 7 migration ran", tonumber(m7.defaultsRev) == 7, tostring(m7.defaultsRev))
+check("rev 7 migration ran (chain now ends at 8)", tonumber(m7.defaultsRev) == 8, tostring(m7.defaultsRev))
 check("aura role converted to dps seat", m7.assignedRoles.auraguy == "dps",
     tostring(m7.assignedRoles.auraguy))
 check("second aura role converted too", m7.assignedRoles.auragal == "dps",
@@ -184,7 +184,53 @@ check("plain dps did NOT gain a bogus aura tag", m7.auraFlags.deeps == nil,
     tostring(m7.auraFlags.deeps))
 check("tank did NOT gain a bogus aura tag", m7.auraFlags.tanky == nil)
 
--- A save already at rev 7 must not be touched again.
+--------------------------------------------------------------------
+-- Regression (v0.4.133): making aura a tag in rev 7 deleted its 3 SEATS
+-- without giving them to anyone, so tank+healer+dps only summed to 12 and
+-- a 15-man raid could never fill. Reported live: roster showed "D 8/7"
+-- and "12 total", and applicants were rejected with "dps is full (7/7)"
+-- while the group was only 12 strong.
+--------------------------------------------------------------------
+_G.AscensionLFMDB = nil
+Database.Init()
+local seats = Database.Get().slotMax
+check("stock seats sum to the raid size",
+    seats.tank + seats.healer + seats.dps == Database.Get().maxPartySize,
+    string.format("%d+%d+%d = %d, maxPartySize %d", seats.tank, seats.healer,
+        seats.dps, seats.tank + seats.healer + seats.dps, Database.Get().maxPartySize))
+check("aura is NOT part of the seat budget",
+    seats.tank + seats.healer + seats.aura + seats.dps > Database.Get().maxPartySize,
+    "aura must be a coverage target on top of the seats, not a seat block")
+
+-- Upgraders on the old 2/3/3/7 split get the 3 lost seats back as DPS.
+_G.AscensionLFMDB = {
+    mode = "hosting",
+    defaultsRev = 7,
+    slotMax = { tank = 2, healer = 3, aura = 3, dps = 7 },
+    maxPartySize = 15,
+}
+Database.Init()
+local m8 = Database.Get()
+check("rev 8 gives the 3 lost seats to dps", m8.slotMax.dps == 10, tostring(m8.slotMax.dps))
+check("rev 8 leaves tank/healer alone",
+    m8.slotMax.tank == 2 and m8.slotMax.healer == 3)
+check("rev 8 leaves the aura target alone", m8.slotMax.aura == 3, tostring(m8.slotMax.aura))
+check("upgraded seats now reach the raid size",
+    m8.slotMax.tank + m8.slotMax.healer + m8.slotMax.dps == 15)
+
+-- A host who tuned their own numbers keeps them - we can't know which of
+-- their seats were meant to absorb aura.
+_G.AscensionLFMDB = {
+    mode = "hosting",
+    defaultsRev = 7,
+    slotMax = { tank = 1, healer = 4, aura = 2, dps = 7 },
+    maxPartySize = 15,
+}
+Database.Init()
+check("rev 8 does not touch a customised split",
+    Database.Get().slotMax.dps == 7, tostring(Database.Get().slotMax.dps))
+
+-- A save already past rev 7 must not have its assignedRoles touched again.
 _G.AscensionLFMDB = {
     mode = "hosting",
     defaultsRev = 7,

@@ -54,7 +54,7 @@ Drag the title to move. **×** collapses to an `ALFM` chip (click to expand). Ti
 
 ## Hosting: slots + invites
 
-Default Manastorm level-run caps: **2 tank / 3 healer / 3 aura / 7 DPS** (editable in UI). The filled/max row updates as invites assign roles from whispers. Party/raid roster changes drop leavers from the assignment map; unknown roles for manually invited players stay uncounted until they whisper a role.
+Default Manastorm level-run seat caps: **2 tank / 3 healer / 10 DPS** = 15, plus an **aura coverage target of 3** (editable in UI). Aura is a tag any role can carry, not a seat — so only tank/healer/DPS count toward the raid size, and DPS seats are held open while aura coverage is short. The filled/max row updates as invites assign roles from whispers. Party/raid roster changes drop leavers from the assignment map; unknown roles for manually invited players stay uncounted until they whisper a role.
 
 - Whispers with **no role** are not invited (default-deny; toggle “Require role in whisper”).
 - Slot full → no invite for that role.

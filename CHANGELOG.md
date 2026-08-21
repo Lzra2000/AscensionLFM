@@ -1,5 +1,58 @@
 # Changelog
 
+## 0.4.133
+
+- **Fixed: the raid could never fill to 15.** Reported live - the roster
+  showed `T 2/2  H 2/3  A 3/3  D 8/7` with only **12 total**, DPS was over
+  its own cap, and applicants were turned away with *"Sorry, dps is full
+  (7/7)"* while the group still had three empty seats.
+  - Root cause, and it was mine: before v0.4.131 aura was a fourth **seat**
+    and the stock split `2 tank / 3 healer / 3 aura / 7 dps` added up to 15.
+    Turning aura into a tag correctly stopped it consuming a seat - but the
+    three seats it used to hold were never given to anyone, so the real
+    budget silently shrank to `2 + 3 + 7 = 12`. Every LFM, reject and slot
+    check has been working off that 12-seat budget since.
+  - Those three seats now belong to DPS: **2 tank / 3 healer / 10 dps = 15**,
+    with aura's `3` remaining a *coverage target* on top. Same blueprint the
+    competing `ManastormRecruiter` documents (2 Tanks, 3 Healers, 10 DPS,
+    plus 3 Auras as a target rather than seats).
+  - Also fixes the "D 8/7" overflow: aura carriers converted to DPS seats by
+    the rev-7 migration pushed the count past the old 7 cap.
+  - **Migration (`defaultsRev` 7 -> 8)** raises DPS 7 -> 10, but *only* for
+    saves still on the exact stock `2/3/?/7` split. A host who tuned their
+    own numbers keeps them, since we cannot know which of their seats were
+    meant to absorb aura.
+  - Built-in presets renamed and rebalanced to keep seats == raid size:
+    `MS 2/3/3/7` -> **`MS 2/3/3/10`** (15), `MS 2/2/2/5` -> **`MS 2/2/2/7`**
+    (11). The Raid-tab size presets had the same gap and were short by
+    exactly the aura count - 10-man was `2+2+5 = 9` seats, 25-man `23`,
+    40-man `37`; now 10/25/40 exactly. Their buttons now read
+    `10-man (T2/H2/D6 + 1 aura)` so the aura figure no longer looks like a
+    fourth cap.
+  - Regression-tested: the new checks assert seats sum to `maxPartySize` and
+    that aura sits *on top* of that budget; reverted to the old numbers and
+    confirmed they fail with `2+3+7 = 12, maxPartySize 15` - the exact live
+    symptom - then restored.
+- **Applicant replies no longer ask for a role that no longer exists.**
+  Seen live: *"Please whisper a role: tank / heal / aura / dps."* Whispering
+  "aura" cannot get you an aura seat any more (it seats you as DPS with the
+  tag), so the stock rejects now read *"tank / heal / dps - add 'aura' if you
+  bring one."* These live hardcoded in `core/Reject.lua`, so the fix reaches
+  existing installs immediately without a SavedVariables migration.
+- **New reject reason `dps seat reserved for aura`.** v0.4.131 already
+  distinguished a held-back DPS from a genuinely full one internally, but it
+  had no reply template, so those applicants were dropped silently. They now
+  get told why - and that whispering again with "aura" gets them in.
+- `README.md`'s documented default caps were wrong on both counts after the
+  v0.4.131/133 changes; corrected to the seat/target split.
+
+Known follow-up (not in this version): a broader sweep found the same stale
+"tank/heal/aura/dps" phrasing in the Role Check raid warning, several
+Hosting/Seeking tooltips, the Mini HUD's aura-need broadcast and the LFM
+post's `Aura` column label. Those need a SavedVariables migration to reach
+existing installs (stored copies of the stock text), so they are deliberately
+left for a follow-up rather than half-done here.
+
 ## 0.4.132
 
 - **Follow-up sweep for v0.4.131 leftovers: two places still treated aura as
