@@ -1980,8 +1980,8 @@ function MainWindow.Init()
         false,
         function(on)
             AscensionLFM.Database.Get().autoMoveTank = on and true or false
-            if on and AscensionLFM.AuraBalance and AscensionLFM.AuraBalance.BalanceAll then
-                AscensionLFM.AuraBalance.BalanceAll()
+            if on and AscensionLFM.AuraBalance and AscensionLFM.AuraBalance.SortGroupsNow then
+                AscensionLFM.AuraBalance.SortGroupsNow()
             end
         end)
     widgets.autoMoveHealer = CreateToggleRow(hosting, rcY - 18 - TOGGLE_STEP,
@@ -1990,8 +1990,8 @@ function MainWindow.Init()
         false,
         function(on)
             AscensionLFM.Database.Get().autoMoveHealer = on and true or false
-            if on and AscensionLFM.AuraBalance and AscensionLFM.AuraBalance.BalanceAll then
-                AscensionLFM.AuraBalance.BalanceAll()
+            if on and AscensionLFM.AuraBalance and AscensionLFM.AuraBalance.SortGroupsNow then
+                AscensionLFM.AuraBalance.SortGroupsNow()
             end
         end)
     widgets.autoMoveAura = CreateToggleRow(hosting, rcY - 18 - TOGGLE_STEP * 2,
@@ -2000,8 +2000,8 @@ function MainWindow.Init()
         false,
         function(on)
             AscensionLFM.Database.Get().autoMoveAura = on and true or false
-            if on and AscensionLFM.AuraBalance and AscensionLFM.AuraBalance.BalanceAll then
-                AscensionLFM.AuraBalance.BalanceAll()
+            if on and AscensionLFM.AuraBalance and AscensionLFM.AuraBalance.SortGroupsNow then
+                AscensionLFM.AuraBalance.SortGroupsNow()
             end
         end)
     widgets.roleCheckAutoResync = CreateToggleRow(hosting, rcY - 18 - TOGGLE_STEP * 3,

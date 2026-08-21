@@ -119,6 +119,27 @@ check("no protectedNames arg behaves as before (both pruned)",
     keptNoProtect.freshy == nil and keptNoProtect.stale == nil)
 check("removed count both without protection", removedNoProtect == 2, tostring(removedNoProtect))
 
+-- Regression: Slots.Assign()/ScanRaid() must NOT auto-trigger AuraBalance
+-- anymore. Both are called from event/timer contexts (whisper
+-- auto-invite, roster-update handlers) where WoW's secure-execution
+-- model blocks SetRaidSubgroup/SwapRaidSubgroup ("prevented the call of
+-- the secure function") - confirmed live. Group sorting is now the
+-- host-triggered "Sort Groups" button (AuraBalance.SortGroupsNow())
+-- instead of an automatic side effect of assigning a role.
+local balanceCalls = 0
+AscensionLFM.AuraBalance = {
+    Balance = function() balanceCalls = balanceCalls + 1; return 0 end,
+    BalanceAll = function() balanceCalls = balanceCalls + 1; return 0 end,
+}
+Slots.Assign("Aurabot", "aura")
+check("Assign(aura) does not auto-trigger AuraBalance", balanceCalls == 0, tostring(balanceCalls))
+
+_G.GetNumRaidMembers = function() return 1 end
+_G.GetRaidRosterInfo = function(i) if i == 1 then return "Aurabot" end end
+Slots.ScanRaid()
+check("ScanRaid() does not auto-trigger AuraBalance", balanceCalls == 0, tostring(balanceCalls))
+AscensionLFM.AuraBalance = nil
+
 io.write(string.format("slots tests: %d passed, %d failed\n", passed, failed))
 if failed > 0 then
     os.exit(1)

@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.4.127
+
+- **Fixed the "prevented the call of the secure function 'UNKNOWN()'"
+  error hit live during normal whisper-hosting.** Root cause: the
+  Tank/Healer/Aura auto-balance (`AuraBalance.BalanceAll()`/`Balance()`)
+  was being triggered automatically from event/timer contexts -
+  `RoleCheck.Resync()` (fired when a Role Check's countdown naturally
+  expires, via `RoleCheck.EnsureTicker()`'s `OnUpdate` handler),
+  `Slots.Assign()` (fired on every whisper auto-invite assigning the aura
+  role), `Slots.ScanRaid()`, and `Scanner.lua`'s roster-update handler.
+  Per this repo's own v0.4.99b hotfix, `SetRaidSubgroup`/
+  `SwapRaidSubgroup`/`InviteUnit`/`UninviteUnit` only work synchronously
+  inside a real hardware-event call stack (a click) - never from
+  `OnUpdate`, timers, or chat-message event handlers. That exact
+  restriction had been reintroduced for the whole auto-balance feature.
+  - All four automatic trigger points removed (see comments left in
+    `Slots.lua`/`Scanner.lua`/`RoleCheck.lua` explaining why).
+  - **New "Sort Groups" button** in the Roster tab (next to Ready) is now
+    the only way group sorting happens - a real click, so it's actually
+    reliable. Wired to `AuraBalance.SortGroupsNow()`, a new function that
+    applies ALL needed Tank -> Healer -> Aura moves synchronously in one
+    call (unlike `BalanceAll()`, which by design only applies one move
+    per call and relied on a ticker to continue - itself part of the bug,
+    since ticker-driven continuation calls are exactly what's disallowed).
+  - The three Role Check "Auto-move Tank/Healer/Aura" settings checkboxes
+    now call `SortGroupsNow()` (not `BalanceAll()`) when toggled on, so
+    flipping one immediately fully sorts within that click.
+  - `AuraBalance.BalanceAll()`/`Balance()`/`PlanRoleMoves()`/`ApplyOne()`
+    are unchanged and still fully tested - only their automatic callers
+    were removed; nothing else in the addon called them, per a full grep.
+  - Regression-tested: reverted the fix, confirmed
+    `tests/test_slots.lua`'s new "does not auto-trigger AuraBalance"
+    checks fail against the old code, and `tests/test_aura_rolecheck.lua`
+    crashes without `SortGroupsNow` (exit 1) against the old
+    `AuraBalance.lua` - then restored the fix and confirmed everything
+    passes.
+
 ## 0.4.126
 
 - **Removed the v0.4.125 Manastorm reward-bonus LFM tag.** User feedback:

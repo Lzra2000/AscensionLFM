@@ -998,7 +998,7 @@ function RosterPanel.Attach(parent)
     hostFrame = parent
     summaryFS = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     summaryFS:SetPoint("TOPLEFT", 6, -6)
-    summaryFS:SetPoint("TOPRIGHT", -90, -6)
+    summaryFS:SetPoint("TOPRIGHT", -166, -6)
     summaryFS:SetJustifyH("LEFT")
     summaryFS:SetTextColor(0.95, 0.88, 0.55)
     summaryFS:SetText("Roster empty")
@@ -1017,6 +1017,28 @@ function RosterPanel.Attach(parent)
         end
     end)
     hostFrame.readyBtn = rcBtn
+
+    -- Group sorting (Tank/Heal/Aura confinement) must fire synchronously
+    -- inside a real click - WoW's secure-execution model blocks
+    -- SetRaidSubgroup from OnUpdate/timers (confirmed live). This button
+    -- is that click; nothing auto-sorts anymore (see AuraBalance.lua /
+    -- Slots.lua comments).
+    local sortBtn = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+    if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(sortBtn) end
+    sortBtn:SetSize(80, 22)
+    sortBtn:SetPoint("TOPRIGHT", rcBtn, "TOPLEFT", -4, 0)
+    sortBtn:SetText("Sort Groups")
+    sortBtn:SetScript("OnClick", function()
+        local moved = 0
+        if AscensionLFM.AuraBalance and AscensionLFM.AuraBalance.SortGroupsNow then
+            moved = AscensionLFM.AuraBalance.SortGroupsNow() or 0
+        end
+        if AscensionLFM.Print then
+            AscensionLFM.Print(moved > 0 and ("Sort Groups: moved " .. moved) or "Sort Groups: already sorted")
+        end
+        RosterPanel.Refresh()
+    end)
+    hostFrame.sortGroupsBtn = sortBtn
 
     EnsureCards(parent)
     RosterPanel.Refresh()

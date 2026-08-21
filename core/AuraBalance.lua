@@ -21,6 +21,15 @@ local SETTLE_TIMEOUT = 2.0
 local TANK_GROUPS = { 1, 2 }
 local AURA_HEALER_GROUPS = { 1, 2, 3 }
 
+-- Shared by BalanceAll() (one move per call, ticker-driven continuation)
+-- and SortGroupsNow() (all moves in one synchronous pass) so the two
+-- never drift on role order/confinement/protection rules.
+local ROLE_BALANCE_SPECS = {
+    { key = "tank", enabled = "autoMoveTank", protect = {}, sortByGroupNumber = true, allowedGroups = TANK_GROUPS },
+    { key = "healer", enabled = "autoMoveHealer", protect = { "tank" }, sortByGroupNumber = false, allowedGroups = AURA_HEALER_GROUPS },
+    { key = "aura", enabled = "autoMoveAura", protect = { "tank", "healer" }, sortByGroupNumber = false, allowedGroups = AURA_HEALER_GROUPS },
+}
+
 -- Balance() (aura-only, fired on nearly every roster event via Scanner/
 -- Slots) and BalanceAll() (tank->healer->aura, fired once per Role Check
 -- resync) used to share one `waitingFor` variable. Balance() runs far
@@ -536,13 +545,7 @@ function AuraBalance.BalanceAll()
         end
     end
 
-    local specs = {
-        { key = "tank", enabled = "autoMoveTank", protect = {}, sortByGroupNumber = true, allowedGroups = TANK_GROUPS },
-        { key = "healer", enabled = "autoMoveHealer", protect = { "tank" }, sortByGroupNumber = false, allowedGroups = AURA_HEALER_GROUPS },
-        { key = "aura", enabled = "autoMoveAura", protect = { "tank", "healer" }, sortByGroupNumber = false, allowedGroups = AURA_HEALER_GROUPS },
-    }
-
-    for _, spec in ipairs(specs) do
+    for _, spec in ipairs(ROLE_BALANCE_SPECS) do
         if not (db and db[spec.enabled] == false) then
             local plan = AuraBalance.PlanRoleMoves(members, spec.key, {
                 protectRoles = spec.protect,
@@ -567,6 +570,74 @@ function AuraBalance.BalanceAll()
 
     ClearWaitAll()
     return 0, 0
+end
+
+-- Reflect an applied move in our in-memory member snapshot, so the next
+-- planning pass within the same synchronous call sees it without needing
+-- to re-query the live raid roster (which may not refresh same-frame).
+local function ReflectMove(members, mv)
+    for _, m in ipairs(members) do
+        if LowerName(m.name) == LowerName(mv.name) then
+            m.subgroup = mv.to
+            break
+        end
+    end
+    if mv.kind == "swap" and mv.swapName then
+        for _, m in ipairs(members) do
+            if LowerName(m.name) == LowerName(mv.swapName) then
+                m.subgroup = mv.from
+                break
+            end
+        end
+    end
+end
+
+--- Tank -> Healer -> Aura, ALL needed moves applied synchronously in one
+-- call - unlike BalanceAll() (one move per call + ticker-driven
+-- continuation, meant for a Role Check's automatic resync), this is only
+-- safe to call directly from a real click (a button's OnClick): WoW's
+-- secure-execution model only allows SetRaidSubgroup/SwapRaidSubgroup
+-- synchronously inside a real hardware-event call stack, never from
+-- OnUpdate/timers (confirmed live, see v0.4.99b and v0.4.127 CHANGELOG
+-- entries) - so every move must land within this one synchronous call,
+-- not be spread across ticks.
+-- @return movedCount
+function AuraBalance.SortGroupsNow()
+    if not CanMoveRaid() then
+        return 0
+    end
+    local db = DB()
+    local members = CollectRaidMembers()
+    if #members == 0 then
+        return 0
+    end
+
+    local applied = 0
+    local SAFETY_CAP = 40 -- generous upper bound; a real raid has <=40 possible moves
+    for _, spec in ipairs(ROLE_BALANCE_SPECS) do
+        if not (db and db[spec.enabled] == false) then
+            local guard = 0
+            while guard < SAFETY_CAP do
+                guard = guard + 1
+                local plan = AuraBalance.PlanRoleMoves(members, spec.key, {
+                    protectRoles = spec.protect,
+                    sortByGroupNumber = spec.sortByGroupNumber,
+                    allowedGroups = spec.allowedGroups,
+                })
+                if #plan == 0 then
+                    break
+                end
+                local mv = plan[1]
+                local ok = AuraBalance.ApplyOne(mv, members)
+                if not ok then
+                    break
+                end
+                applied = applied + 1
+                ReflectMove(members, mv)
+            end
+        end
+    end
+    return applied
 end
 
 -- Drives BalanceAll()'s tank->healer->aura queue to completion. Resync()

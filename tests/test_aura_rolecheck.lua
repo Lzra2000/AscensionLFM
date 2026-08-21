@@ -399,3 +399,60 @@ check("BalanceAll pulls a stray g4 tank back into g1/g2", mv4 == 1 and setCalls4
     setCalls4[1] and (setCalls4[1].name .. "->" .. tostring(setCalls4[1].to)) or "none")
 
 print("allowedGroups confinement tests passed")
+
+--------------------------------------------------------------------
+-- New: SortGroupsNow() - ALL needed moves applied synchronously in one
+-- call, unlike BalanceAll() (one move per call + ticker-driven
+-- continuation). Only this function is safe to wire to a real click -
+-- see its doc comment: SetRaidSubgroup/SwapRaidSubgroup are not allowed
+-- to fire from OnUpdate/timers (confirmed live - the "prevented the call
+-- of the secure function" error), which is why BalanceAll()'s automatic
+-- callers (RoleCheck.Resync, Slots.Assign/ScanRaid, Scanner's roster
+-- handler) were all removed this version.
+--------------------------------------------------------------------
+AB._ResetForTests()
+local rosterSort = {
+    { name = "T1", sub = 1, role = "tank" },
+    { name = "T2", sub = 1, role = "tank" }, -- excess tank
+    { name = "H1", sub = 1, role = "healer" },
+    { name = "H2", sub = 1, role = "healer" }, -- excess healer
+    { name = "A1", sub = 1, role = "aura" },
+    { name = "A2", sub = 1, role = "aura" }, -- excess aura
+}
+_G.GetNumRaidMembers = function() return #rosterSort end
+_G.GetRaidRosterInfo = function(i)
+    local r = rosterSort[i]
+    if not r then return end
+    return r.name, nil, r.sub
+end
+_G.IsRaidLeader = function() return true end
+_G.IsRaidOfficer = function() return false end
+_G.UnitAffectingCombat = function() return false end
+local setCallsSort = {}
+_G.SetRaidSubgroup = function(i, to)
+    local r = rosterSort[i]
+    table.insert(setCallsSort, { name = r and r.name, to = to })
+    if r then r.sub = to end
+end
+_G.SwapRaidSubgroup = function() end
+local dbSort = AscensionLFM.Database.Get()
+dbSort.assignedRoles = { t1 = "tank", t2 = "tank", h1 = "healer", h2 = "healer", a1 = "aura", a2 = "aura" }
+dbSort.autoMoveTank = true
+dbSort.autoMoveHealer = true
+dbSort.autoMoveAura = true
+_G.GetTime = function() return 10000 end
+
+local movedSync = AB.SortGroupsNow()
+check("SortGroupsNow applies all 3 moves in one synchronous call", movedSync == 3, tostring(movedSync))
+check("SetRaidSubgroup called 3 times (no ticker needed)", #setCallsSort == 3, tostring(#setCallsSort))
+check("moved T2 out of tank-excess", setCallsSort[1] and setCallsSort[1].name == "T2",
+    setCallsSort[1] and setCallsSort[1].name or "none")
+check("moved H2 out of healer-excess", setCallsSort[2] and setCallsSort[2].name == "H2",
+    setCallsSort[2] and setCallsSort[2].name or "none")
+check("moved A2 out of aura-excess", setCallsSort[3] and setCallsSort[3].name == "A2",
+    setCallsSort[3] and setCallsSort[3].name or "none")
+
+local movedSync2 = AB.SortGroupsNow()
+check("SortGroupsNow settles (no more moves needed on a second call)", movedSync2 == 0, tostring(movedSync2))
+
+print("SortGroupsNow tests passed")

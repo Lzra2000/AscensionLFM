@@ -248,9 +248,12 @@ function Slots.Assign(name, role, assignedAtOverride)
     if AscensionLFM.MiniHUD and AscensionLFM.MiniHUD.RememberPlayer then
         AscensionLFM.MiniHUD.RememberPlayer(name)
     end
-    if role == "aura" and AscensionLFM.AuraBalance and AscensionLFM.AuraBalance.Balance then
-        AscensionLFM.AuraBalance.Balance()
-    end
+    -- Deliberately does NOT auto-trigger AuraBalance here anymore (used to,
+    -- for role=="aura") - Assign() is called from event/timer contexts
+    -- (whisper auto-invite, Role Check resync) where SetRaidSubgroup is
+    -- not allowed to fire (WoW's secure-execution model requires a real
+    -- click). Group sorting is now the host-triggered "Sort Groups"
+    -- button (AuraBalance.SortGroupsNow()) instead.
     return true
 end
 
@@ -484,9 +487,10 @@ function Slots.ScanRaid()
     if db and (db.mode == "hosting" or db.fullAutoHosting) then
         Slots.EnsureHostAssigned()
     end
-    if AscensionLFM.AuraBalance and AscensionLFM.AuraBalance.Balance then
-        AscensionLFM.AuraBalance.Balance()
-    end
+    -- Deliberately does NOT auto-trigger AuraBalance here anymore - ScanRaid
+    -- is called from event/timer-driven roster tracking, where
+    -- SetRaidSubgroup is not allowed to fire (see Slots.Assign's comment
+    -- above). Group sorting is now the host-triggered "Sort Groups" button.
     local snap = Slots.Snapshot()
     local _, unassigned = Slots.UnassignedMembers()
     if AscensionLFM.Poster and AscensionLFM.Poster.RefreshMessage then

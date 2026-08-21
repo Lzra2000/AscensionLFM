@@ -534,9 +534,11 @@ local function HandleRoster()
         AscensionLFM.Slots.ScanRaid()
     elseif AscensionLFM.Slots and AscensionLFM.Slots.SyncFromRoster then
         AscensionLFM.Slots.SyncFromRoster()
-        if AscensionLFM.AuraBalance and AscensionLFM.AuraBalance.Balance then
-            AscensionLFM.AuraBalance.Balance()
-        end
+        -- Deliberately does NOT auto-trigger AuraBalance here anymore -
+        -- this handler runs off a roster-update event, where
+        -- SetRaidSubgroup is not allowed to fire (see Slots.Assign's
+        -- comment). Group sorting is now the host-triggered "Sort Groups"
+        -- button.
         if AscensionLFM.MainWindow and AscensionLFM.MainWindow.RefreshSlots then
             AscensionLFM.MainWindow.RefreshSlots()
         end

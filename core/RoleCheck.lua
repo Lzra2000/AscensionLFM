@@ -489,17 +489,17 @@ function RoleCheck.Resync()
         removed = AscensionLFM.Slots.SyncFromRoster() or removed
     end
 
-    local moved = 0
-    if AscensionLFM.AuraBalance and AscensionLFM.AuraBalance.BalanceAll then
-        moved = AscensionLFM.AuraBalance.BalanceAll() or 0
-    elseif AscensionLFM.AuraBalance and AscensionLFM.AuraBalance.Balance then
-        moved = AscensionLFM.AuraBalance.Balance() or 0
-    end
-
+    -- Deliberately does NOT auto-trigger AuraBalance here anymore (used to
+    -- call BalanceAll()/Balance()) - Resync() runs off a Role Check
+    -- countdown timer, where SetRaidSubgroup is not allowed to fire (WoW's
+    -- secure-execution model requires a real click; see Slots.Assign's
+    -- comment for the full explanation, and the v0.4.127 CHANGELOG entry).
+    -- Group sorting is now the host-triggered "Sort Groups" button
+    -- (AuraBalance.SortGroupsNow()) instead of an automatic side effect.
     lastResponseCount = RoleCheck.ResponseCount()
     local line = string.format(
-        "roles resynced (pruned %d, applied %d, role moves %d, replies %d)",
-        removed, applied, moved, lastResponseCount
+        "roles resynced (pruned %d, applied %d, replies %d) - click Sort Groups to organize",
+        removed, applied, lastResponseCount
     )
     if AscensionLFM.Activity and AscensionLFM.Activity.Push then
         AscensionLFM.Activity.Push("match", line)
