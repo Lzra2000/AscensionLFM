@@ -1,5 +1,48 @@
 # Changelog
 
+## 0.4.134
+
+- **Fixed: "Sort Groups" replanned the same swap on every click.** Reported
+  live - clicking the button moved nobody, and clicking it again produced the
+  identical plan. The roster never converged.
+  - Root cause: `SwapRaidSubgroup` is a **silent no-op** on that realm. The
+    call returns normally, the server simply ignores the packet. A dropped
+    packet is not a Lua error, so `pcall` reported success, `ReflectMove`
+    recorded a move that had never happened, and the in-memory model
+    "converged" while the actual raid stayed put. The next click compared the
+    real roster against the same target and planned the same swap again.
+  - This is the second time the "no Lua error means it worked" assumption has
+    bitten this addon (see the v0.4.99b entry on hardware-event gating).
+    `pcall` tells you the client accepted the call, never that the server
+    acted on it.
+  - `SetRaidSubgroup` *does* work on that realm, so swaps are now routed
+    through it: the victim is parked in a spare group, `me` takes the freed
+    slot, then the victim moves into the origin group. Order matters - the
+    victim has to leave first, otherwise moving into a full target group is
+    itself rejected. `SwapRaidSubgroup` remains as a fallback when no spare
+    group is free.
+  - Raid indices stay valid across the three calls: the client roster is
+    server-authoritative and cannot renumber inside one synchronous click.
+  - The runtime fallback now records what *actually* ran (`mv.appliedKind`,
+    `mv.appliedSwapName`) instead of what was planned, so `ReflectMove` can no
+    longer update the model for a route that was not taken.
+  - Regression-tested against a stubbed realm where `SwapRaidSubgroup` exists
+    but does nothing and `SetRaidSubgroup` refuses full target groups - the
+    exact live shape. The guard asserts the **second** click finds nothing
+    left to do. Reverted the fix and confirmed the test fails with
+    `Orange landet wirklich in g1 - g2`, then restored.
+
+- **`scripts/check.sh` no longer reports FAILED on every run.** The
+  forbidden-API grep banned every `C_*` reference to keep retail APIs out,
+  which also caught `C_Manastorm` - a verified Ascension 3.3.5a API the addon
+  uses on purpose, type-guarded and wrapped in `pcall` at all 16 call sites.
+  The check has therefore printed `FAILED` on every single release while all
+  tests passed, which is the fastest way to train everyone to ignore it.
+  There is now a one-name allowlist (`ALLOWED_C_API`) with a comment saying a
+  name only goes in after being verified in the client extract. Confirmed the
+  check still catches real hits by planting a `C_Wildcard.RollAbilities()`
+  call and watching it fail.
+
 ## 0.4.133
 
 - **Fixed: the raid could never fill to 15.** Reported live - the roster

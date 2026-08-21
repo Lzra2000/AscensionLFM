@@ -372,6 +372,52 @@ local function LogMove(mv, detail)
     end
 end
 
+--- Emulate a subgroup swap with two/three SetRaidSubgroup calls, routed
+-- through any group that still has a free slot.
+--
+-- Exists because SwapRaidSubgroup is a silent no-op on at least one live
+-- realm (see ApplyOne). SetRaidSubgroup demonstrably works there, so this
+-- keeps Sort Groups making progress instead of replanning the same swap
+-- forever. Order matters: the victim leaves first, otherwise moving `me`
+-- into a full target would itself be rejected.
+--
+-- Raid indices stay valid throughout: the client roster is
+-- server-authoritative and cannot renumber inside one synchronous click.
+-- @return true when the three-step route was taken
+local function SwapViaSets(members, me, other, to, from)
+    if type(SetRaidSubgroup) ~= "function" then
+        return false
+    end
+    local counts = {}
+    for g = 1, 8 do
+        counts[g] = 0
+    end
+    for _, m in ipairs(members) do
+        local g = tonumber(m.subgroup)
+        if g and g >= 1 and g <= 8 then
+            counts[g] = counts[g] + 1
+        end
+    end
+    local spare = nil
+    for g = 1, 8 do
+        if g ~= to and g ~= from and counts[g] < GROUP_CAP then
+            spare = g
+            break
+        end
+    end
+    if not spare then
+        return false
+    end
+    if not pcall(SetRaidSubgroup, other.index, spare) then
+        return false
+    end
+    if not pcall(SetRaidSubgroup, me.index, to) then
+        return false
+    end
+    pcall(SetRaidSubgroup, other.index, from)
+    return true
+end
+
 --- Apply a single planned move using live roster indices (by name).
 -- @return ok
 function AuraBalance.ApplyOne(mv, members)
@@ -404,13 +450,25 @@ function AuraBalance.ApplyOne(mv, members)
         if not other then
             return false
         end
-        if type(SwapRaidSubgroup) ~= "function" then
-            return false
+        local from = tonumber(me.subgroup) or mv.from
+        -- Prefer emulating the swap with SetRaidSubgroup. Reported live:
+        -- clicking Sort Groups replanned the SAME swap on every click while
+        -- SetRaidSubgroup-based moves landed immediately - i.e.
+        -- SwapRaidSubgroup is a silent no-op on this realm. pcall cannot
+        -- see that (a server-ignored packet is not a Lua error), so
+        -- ApplyOne reported success, ReflectMove recorded a move that never
+        -- happened, and the planner replanned it forever.
+        local ok = SwapViaSets(members, me, other, to, from)
+        if not ok then
+            -- No spare group to route through - fall back to the real API.
+            if type(SwapRaidSubgroup) ~= "function" then
+                return false
+            end
+            ok = pcall(SwapRaidSubgroup, me.index, other.index) and true or false
         end
-        local ok = pcall(SwapRaidSubgroup, me.index, other.index)
         if ok then
             LogMove(mv, string.format(
-                "swapped %s ? %s (%s -> g%d)",
+                "swapped %s / %s (%s -> g%d)",
                 tostring(mv.name), tostring(mv.swapName), roleKey, to
             ))
         end
@@ -433,11 +491,24 @@ function AuraBalance.ApplyOne(mv, members)
         end
     end
     if targetCount >= GROUP_CAP then
-        if victim and type(SwapRaidSubgroup) == "function" then
-            local ok = pcall(SwapRaidSubgroup, me.index, victim.index)
+        if victim then
+            local from = tonumber(me.subgroup) or mv.from
+            local ok = SwapViaSets(members, me, victim, to, from)
+            if not ok and type(SwapRaidSubgroup) == "function" then
+                ok = pcall(SwapRaidSubgroup, me.index, victim.index) and true or false
+            end
             if ok then
+                -- Report what was ACTUALLY done, not what was planned. The
+                -- plan said kind="set"; at runtime the target had filled up
+                -- and this became a swap with a victim the plan never named.
+                -- Without these two fields ReflectMove would leave the
+                -- victim sitting in the target group in our in-memory model
+                -- while the server moved them out - and the next planning
+                -- pass would work off a roster that never existed.
+                mv.appliedKind = "swap"
+                mv.appliedSwapName = victim.name
                 LogMove(mv, string.format(
-                    "swapped %s ? %s (%s -> g%d, group was full)",
+                    "swapped %s / %s (%s -> g%d, group was full)",
                     tostring(mv.name), tostring(victim.name), roleKey, to
                 ))
             end
@@ -603,9 +674,14 @@ local function ReflectMove(members, mv)
             break
         end
     end
-    if mv.kind == "swap" and mv.swapName then
+    -- Use what ApplyOne actually did, not what was planned: a planned "set"
+    -- can turn into a swap at runtime when the target filled up in the
+    -- meantime, and it picks its own victim (see ApplyOne).
+    local kind = mv.appliedKind or mv.kind
+    local swapName = mv.appliedSwapName or mv.swapName
+    if kind == "swap" and swapName then
         for _, m in ipairs(members) do
-            if LowerName(m.name) == LowerName(mv.swapName) then
+            if LowerName(m.name) == LowerName(swapName) then
                 m.subgroup = mv.from
                 break
             end

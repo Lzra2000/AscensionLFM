@@ -517,3 +517,67 @@ local movedDual2 = AB.SortGroupsNow()
 check("dual-role sort settles instead of oscillating", movedDual2 == 0, tostring(movedDual2))
 
 print("dual-role (tag model) tests passed")
+
+--------------------------------------------------------------------
+-- Live repro: "Sort Groups" replanned the SAME swap on every click.
+-- Root cause: SwapRaidSubgroup is a silent no-op on that realm, and a
+-- server-ignored packet is not a Lua error - so pcall reported success,
+-- ReflectMove recorded a move that never happened, the in-memory model
+-- converged, and the next click replanned the identical swap forever.
+-- SetRaidSubgroup worked there, so the fix routes swaps through a spare
+-- group instead of trusting SwapRaidSubgroup.
+--------------------------------------------------------------------
+AB._ResetForTests()
+local rosterNoSwap = {
+    { name = "Caerridwien", sub = 1 }, { name = "P2", sub = 1 },
+    { name = "P3", sub = 1 }, { name = "P4", sub = 1 },
+    { name = "P5", sub = 1 },                                    -- g1 VOLL, kein Tank
+    { name = "TankA", sub = 2 }, { name = "Orange", sub = 2 },   -- zwei Tanks in g2
+    { name = "P8", sub = 2 }, { name = "P9", sub = 2 }, { name = "P10", sub = 2 },
+}
+local function CountIn(g)
+    local n = 0
+    for _, r in ipairs(rosterNoSwap) do
+        if r.sub == g then n = n + 1 end
+    end
+    return n
+end
+local function GroupOf(name)
+    for _, r in ipairs(rosterNoSwap) do
+        if r.name == name then return r.sub end
+    end
+end
+_G.GetNumRaidMembers = function() return #rosterNoSwap end
+_G.GetRaidRosterInfo = function(i)
+    local r = rosterNoSwap[i]
+    if not r then return end
+    return r.name, nil, r.sub
+end
+local swapCalls = 0
+-- Genau das Live-Verhalten: die API existiert, tut aber nichts.
+_G.SwapRaidSubgroup = function() swapCalls = swapCalls + 1 end
+_G.SetRaidSubgroup = function(i, to)
+    local r = rosterNoSwap[i]
+    if not r then return end
+    if CountIn(to) >= AB.GROUP_CAP then return end  -- Server lehnt volles Ziel ab
+    r.sub = to
+end
+local dbNS = AscensionLFM.Database.Get()
+dbNS.assignedRoles = { tanka = "tank", orange = "tank" }
+dbNS.auraFlags = {}
+dbNS.autoMoveTank, dbNS.autoMoveHealer, dbNS.autoMoveAura = true, true, true
+_G.GetTime = function() return 12000 end
+
+local ns1 = AB.SortGroupsNow()
+check("no-op-swap realm: Orange landet wirklich in g1", GroupOf("Orange") == 1,
+    "g" .. tostring(GroupOf("Orange")))
+check("no-op-swap realm: g1 bleibt bei GROUP_CAP", CountIn(1) == AB.GROUP_CAP,
+    tostring(CountIn(1)))
+check("no-op-swap realm: SwapRaidSubgroup wurde umgangen", swapCalls == 0,
+    tostring(swapCalls) .. " Aufrufe")
+-- Der eigentliche Regressionswaechter: der ZWEITE Klick darf nichts mehr finden.
+local ns2 = AB.SortGroupsNow()
+check("no-op-swap realm: zweiter Klick findet nichts mehr", ns2 == 0,
+    "klick1=" .. tostring(ns1) .. " klick2=" .. tostring(ns2))
+
+print("no-op-swap realm tests passed")
