@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.4.123
+
+- **Tank/Healer/Aura auto-balance is now confined to specific groups, not
+  spread across all 8.** Previously `AuraBalance.BalanceAll()` /
+  `Balance()` only enforced "at most one of this role per subgroup" and
+  would happily plant a lone tank or aura in group 5+ if that was the
+  emptiest group available - on an 11-person raid this could leave group
+  4/5 holding a single straggler while group 3 still had room, instead of
+  the roster staying compact in the front groups the way a host actually
+  reads their raid frame. Reported live via screenshot (tanks scattered
+  past group 2, an aura member landing outside group 1-3).
+  - Tanks are now confined to groups 1-2 (`TANK_GROUPS`).
+  - Healers and aura-bearers are now confined to groups 1-3
+    (`AURA_HEALER_GROUPS`).
+  - `AuraBalance.PlanRoleMoves()` gained an `allowedGroups` option: any
+    member with a matching role sitting outside the allowed set now
+    counts as "excess" and gets moved, even if it's the *only* one of
+    that role in its group (previously excess only triggered when a
+    group had more than one match). `opts.allowedGroups` is optional and
+    defaults to unrestricted (all 8 groups), so every other caller of
+    `PlanRoleMoves` keeps its prior behavior unchanged.
+  - `BalanceAll()`'s tank/healer/aura specs and `Balance()`'s aura-only
+    pass (`PlanMoves`) now pass the matching `allowedGroups` list.
+  - Regression-tested: reverted the fix, confirmed
+    `tests/test_aura_rolecheck.lua`'s new "lone tank outside allowed
+    groups still moves" check fails against the old code (0 moves
+    planned instead of 1), then restored the fix and confirmed it
+    passes.
+
 ## 0.4.122
 
 - **Minimap icon + MiniHUD collapsed icon changed to Ascension's own

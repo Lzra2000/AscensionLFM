@@ -332,3 +332,70 @@ local m5 = AB.BalanceAll()
 check("autoMoveTank=false skips tank pass", m5 == 0 and #setCalls3 == 0, tostring(m5))
 
 print("tank/healer balance tests passed")
+
+--------------------------------------------------------------------
+-- New: allowedGroups confines a role to specific subgroups even when
+-- the member is alone there (not just "more than one per group").
+-- Tanks -> groups 1-2 only; healer/aura -> groups 1-3 only.
+--------------------------------------------------------------------
+
+-- A lone tank sitting in group 5 is still out-of-bounds and must move,
+-- even though group 5 has no second tank to trigger the old "excess"
+-- rule.
+local boundedTankMoves = AB.PlanRoleMoves({
+    { name = "T1", index = 1, subgroup = 5, role = "tank" },
+}, "tank", { sortByGroupNumber = true, allowedGroups = { 1, 2 } })
+check("lone tank outside allowed groups still moves", #boundedTankMoves == 1,
+    tostring(#boundedTankMoves))
+check("lone tank moves into lowest allowed group (g1)", boundedTankMoves[1].to == 1,
+    tostring(boundedTankMoves[1] and boundedTankMoves[1].to))
+
+-- A tank already inside the allowed set (g2) is left alone.
+local okTankMoves = AB.PlanRoleMoves({
+    { name = "T1", index = 1, subgroup = 2, role = "tank" },
+}, "tank", { sortByGroupNumber = true, allowedGroups = { 1, 2 } })
+check("tank already inside allowed groups needs no move", #okTankMoves == 0,
+    tostring(#okTankMoves))
+
+-- PlanMoves (aura, real signature used by Balance()) confines to g1-3:
+-- a lone aura in group 6 must relocate even with no competing aura.
+local boundedAuraMoves = AB.PlanMoves({
+    { name = "A1", index = 1, subgroup = 6, isAura = true },
+})
+check("lone aura outside g1-3 still moves", #boundedAuraMoves == 1,
+    tostring(#boundedAuraMoves))
+check("lone aura lands within g1-3", boundedAuraMoves[1].to >= 1 and boundedAuraMoves[1].to <= 3,
+    tostring(boundedAuraMoves[1] and boundedAuraMoves[1].to))
+
+-- BalanceAll end-to-end: a tank that ended up in group 4 (e.g. from raid
+-- join order) gets pulled back into g1/g2 by the tank pass.
+AB._ResetForTests()
+local roster4 = {
+    { name = "T1", sub = 4, role = "tank" },
+    { name = "D1", sub = 1, role = "dps" },
+}
+_G.GetNumRaidMembers = function() return #roster4 end
+_G.GetRaidRosterInfo = function(i)
+    local r = roster4[i]
+    if not r then return end
+    return r.name, nil, r.sub
+end
+local setCalls4 = {}
+_G.SetRaidSubgroup = function(i, to)
+    local r = roster4[i]
+    table.insert(setCalls4, { name = r and r.name, to = to })
+    if r then r.sub = to end
+end
+_G.SwapRaidSubgroup = function() end
+local db4 = AscensionLFM.Database.Get()
+db4.assignedRoles = { t1 = "tank", d1 = "dps" }
+db4.autoMoveTank = true
+db4.autoMoveHealer = true
+db4.autoMoveAura = true
+_G.GetTime = function() return 8000 end
+local mv4 = AB.BalanceAll()
+check("BalanceAll pulls a stray g4 tank back into g1/g2", mv4 == 1 and setCalls4[1]
+    and setCalls4[1].name == "T1" and (setCalls4[1].to == 1 or setCalls4[1].to == 2),
+    setCalls4[1] and (setCalls4[1].name .. "->" .. tostring(setCalls4[1].to)) or "none")
+
+print("allowedGroups confinement tests passed")

@@ -15,6 +15,12 @@ AscensionLFM.AuraBalance = AuraBalance
 local GROUP_CAP = 5
 local SETTLE_TIMEOUT = 2.0
 
+-- Tanks are confined to the first two raid groups (matches how hosts read
+-- their raid frame); aura + healer coverage is confined to the first
+-- three so it stays concentrated instead of spreading across all 8.
+local TANK_GROUPS = { 1, 2 }
+local AURA_HEALER_GROUPS = { 1, 2, 3 }
+
 -- Balance() (aura-only, fired on nearly every roster event via Scanner/
 -- Slots) and BalanceAll() (tank->healer->aura, fired once per Role Check
 -- resync) used to share one `waitingFor` variable. Balance() runs far
@@ -69,7 +75,11 @@ end
 -- @param roleKey which role to balance ("aura" default, or "tank"/"healer")
 -- @param opts { protectRoles={...} - never swap-displace these roles unless
 --   no other choice exists; sortByGroupNumber=true - fill lowest-numbered
---   empty groups first (tank) instead of emptiest-group-first (aura/healer) }
+--   empty groups first (tank) instead of emptiest-group-first (aura/healer);
+--   allowedGroups={...} - restrict this role to only these subgroup numbers
+--   (e.g. tank -> {1,2}); a match sitting outside the allowed set counts as
+--   excess and is moved even if it's alone in its group; nil/omitted means
+--   unrestricted (any of groups 1-8), matching prior behavior }
 -- @return moves { {name=, from=, to=, kind=, roleKey=, swapName?=}, ... }
 function AuraBalance.PlanRoleMoves(members, roleKey, opts)
     roleKey = roleKey or "aura"
@@ -79,6 +89,16 @@ function AuraBalance.PlanRoleMoves(members, roleKey, opts)
         for _, r in ipairs(opts.protectRoles) do
             protect[r] = true
         end
+    end
+    local allowed = nil
+    if type(opts.allowedGroups) == "table" then
+        allowed = {}
+        for _, g in ipairs(opts.allowedGroups) do
+            allowed[tonumber(g)] = true
+        end
+    end
+    local function isAllowedGroup(g)
+        return not allowed or allowed[g] == true
     end
     local hasRole = function(m)
         if roleKey == "aura" then
@@ -114,7 +134,18 @@ function AuraBalance.PlanRoleMoves(members, roleKey, opts)
     local excess = {}
     for g = 1, 8 do
         local matches = byGroup[g].matches
-        if #matches > 1 then
+        if not isAllowedGroup(g) then
+            -- Every matching-role member here is out-of-bounds (e.g. a
+            -- tank sitting alone in group 5 when only 1/2 are allowed) -
+            -- all of them must move, not just the overflow past #1.
+            table.sort(matches, function(a, b)
+                return (tonumber(a.index) or 0) < (tonumber(b.index) or 0)
+            end)
+            for i = 1, #matches do
+                table.insert(excess, matches[i])
+            end
+            byGroup[g].matches = {}
+        elseif #matches > 1 then
             table.sort(matches, function(a, b)
                 return (tonumber(a.index) or 0) < (tonumber(b.index) or 0)
             end)
@@ -151,7 +182,7 @@ function AuraBalance.PlanRoleMoves(members, roleKey, opts)
     local function groupsWithoutMatch()
         local out = {}
         for g = 1, 8 do
-            if #byGroup[g].matches == 0 then
+            if isAllowedGroup(g) and #byGroup[g].matches == 0 then
                 table.insert(out, g)
             end
         end
@@ -241,12 +272,13 @@ function AuraBalance.PlanRoleMoves(members, roleKey, opts)
     return moves
 end
 
---- Pure: plan moves so each subgroup has at most one aura. Back-compat
--- wrapper around PlanRoleMoves("aura") - unchanged behavior/signature.
+--- Pure: plan moves so each subgroup has at most one aura, confined to
+-- groups 1-3 (AURA_HEALER_GROUPS) so aura/healer coverage stays
+-- concentrated on the front groups instead of spreading to 4-8.
 -- @param members { {name=, index=, subgroup=, isAura=}, ... }
 -- @return moves { {name=, from=, to=, kind=, swapName?=}, ... }
 function AuraBalance.PlanMoves(members)
-    return AuraBalance.PlanRoleMoves(members, "aura", {})
+    return AuraBalance.PlanRoleMoves(members, "aura", { allowedGroups = AURA_HEALER_GROUPS })
 end
 
 local function CollectRaidMembers()
@@ -505,9 +537,9 @@ function AuraBalance.BalanceAll()
     end
 
     local specs = {
-        { key = "tank", enabled = "autoMoveTank", protect = {}, sortByGroupNumber = true },
-        { key = "healer", enabled = "autoMoveHealer", protect = { "tank" }, sortByGroupNumber = false },
-        { key = "aura", enabled = "autoMoveAura", protect = { "tank", "healer" }, sortByGroupNumber = false },
+        { key = "tank", enabled = "autoMoveTank", protect = {}, sortByGroupNumber = true, allowedGroups = TANK_GROUPS },
+        { key = "healer", enabled = "autoMoveHealer", protect = { "tank" }, sortByGroupNumber = false, allowedGroups = AURA_HEALER_GROUPS },
+        { key = "aura", enabled = "autoMoveAura", protect = { "tank", "healer" }, sortByGroupNumber = false, allowedGroups = AURA_HEALER_GROUPS },
     }
 
     for _, spec in ipairs(specs) do
@@ -515,6 +547,7 @@ function AuraBalance.BalanceAll()
             local plan = AuraBalance.PlanRoleMoves(members, spec.key, {
                 protectRoles = spec.protect,
                 sortByGroupNumber = spec.sortByGroupNumber,
+                allowedGroups = spec.allowedGroups,
             })
             if #plan > 0 then
                 local first = plan[1]
