@@ -37,8 +37,31 @@ check("discipline matches healer", SpecRole._MatchRole("Discipline") == "healer"
 check("restoration matches healer", SpecRole._MatchRole("Restoration") == "healer")
 check("mistweaver matches healer", SpecRole._MatchRole("Mistweaver") == "healer")
 
-check("aura matches aura", SpecRole._MatchRole("Aura Specialist") == "aura")
-check("experience matches aura", SpecRole._MatchRole("Path of Experience") == "aura")
+-- v0.4.131: aura is a tag, not a seat. A spec that ONLY reads as aura seats
+-- as DPS and carries the tag - the same rule Parser uses for a bare "aura"
+-- whisper. Previously this assigned the host role="aura", which is no longer
+-- a valid combat role and would leave them reading as unseated.
+local sr, sa = SpecRole._MatchRole("Aura Specialist")
+check("aura-only spec seats as dps", sr == "dps", tostring(sr))
+check("aura-only spec carries the tag", sa == true, tostring(sa))
+
+sr, sa = SpecRole._MatchRole("Path of Experience")
+check("experience spec seats as dps", sr == "dps", tostring(sr))
+check("experience spec carries the tag", sa == true, tostring(sa))
+
+-- A spec naming BOTH a combat role and an aura must report both halves,
+-- not collapse to one (the whole point of the tag model).
+sr, sa = SpecRole._MatchRole("Fire Aura of Experience")
+check("combat+aura spec keeps the combat seat", sr == "dps", tostring(sr))
+check("combat+aura spec keeps the tag", sa == true, tostring(sa))
+
+sr, sa = SpecRole._MatchRole("Protection Aura")
+check("tank spec with aura keeps the tank seat", sr == "tank", tostring(sr))
+check("tank spec with aura keeps the tag", sa == true, tostring(sa))
+
+sr, sa = SpecRole._MatchRole("Frost")
+check("plain combat spec has no aura tag", sr == "dps" and sa == false,
+    tostring(sr) .. "/" .. tostring(sa))
 
 check("fury matches dps", SpecRole._MatchRole("Fury") == "dps")
 check("shadow matches dps", SpecRole._MatchRole("Shadow") == "dps")

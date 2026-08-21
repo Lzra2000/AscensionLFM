@@ -11,29 +11,50 @@ end
 local SpecRole = {}
 AscensionLFM.SpecRole = SpecRole
 
--- Keyword -> role. Order: tank/heal/aura before generic dps.
+-- Keyword -> combat seat. Order: tank/heal before generic dps.
+-- "aura" is NOT in here since v0.4.131 - it stopped being a seat and became
+-- an orthogonal tag, so a spec whose name mentions an aura still has to take
+-- a real tank/heal/dps seat (see AURA_KEYS below).
 local RULES = {
     { role = "tank", keys = { "tank", "prot", "protection", "blood", "guardian", "defensive" } },
     { role = "healer", keys = { "heal", "holy", "disc", "discipline", "resto", "restoration", "mist" } },
-    { role = "aura", keys = { "aura", "experience" } },
     { role = "dps", keys = { "dps", "arms", "fury", "frost", "unholy", "fire", "arcane", "affliction",
         "destruction", "demonology", "assassin", "combat", "subtlety", "balance", "feral", "enhancement",
         "elemental", "shadow", "ret", "retribution", "survival", "marksmanship", "beast", "windwalker" } },
 }
 
+-- Checked independently of RULES, so "Fire Aura of Experience" reports
+-- ("dps", true) instead of losing one half of that information.
+local AURA_KEYS = { "aura", "experience" }
+
+--- @return role ("tank"/"healer"/"dps") or nil, hasAura (boolean)
+--   A spec that only matches an aura keyword seats as DPS + the tag, the
+--   same rule Parser.RequestedRole uses for a bare "aura" whisper.
 local function MatchRole(text)
     if type(text) ~= "string" or text == "" then
-        return nil
+        return nil, false
     end
     local low = text:lower()
+
+    local hasAura = false
+    for _, k in ipairs(AURA_KEYS) do
+        if low:find(k, 1, true) then
+            hasAura = true
+            break
+        end
+    end
+
     for _, rule in ipairs(RULES) do
         for _, k in ipairs(rule.keys) do
             if low:find(k, 1, true) then
-                return rule.role
+                return rule.role, hasAura
             end
         end
     end
-    return nil
+    if hasAura then
+        return "dps", true
+    end
+    return nil, false
 end
 
 --- Best-effort role from active Ascension specialization.
@@ -45,15 +66,15 @@ function SpecRole.GuessFromActiveSpec()
             local ok, info = pcall(su.GetActiveSpecialization)
             if ok and type(info) == "table" then
                 local name = info.name or info.Name or info.specName
-                local role = MatchRole(tostring(name or ""))
-                if role then return role, name end
+                local role, hasAura = MatchRole(tostring(name or ""))
+                if role then return role, name, hasAura end
             elseif ok and type(info) == "number" then
                 if type(su.GetSpecializationInfo) == "function" then
                     local ok2, a, b, c = pcall(su.GetSpecializationInfo, info)
                     if ok2 then
                         local name = type(a) == "string" and a or (type(b) == "string" and b) or tostring(info)
-                        local role = MatchRole(tostring(name))
-                        if role then return role, name end
+                        local role, hasAura = MatchRole(tostring(name))
+                        if role then return role, name, hasAura end
                     end
                 end
             end
@@ -82,17 +103,17 @@ function SpecRole.GuessFromActiveSpec()
                 bestName = name
             end
         end
-        local role = MatchRole(tostring(bestName or ""))
+        local role, hasAura = MatchRole(tostring(bestName or ""))
         if role then
-            return role, bestName
+            return role, bestName, hasAura
         end
     end
-    return nil, nil
+    return nil, nil, false
 end
 
 --- Assign guessed role to player in Slots (hosting helper).
 function SpecRole.ApplyToSelf()
-    local role, src = SpecRole.GuessFromActiveSpec()
+    local role, src, hasAura = SpecRole.GuessFromActiveSpec()
     if not role then
         if AscensionLFM.Print then
             AscensionLFM.Print("SpecRole: could not guess role from active spec/talents")
@@ -101,10 +122,11 @@ function SpecRole.ApplyToSelf()
     end
     local me = type(UnitName) == "function" and UnitName("player") or nil
     if me and AscensionLFM.Slots and AscensionLFM.Slots.Assign then
-        AscensionLFM.Slots.Assign(me, role)
+        AscensionLFM.Slots.Assign(me, role, nil, hasAura)
     end
     if AscensionLFM.Print then
-        AscensionLFM.Print(string.format("SpecRole: you -> %s (%s)", role, tostring(src or "?")))
+        AscensionLFM.Print(string.format("SpecRole: you -> %s%s (%s)",
+            role, hasAura and " (+aura)" or "", tostring(src or "?")))
     end
     if AscensionLFM.RosterPanel and AscensionLFM.RosterPanel.Refresh then
         AscensionLFM.RosterPanel.Refresh()

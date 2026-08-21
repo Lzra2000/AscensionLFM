@@ -149,18 +149,23 @@ local function NextWhisperMessage(db, preferredRole)
     return msg
 end
 
+-- Which role to apply as when whispering someone else's LFM. Combat seats
+-- only since v0.4.131: "aura" is a tag, so applying *as* aura would just get
+-- you seated as DPS anyway. Whether you also carry one is communicated
+-- separately by BuildFollowUpReply ("dps + aura yes"), which has always
+-- treated it as an independent yes/no.
 local function PreferredSeekRole(parsed, roles)
     if AscensionLFM.Parser and AscensionLFM.Parser.NeededRoles then
         local needed = AscensionLFM.Parser.NeededRoles(parsed, roles)
         if type(needed) == "table" then
-            for _, role in ipairs({ "tank", "healer", "aura", "dps" }) do
+            for _, role in ipairs({ "tank", "healer", "dps" }) do
                 if needed[role] then
                     return role
                 end
             end
         end
     end
-    for _, role in ipairs({ "tank", "healer", "aura", "dps" }) do
+    for _, role in ipairs({ "tank", "healer", "dps" }) do
         if roles and roles[role] then
             return role
         end

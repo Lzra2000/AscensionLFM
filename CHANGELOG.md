@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.4.132
+
+- **Follow-up sweep for v0.4.131 leftovers: two places still treated aura as
+  a seat.** Found by grepping every remaining `"aura"` occurrence in `core/`
+  and `ui/` against the new model rather than trusting the test suite (both
+  of these were green - no existing test covered them).
+  - **`core/SpecRole.lua` (real bug):** clicking **My Spec** with an
+    aura-ish spec name assigned the host `role = "aura"` - not a valid
+    combat seat since v0.4.131, so they'd read as unseated and
+    `Slots.EnsureHostAssigned()` would refuse to trust it. Aura keywords are
+    now checked *independently* of the combat rules: `"Aura Specialist"` ->
+    `("dps", true)`, and `"Protection Aura"` -> `("tank", true)` instead of
+    collapsing to aura and throwing the tank half away. `MatchRole()` and
+    `GuessFromActiveSpec()` return `role, [src,] hasAura`; `ApplyToSelf()`
+    passes the tag through to `Slots.Assign()`.
+  - **`core/Scanner.lua`:** `PreferredSeekRole()` could pick `"aura"` as the
+    role to apply as when whispering someone else's LFM. Applying *as* aura
+    just gets you seated as DPS now, so it's combat seats only. Whether you
+    also carry one is still communicated by `BuildFollowUpReply()`'s
+    `"dps + aura yes"`, which has always modelled it as an independent axis.
+  - Everything else the sweep turned up is correct as-is: the 4-wide
+    `ROLE_ORDER` display loops (Poster/MiniHUD/MainWindow/RosterPanel) are
+    intentional - `Slots.CountFilled("aura")` returns coverage, so those
+    "A x/y" readouts stay meaningful - as are `Parser`'s `roles.aura` table
+    key (converted to a tag by `RequestedRole`) and `Queue.FormatRoleLabel`'s
+    cosmetic `"dps+aura"` label.
+  - Regression-tested: reverted the SpecRole fix, confirmed the new checks
+    fail against the old code (`role` came back as `"aura"`), then restored
+    it. Also added coverage for the combined case (`"Fire Aura of
+    Experience"` -> dps + tag) that the old model could not express at all.
+
 ## 0.4.131
 
 - **Aura is no longer a fourth exclusive role - it's now a tag that sits on
