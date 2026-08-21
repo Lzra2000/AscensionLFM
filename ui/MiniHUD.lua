@@ -845,6 +845,26 @@ function MiniHUD.ActionRegroup()
     local roster = (db and db.regroupRoster) or {}
     local display = (db and db.regroupDisplay) or {}
 
+    -- Snapshot each member's assigned role BEFORE disbanding. Without this,
+    -- Slots.SyncFromRoster() (fired by the very roster-update events
+    -- DisbandGroup()'s UninviteUnit calls trigger) sees everyone as "not
+    -- present" mid-regroup and drops their db.assignedRoles entry entirely -
+    -- so a full Tank/Heal/Aura roster comes back from a regroup with every
+    -- role forgotten. Restored below via Slots.Assign() (not a raw table
+    -- write) specifically so it also refreshes each name's
+    -- RecentlyAssigned grace timestamp - the same protection
+    -- SyncFromRoster already gives a freshly-invited applicant - covering
+    -- the gap between "re-invited" and "actually back in the roster".
+    local savedRoles = {}
+    if AscensionLFM.Slots and AscensionLFM.Slots.GetAssigned then
+        for _, name in ipairs(roster) do
+            local role = AscensionLFM.Slots.GetAssigned(name)
+            if role then
+                savedRoles[LowerName(name)] = role
+            end
+        end
+    end
+
     local canInvite, invKind = CanInviteOthers()
     if not canInvite then
         -- No disband/invite to gate behind a confirm - this click can
@@ -993,6 +1013,18 @@ function MiniHUD.ActionRegroup()
             invited = invited + 1
         else
             failed = failed + 1
+        end
+    end
+
+    -- Restore each re-invited member's role now that invites are out -
+    -- see the savedRoles comment above. Only for people actually being
+    -- re-invited (never for a level-capped name we deliberately skipped).
+    if AscensionLFM.Slots and AscensionLFM.Slots.Assign then
+        for _, name in ipairs(toInvite) do
+            local role = savedRoles[LowerName(name)]
+            if role then
+                AscensionLFM.Slots.Assign(name, role)
+            end
         end
     end
 

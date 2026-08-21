@@ -519,6 +519,61 @@ MiniHUD.ActionRegroup() -- confirm click: disband + re-invite
 check("level-capped Alice not re-invited", uniqueCount(invitedLvl) == 1 and invitedLvl[1] == "Bob",
     table.concat(invitedLvl, ","))
 
+-- Regression: Regroup must preserve assigned roles (tank/healer/aura)
+-- across the disband+reinvite cycle, and specifically must survive a
+-- SyncFromRoster() pass that runs AFTER the click returns (as it would
+-- live, once WoW's event loop dispatches the roster-update event(s)
+-- DisbandGroup()'s UninviteUnit calls trigger) while the re-invited
+-- people haven't actually rejoined yet. Slots.Assign() (not a raw table
+-- write) is what protects them, via the same RecentlyAssigned grace
+-- period a freshly-invited applicant already gets.
+MiniHUD._ResetForTests()
+AscensionLFM.Slots.ClearAll()
+_G._chats = {}
+_G.InviteUnit = function() end
+_G.UninviteUnit = function() end
+_G.ConvertToRaid = function() end
+_G.GetNumRaidMembers = function() return 3 end
+_G.GetNumPartyMembers = function() return 0 end
+_G.GetRaidRosterInfo = function(i)
+    local rows = { "Host", "Alice", "Bob" }
+    return rows[i]
+end
+_G.UnitName = function(u)
+    if u == "player" or u == "raid1" then return "Host" end
+    if u == "raid2" then return "Alice" end
+    if u == "raid3" then return "Bob" end
+    return nil
+end
+_G.UnitLevel = function() return 30 end
+local dbRoles = AscensionLFM.Database.Get()
+dbRoles.regroupRoster = {}
+dbRoles.regroupDisplay = {}
+dbRoles.regroupSeenAt = {}
+dbRoles.regroupLevel = {}
+-- Pre-existing assignments, aged well past the RecentlyAssigned grace
+-- window (assigned "long ago" mid-run, not moments before the regroup).
+_G.GetTime = function() return 100 end
+AscensionLFM.Slots.Assign("Alice", "tank")
+AscensionLFM.Slots.Assign("Bob", "healer")
+_G.GetTime = function() return 5000 end -- far past that assignedAt
+
+MiniHUD.ActionRegroup() -- preview click: snapshots present members, arms confirm
+MiniHUD.ActionRegroup() -- confirm click: disband + re-invite + restore roles
+
+-- Simulate the roster-update event(s) DisbandGroup()'s UninviteUnit calls
+-- trigger, dispatched by WoW's event loop AFTER this click handler
+-- returns - the re-invited Alice/Bob haven't actually rejoined yet, so
+-- "present" only shows the host.
+_G.GetNumRaidMembers = function() return 0 end
+_G.GetNumPartyMembers = function() return 0 end
+AscensionLFM.Slots.SyncFromRoster()
+
+check("regroup restores tank role across the disband/reinvite gap",
+    AscensionLFM.Slots.GetAssigned("Alice") == "tank", tostring(AscensionLFM.Slots.GetAssigned("Alice")))
+check("regroup restores healer role across the disband/reinvite gap",
+    AscensionLFM.Slots.GetAssigned("Bob") == "healer", tostring(AscensionLFM.Slots.GetAssigned("Bob")))
+
 io.write(string.format("mini_hud tests: %d passed, %d failed\n", passed, failed))
 if failed > 0 then
     os.exit(1)

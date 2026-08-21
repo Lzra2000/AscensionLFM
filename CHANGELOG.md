@@ -1,5 +1,57 @@
 # Changelog
 
+## 0.4.126
+
+- **Removed the v0.4.125 Manastorm reward-bonus LFM tag.** User feedback:
+  this addon is used mostly for speed-leveling 10-59, where a loot-bonus
+  callout isn't relevant. Reverted `Poster.RewardBonusPrefix`/the live
+  resolver and its `BuildMessage` wiring; `BuildMessage` is back to its
+  original 5-arg signature.
+- **Regroup now preserves assigned roles (Tank/Heal/Aura/DPS) across the
+  disband+reinvite cycle.** Previously a Regrp click would come back with
+  everyone's role forgotten - traced to `Slots.SyncFromRoster()` (fired
+  by the roster-update event(s) `DisbandGroup()`'s `UninviteUnit` calls
+  trigger) seeing the re-invited members as "not present" before they've
+  actually rejoined, and dropping their `db.assignedRoles` entry for
+  anyone whose original assignment was older than the 20s
+  `RecentlyAssigned` grace window.
+  - `MiniHUD.ActionRegroup()` now snapshots each member's role from
+    `Slots.GetAssigned()` before disbanding, and restores it via
+    `Slots.Assign()` (not a raw table write) right after the re-invites
+    fire - `Slots.Assign()` also refreshes the `RecentlyAssigned` grace
+    timestamp, the same protection a freshly-invited applicant already
+    gets, so the role survives the async `SyncFromRoster()` pass that
+    runs once WoW's event loop resumes after the click returns. Only
+    restored for people actually being re-invited - never for a name
+    skipped by the v0.4.124 level cap filter.
+  - Regression-tested: reverted the fix, confirmed
+    `tests/test_mini_hud.lua`'s new role-preservation checks fail against
+    the old code (role comes back `nil`), then restored the fix and
+    confirmed they pass.
+- **Auto-convert-to-raid at 6+ members was already fully implemented** -
+  confirmed via code read, not new this version. `Invite.InvitePlayer()`
+  (the single funnel for whisper-hosting, LFG auto-invite, and Queue
+  invites) already calls `ConvertToRaid()` pre-emptively once the party
+  hits 4 others, and `MiniHUD.ActionRegroup()` has its own equivalent
+  check for its re-invite batch. No code change needed for this part of
+  the ask.
+- **Found (not yet fixed): a likely pre-existing "prevented the call of
+  the secure function" bug in the Tank/Healer/Aura auto-balance.**
+  User hit this live during normal whisper-hosting. Traced
+  `RoleCheck.Tick()` (fired from `RoleCheck.EnsureTicker()`'s `OnUpdate`
+  handler, when a Role Check's countdown naturally expires) calling
+  `RoleCheck.Resync()` -> `AuraBalance.BalanceAll()` ->
+  `SetRaidSubgroup`/`SwapRaidSubgroup` - and separately,
+  `AuraBalance.Start()`'s own continuation ticker does the same. Per this
+  repo's own v0.4.99b hotfix, `SetRaidSubgroup`/`InviteUnit`/
+  `UninviteUnit` only work synchronously inside a real hardware-event
+  call stack (a click), never from `OnUpdate`/timers - the exact pattern
+  that was fixed for Regroup/drag-and-drop back then appears to have been
+  reintroduced for the whole auto-balance feature. Not fixed in this
+  version - needs a design decision (e.g. turn Role Check's auto-resync
+  into a one-click "Sort Groups" action, mirroring how Regroup already
+  requires a click) before touching it.
+
 ## 0.4.125
 
 - **LFM posts now auto-tag an active Manastorm group-reward bonus** (e.g.
