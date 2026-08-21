@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.120
+
+- **Fix: Roster tab's ⇄ move button too narrow for its own text.**
+  v0.4.112's fix for the "?" tofu glyph replaced a single Unicode arrow
+  icon with the two-character string `"<>"`, but left the button at its
+  old 20px width (for comparison, the kick button next to it is 24px for
+  a single "X" character) - the two glyphs were cramped with only 1-3px
+  of margin, bleeding into the adjacent level number/kick button.
+  Widened to 26px. Found via a fresh layout-math pass that also
+  re-verified the last two additions (Chat Tab section, Favorite
+  applicants section) - both fit their pages correctly.
+
 ## 0.4.119
 
 - **New: German LFM/LFG phrase recognition.** `Parser.lua`'s role

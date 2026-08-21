@@ -923,7 +923,11 @@ local function EnsureCards(parent)
             -- same interaction pattern as the role picker.
             local moveBtn = CreateFrame("Button", nil, rowF, "UIPanelButtonTemplate")
     if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(moveBtn) end
-            moveBtn:SetSize(20, 18)
+            -- 20px fit the old single-glyph arrow icon; "<>" is two
+            -- characters and was cramped into the same width (kickBtn
+            -- next to it is 24px for a single "X"). 26px gives it real
+            -- margin.
+            moveBtn:SetSize(26, 18)
             moveBtn:SetPoint("RIGHT", kickBtn, "LEFT", -2, 0)
             -- Was U+2194 (arrows-left-right) - WotLK 3.3.5a's default UI
             -- font doesn't have that glyph and rendered it as a "?" tofu
