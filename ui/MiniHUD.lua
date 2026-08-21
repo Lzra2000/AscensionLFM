@@ -931,6 +931,23 @@ function MiniHUD.ActionRegroup()
         return true, 0
     end
 
+    -- Blocked while inside a Manastorm: InviteUnit-by-name can't reliably
+    -- resolve someone still deep in the instance once uninvited ("Cannot
+    -- find player" - observed live). Two independent competing addons
+    -- (Manastormer, MSBuilder) hit the exact same limitation and both
+    -- require leaving the instance before a disband+reinvite is attempted
+    -- - MSBuilder's own /msb reinvite literally "refuses while it detects
+    -- you're still inside." Mirrored here as a hard block rather than a
+    -- warning, since a GUI button has no equivalent to a deliberate
+    -- "force" flag.
+    if IsInsideManastorm() then
+        regroupConfirmArmedAt = nil
+        Print("Regroup: blocked - you're inside the Manastorm. Leave the "
+            .. "instance first (re-invites fail with \"Cannot find player\" "
+            .. "for anyone still deep in it), then click Regrp again.")
+        return false, "inside manastorm"
+    end
+
     local now = Now()
     local isConfirming = regroupConfirmArmedAt and (now - regroupConfirmArmedAt) < REGROUP_CONFIRM_WINDOW
     if not isConfirming then
@@ -951,11 +968,6 @@ function MiniHUD.ActionRegroup()
         Print(string.format(
             "Regroup: will disband the group and re-invite %d%s - click Regrp again within %ds to confirm",
             n, capped > 0 and (" (" .. capped .. " skipped, level-capped)") or "", REGROUP_CONFIRM_WINDOW))
-        if IsInsideManastorm() then
-            Print("Regroup: you're inside a Manastorm - re-invites can fail with "
-                .. "\"Cannot find player\" for anyone deep in the instance. If that "
-                .. "happens, have them leave the instance and whisper you to rejoin.")
-        end
         return true, 0
     end
     regroupConfirmArmedAt = nil

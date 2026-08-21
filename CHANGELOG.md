@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.4.129
+
+- **Regroup now hard-blocks while you're inside a Manastorm**, instead of
+  just warning (v0.4.128) and letting it proceed. Researched two
+  competing addons (`Manastormer`, `MSBuilder` - both found via
+  `github.com/search?q=manastorm&type=repositories`) that hit the exact
+  same "Cannot find player" failure this addon hit live, and both
+  independently landed on the same fix: refuse the disband+reinvite while
+  still inside the instance. MSBuilder's own `/msb reinvite` literally
+  "refuses while it detects you're still inside" (its README, verbatim).
+  `InviteUnit`-by-name can't reliably resolve someone still deep in the
+  instance once uninvited - this isn't something a warning can paper
+  over, so both clicks (preview and confirm) now refuse outright with a
+  clear message telling the host to leave the instance first. No "force"
+  override - a GUI button has no clean equivalent to a deliberate CLI
+  flag, and this addon has no coordinated leave/rejoin mechanism (unlike
+  Manastormer's addon-message-synced clients) to make forcing it safe.
+  - Regression-tested: reverted the fix, confirmed
+    `tests/test_mini_hud.lua`'s new "regroup blocked while inside a
+    Manastorm" checks fail against the old (warn-only, still-proceeds)
+    code, then restored the fix and confirmed they pass.
+- Competitor research notes (no other code changes needed):
+  - Confirmed our v0.4.127 "Sort Groups must be a real click, not
+    automatic" fix matches the leading competitors' own documented
+    workaround for the same WoW secure-execution restriction -
+    ManastormRecruiter's README states outright: "The addon never calls
+    `SetPartyAssignment` from addon Lua because Ascension blocks that
+    protected operation," and gates its own subgroup moves behind a
+    "Verify groups" click for the same reason.
+  - Our existing tank/healer raid-mark auto-assignment
+    (`core/RaidMarks.lua`, Skull/Cross for tanks) already covers what
+    ManastormRecruiter's MT/MA star-circle marking does.
+  - Our public-channel chat scanner already correctly ignores heirloom
+    ("loomed") mentions when detecting LFG posts (confirmed via the
+    user's own live log) - matches ManastormGroupFinder's explicit
+    "aura and looms" parsing rules; no gap found.
+
 ## 0.4.128
 
 - **Fixed Regroup's watch list wiping itself out mid-regroup.** Reported

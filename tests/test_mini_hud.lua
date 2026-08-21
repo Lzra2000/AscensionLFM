@@ -643,12 +643,17 @@ MiniHUD.RememberPresent()
 check("watch list survives the regroup's own solo->grouped blip (Bob not lost)",
     dbWatch.regroupDisplay.bob == "Bob", tostring(dbWatch.regroupDisplay.bob))
 
--- Regroup's preview click warns when inside a Manastorm - re-invites can
--- fail with "Cannot find player" for anyone deep in the instance
--- (observed live). Silent when C_Manastorm says otherwise or is absent.
+-- Regroup is BLOCKED entirely while inside a Manastorm - re-invites can't
+-- reliably resolve someone still deep in the instance once uninvited
+-- ("Cannot find player" - observed live). Matches how two independent
+-- competing addons (Manastormer, MSBuilder) handle the same underlying
+-- InviteUnit-by-name limitation - MSBuilder's own reinvite command
+-- literally "refuses while it detects you're still inside."
 MiniHUD._ResetForTests()
 local printed = {}
 AscensionLFM.Print = function(msg) table.insert(printed, tostring(msg)) end
+_G.InviteUnit = function() end
+_G.UninviteUnit = function() end
 _G.GetNumRaidMembers = function() return 1 end
 _G.GetNumPartyMembers = function() return 0 end
 _G.GetRaidRosterInfo = function(i) if i == 1 then return "Host" end end
@@ -656,28 +661,31 @@ dbWatch.regroupRoster = { "Alice" }
 dbWatch.regroupSeenAt = { alice = 1000 }
 _G.GetTime = function() return 1000 end
 _G.C_Manastorm = { IsInManastorm = function() return true end }
-MiniHUD.ActionRegroup() -- preview click
-local sawWarning = false
+local blockedOk, blockedErr = MiniHUD.ActionRegroup() -- would-be preview click
+check("regroup blocked while inside a Manastorm", blockedOk == false and blockedErr == "inside manastorm",
+    tostring(blockedOk) .. "/" .. tostring(blockedErr))
+local sawBlock = false
 for _, m in ipairs(printed) do
     if m:find("Cannot find player", 1, true) then
-        sawWarning = true
+        sawBlock = true
     end
 end
-check("regroup preview warns about in-instance re-invite risk", sawWarning, table.concat(printed, " | "))
+check("block message explains why", sawBlock, table.concat(printed, " | "))
 
+-- A second click (that would normally be the confirm click) stays
+-- blocked too - the confirm window never even armed.
+printed = {}
+local blockedOk2 = MiniHUD.ActionRegroup()
+check("second click while inside stays blocked (never armed)", blockedOk2 == false)
+
+-- Once outside, Regroup proceeds normally again.
 MiniHUD._ResetForTests()
 printed = {}
 dbWatch.regroupRoster = { "Alice" }
 dbWatch.regroupSeenAt = { alice = 1000 }
 _G.C_Manastorm = { IsInManastorm = function() return false end }
-MiniHUD.ActionRegroup() -- preview click
-sawWarning = false
-for _, m in ipairs(printed) do
-    if m:find("Cannot find player", 1, true) then
-        sawWarning = true
-    end
-end
-check("no in-instance warning when not in a Manastorm", not sawWarning, table.concat(printed, " | "))
+local previewOk = MiniHUD.ActionRegroup() -- preview click
+check("regroup proceeds normally outside a Manastorm", previewOk == true, tostring(previewOk))
 _G.C_Manastorm = nil
 
 io.write(string.format("mini_hud tests: %d passed, %d failed\n", passed, failed))
