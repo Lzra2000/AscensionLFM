@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.122
+
+- **Minimap icon + MiniHUD collapsed icon changed to Ascension's own
+  Manastorm icon.** Was the generic `UI-Group-LeaderIcon` raid-leader
+  crown. Confirmed via extracted Ascension client source
+  (`Ascension_Manastorm/ManastormQueue.lua`) that Ascension's own
+  Manastorm queue window uses `Interface\LFGFrame\lfgicon-arcanevaults`
+  as its own portrait icon - the closest thing to an "official" Manastorm
+  icon, and now used consistently across both of this addon's
+  minimap-adjacent icons instead of a generic unrelated icon.
+
 ## 0.4.121
 
 Three fixes reported live via screenshots (v0.4.119) - first real in-game

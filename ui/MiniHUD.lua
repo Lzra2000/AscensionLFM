@@ -1232,13 +1232,15 @@ local function BuildFrame()
     chip:SetTextColor(0.92, 0.84, 0.50)
     f.chipFS = chip
 
-    -- Collapsed-state icon (raid-leader crown, Interface\GroupFrame\
-    -- UI-Group-LeaderIcon - a well-established, stable standard icon,
-    -- thematically fitting next to "HOST" status) shown instead of the
-    -- abbreviated "ALFM" text label when collapsed - hidden while
-    -- expanded, where the full title/chip text is shown instead.
+    -- Collapsed-state icon shown instead of the abbreviated "ALFM" text
+    -- label when collapsed - hidden while expanded, where the full
+    -- title/chip text is shown instead. Was the generic raid-leader
+    -- crown; now Ascension's own Manastorm queue window's portrait icon
+    -- (confirmed via extracted client source, Ascension_Manastorm/
+    -- ManastormQueue.lua) - matches ui/MinimapButton.lua's icon too, so
+    -- both of this addon's minimap-adjacent icons are consistent.
     local collapsedIcon = f:CreateTexture(nil, "OVERLAY")
-    collapsedIcon:SetTexture("Interface\\GroupFrame\\UI-Group-LeaderIcon")
+    collapsedIcon:SetTexture("Interface\\LFGFrame\\lfgicon-arcanevaults")
     collapsedIcon:SetSize(18, 18)
     collapsedIcon:SetPoint("LEFT", f, "LEFT", 8, 0)
     collapsedIcon:Hide()

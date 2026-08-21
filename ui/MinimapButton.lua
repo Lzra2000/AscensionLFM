@@ -115,7 +115,13 @@ local function BuildButton()
     b:RegisterForDrag("LeftButton")
 
     local icon = b:CreateTexture(nil, "BACKGROUND")
-    icon:SetTexture("Interface\\GroupFrame\\UI-Group-LeaderIcon")
+    -- Ascension's own Manastorm queue window uses this exact icon as its
+    -- portrait (confirmed via extracted client source,
+    -- Ascension_Manastorm/ManastormQueue.lua:
+    -- PortraitFrame_SetIcon(parent, "Interface\LFGFrame\lfgicon-arcanevaults"))
+    -- - the closest thing to an "official" Manastorm icon, more on-theme
+    -- than the generic group-leader crown this used before.
+    icon:SetTexture("Interface\\LFGFrame\\lfgicon-arcanevaults")
     icon:SetSize(20, 20)
     icon:SetPoint("CENTER", 0, 0)
     b.icon = icon
