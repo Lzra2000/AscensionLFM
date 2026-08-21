@@ -37,7 +37,8 @@ AscensionLFM.Database.Init()
 AscensionLFM.Slots.ClearAll()
 AscensionLFM.Slots.Assign("Tanky", "tank")
 AscensionLFM.Slots.Assign("Healy", "healer")
-AscensionLFM.Slots.Assign("Aury", "aura")
+-- v0.4.131: "Aury" is a DPS who also carries an aura (tag, not a seat).
+AscensionLFM.Slots.Assign("Aury", "dps", nil, true)
 AscensionLFM.Slots.Assign("Dee", "dps")
 -- "Nameless" is present but never assigned a role -> counts as unknown.
 
@@ -67,12 +68,16 @@ check("group1 sorted tank first", groups[1][1].name == "Tanky", groups[1][1].nam
 check("group1 sorted dps second", groups[1][2].name == "Dee", groups[1][2].name)
 check("group1 sorted unknown last", groups[1][3].name == "Nameless", groups[1][3].name)
 check("group2 sorted healer first", groups[2][1].name == "Healy", groups[2][1].name)
-check("group2 sorted aura second", groups[2][2].name == "Aury", groups[2][2].name)
+check("group2 sorted aura-carrying dps second", groups[2][2].name == "Aury", groups[2][2].name)
+check("aura carrier is flagged on the entry", groups[2][2].isAura == true,
+    tostring(groups[2][2].isAura))
 
 check("counts.tank", counts.tank == 1, tostring(counts.tank))
 check("counts.healer", counts.healer == 1, tostring(counts.healer))
-check("counts.aura", counts.aura == 1, tostring(counts.aura))
-check("counts.dps", counts.dps == 1, tostring(counts.dps))
+-- Aura is counted independently of the seat now, so Aury shows up in BOTH
+-- counts.dps and counts.aura - that overlap is the point of the tag model.
+check("counts.aura counts the tag", counts.aura == 1, tostring(counts.aura))
+check("counts.dps includes the aura carrier", counts.dps == 2, tostring(counts.dps))
 check("counts.unknown", counts.unknown == 1, tostring(counts.unknown))
 check("counts.total", counts.total == 5, tostring(counts.total))
 check("counts.online excludes the offline member", counts.online == 4, tostring(counts.online))

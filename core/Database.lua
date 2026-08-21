@@ -14,21 +14,31 @@ AscensionLFM.Database = Database
 -- Default "notify": Log fills from public LFM/LFG MS lines; kick/auto-invite stay off.
 local DEFAULTS = {
     mode = "notify",
-    defaultsRev = 6, -- bumped when shipping default-mode / stock-copy changes
+    defaultsRev = 7, -- bumped when shipping default-mode / stock-copy changes
     roles = {
         tank = true,
         healer = false,
+        -- Since v0.4.131 this is NOT "accept aura applicants" any more (aura
+        -- is no longer a seat someone can apply for) - it means "recruit
+        -- toward aura coverage", i.e. whether the DPS-slot reservation in
+        -- Slots.HasOpenSlotFor() is active at all. Off = fill DPS with
+        -- whoever shows up (MSBuilder's `auratarget 0` equivalent).
         aura = false,
         dps = true,
     },
-    -- Manastorm level-run style defaults (2/3/3/7)
+    -- Manastorm level-run style defaults (2/3/3/7). NOTE: `aura` is NOT a
+    -- seat cap like the other three - it's the aura COVERAGE TARGET (how
+    -- many raid members should carry an XP aura, ideally one per subgroup).
+    -- Aura is an orthogonal tag on top of tank/healer/dps, not a role of
+    -- its own, so it never consumes a seat. See core/Slots.lua.
     slotMax = {
         tank = 2,
         healer = 3,
         aura = 3,
         dps = 7,
     },
-    assignedRoles = {}, -- [nameLower] = role
+    assignedRoles = {}, -- [nameLower] = combat role ("tank"/"healer"/"dps")
+    auraFlags = {}, -- [nameLower] = true when that player carries an XP aura
     scanLfg = true, -- also scan LFG Manastorm lines
     chatFilterEnabled = false, -- hide public MS LFM/LFG listings from chat (already in Log tab)
     minimapIconShown = true, -- draggable minimap icon (mode/activity tooltip, click to open settings)
@@ -233,6 +243,29 @@ function Database.Init()
             _G.AscensionLFMDB.auraScanAutoKick = false
             _G.AscensionLFMDB.auraScanEnabled = false
             _G.AscensionLFMDB.defaultsRev = 6
+            rev = 6
+        end
+        -- v0.4.131: aura stopped being an exclusive 4th role and became an
+        -- orthogonal tag that sits on top of tank/healer/dps. Anyone stored
+        -- as role=="aura" has no combat role under the new model, so they'd
+        -- read as unassigned and get pruned/re-asked. Convert them to
+        -- "dps" + the aura tag: in a Manastorm level run an aura-only
+        -- signup is overwhelmingly a DPS, and this way nobody loses their
+        -- seat or their aura coverage on upgrade.
+        if rev < 7 then
+            if type(_G.AscensionLFMDB.auraFlags) ~= "table" then
+                _G.AscensionLFMDB.auraFlags = {}
+            end
+            if type(_G.AscensionLFMDB.assignedRoles) == "table" then
+                for key, role in pairs(_G.AscensionLFMDB.assignedRoles) do
+                    if role == "aura" then
+                        _G.AscensionLFMDB.assignedRoles[key] = "dps"
+                        _G.AscensionLFMDB.auraFlags[key] = true
+                    end
+                end
+            end
+            _G.AscensionLFMDB.defaultsRev = 7
+            rev = 7
         end
     end
 end

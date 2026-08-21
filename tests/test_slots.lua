@@ -140,6 +140,82 @@ Slots.ScanRaid()
 check("ScanRaid() does not auto-trigger AuraBalance", balanceCalls == 0, tostring(balanceCalls))
 AscensionLFM.AuraBalance = nil
 
+--------------------------------------------------------------------
+-- v0.4.131: aura as an orthogonal tag + the DPS-seat reservation.
+--------------------------------------------------------------------
+
+-- No roster APIs here, so CountFilled/CountAura count every tracked entry
+-- (the groupSize==0 "tests / loading" path).
+_G.GetNumRaidMembers = function() return 0 end
+_G.GetNumPartyMembers = function() return 0 end
+_G.GetRaidRosterInfo = function() return nil end
+_G.UnitName = function() return nil end
+
+local sdb = AscensionLFM.Database.Get()
+Slots.ClearAll()
+sdb.roles = { tank = true, healer = true, aura = true, dps = true }
+Slots.SetMax("tank", 2); Slots.SetMax("healer", 3); Slots.SetMax("aura", 3); Slots.SetMax("dps", 7)
+
+-- The tag is orthogonal: setting it must not disturb the combat seat.
+Slots.Assign("Auradin", "tank", nil, true)
+check("aura tag does not change the combat role", Slots.GetAssigned("Auradin") == "tank",
+    tostring(Slots.GetAssigned("Auradin")))
+check("aura tag is readable", Slots.HasAura("Auradin") == true)
+check("tagged tank still counts as a tank", Slots.CountFilled("tank") == 1,
+    tostring(Slots.CountFilled("tank")))
+check("tagged tank counts toward aura coverage", Slots.CountAura() == 1,
+    tostring(Slots.CountAura()))
+check("CountFilled('aura') is coverage, not a seat count", Slots.CountFilled("aura") == 1,
+    tostring(Slots.CountFilled("aura")))
+
+Slots.SetAura("Auradin", false)
+check("aura tag can be removed without losing the seat",
+    Slots.HasAura("Auradin") == false and Slots.GetAssigned("Auradin") == "tank")
+Slots.SetAura("Auradin", true)
+
+-- Reservation: aura target 3, one carrier so far -> 2 still needed, so the
+-- last 2 of the 7 DPS seats are held for aura carriers.
+check("aura shortfall reflects the target", Slots.AuraShortfall() == 2, tostring(Slots.AuraShortfall()))
+for i = 1, 5 do Slots.Assign("Plain" .. i, "dps") end
+check("5 plain dps seated", Slots.CountFilled("dps") == 5, tostring(Slots.CountFilled("dps")))
+check("dps seat still open in raw terms", Slots.HasOpenSlot("dps") == true)
+check("non-aura dps is turned away while aura is short",
+    Slots.HasOpenSlotFor("dps", false) == false)
+check("aura-carrying dps is still accepted", Slots.HasOpenSlotFor("dps", true) == true)
+check("tank is never blocked for aura", Slots.HasOpenSlotFor("tank", false) == true)
+check("healer is never blocked for aura", Slots.HasOpenSlotFor("healer", false) == true)
+
+-- Turning the reservation off fills DPS with whoever shows up.
+sdb.roles.aura = false
+check("reservation off lets plain dps in", Slots.HasOpenSlotFor("dps", false) == true)
+sdb.roles.aura = true
+
+-- Meeting the target releases the held seats. Coverage is filled here by
+-- two aura-carrying HEALERS, which is exactly the case the old exclusive
+-- model could not express - and it proves the reservation frees DPS seats
+-- without those seats having to be spent on the aura carriers themselves.
+Slots.Assign("AuraHeal1", "healer", nil, true)
+Slots.Assign("AuraHeal2", "healer", nil, true)
+check("aura target met from non-dps seats", Slots.AuraShortfall() == 0,
+    tostring(Slots.AuraShortfall()))
+check("held dps seats released once coverage is met",
+    Slots.HasOpenSlotFor("dps", false) == true)
+
+-- Clearing a member drops both their seat and their tag.
+Slots.ClearName("AuraHeal1")
+check("ClearName drops the aura tag too", Slots.HasAura("AuraHeal1") == false)
+check("ClearName drops the seat too", Slots.GetAssigned("AuraHeal1") == nil)
+check("coverage drops back when a carrier leaves", Slots.AuraShortfall() == 1,
+    tostring(Slots.AuraShortfall()))
+
+-- SnapshotAuraFlags is what lets RoleCheck.Resync survive its ClearAll().
+local snap = Slots.SnapshotAuraFlags()
+check("snapshot captures live tags", snap.auradin == true, tostring(snap.auradin))
+Slots.ClearAll()
+check("ClearAll wipes tags", Slots.CountAura() == 0, tostring(Slots.CountAura()))
+Slots.Assign("Auradin", "tank", nil, snap.auradin)
+check("tags can be restored from a snapshot", Slots.HasAura("Auradin") == true)
+
 io.write(string.format("slots tests: %d passed, %d failed\n", passed, failed))
 if failed > 0 then
     os.exit(1)

@@ -102,14 +102,46 @@ check("MT is tank", p and Parser.RequestedRole(p) == "tank")
 p = Parser.Parse("HPS")
 check("HPS is healer", p and Parser.RequestedRole(p) == "healer")
 
-p = Parser.Parse("Aura of Exp")
-check("Aura of Exp", p and Parser.RequestedRole(p) == "aura")
+-- Since v0.4.131 aura is an orthogonal TAG, not a 4th seat: an aura-only
+-- signup seats as DPS and keeps the tag, rather than occupying an "aura
+-- slot" that no longer exists.
+local function roleAndAura(text)
+    local parsedText = Parser.Parse(text)
+    if not parsedText then
+        return nil, false
+    end
+    return Parser.RequestedRole(parsedText)
+end
 
-p = Parser.Parse("exp aura inv")
-check("exp aura", p and Parser.RequestedRole(p) == "aura")
+local r, a = roleAndAura("Aura of Exp")
+check("Aura of Exp seats as dps", r == "dps", tostring(r))
+check("Aura of Exp keeps the aura tag", a == true, tostring(a))
 
-p = Parser.Parse("AoE aura")
-check("AoE aura", p and Parser.RequestedRole(p) == "aura")
+r, a = roleAndAura("exp aura inv")
+check("exp aura seats as dps", r == "dps", tostring(r))
+check("exp aura keeps the aura tag", a == true, tostring(a))
+
+r, a = roleAndAura("AoE aura")
+check("AoE aura seats as dps", r == "dps", tostring(r))
+check("AoE aura keeps the aura tag", a == true, tostring(a))
+
+-- The headline case the whole model change exists for: a DPS who brings an
+-- aura must resolve to BOTH, not collapse to one.
+r, a = roleAndAura("dps with aura")
+check("dps with aura -> dps seat", r == "dps", tostring(r))
+check("dps with aura -> aura tag", a == true, tostring(a))
+
+r, a = roleAndAura("tank aura")
+check("tank aura -> tank seat", r == "tank", tostring(r))
+check("tank aura -> aura tag", a == true, tostring(a))
+
+r, a = roleAndAura("heal no aura")
+check("heal no aura -> healer seat", r == "healer", tostring(r))
+check("heal no aura -> no tag (negation respected)", a == false, tostring(a))
+
+r, a = roleAndAura("dps")
+check("plain dps -> dps seat", r == "dps", tostring(r))
+check("plain dps -> no aura tag", a == false, tostring(a))
 
 p = Parser.Parse("DD")
 check("DD is dps", p and Parser.RequestedRole(p) == "dps")
@@ -119,8 +151,9 @@ p = Parser.Parse("H")
 check("letter H is healer", p and Parser.RequestedRole(p) == "healer")
 p = Parser.Parse("T")
 check("letter T is tank", p and Parser.RequestedRole(p) == "tank")
-p = Parser.Parse("A")
-check("letter A is aura", p and Parser.RequestedRole(p) == "aura")
+r, a = roleAndAura("A")
+check("letter A seats as dps", r == "dps", tostring(r))
+check("letter A keeps the aura tag", a == true, tostring(a))
 p = Parser.Parse("D")
 check("letter D is dps", p and Parser.RequestedRole(p) == "dps")
 p = Parser.Parse("healers!")

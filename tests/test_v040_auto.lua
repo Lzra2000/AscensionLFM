@@ -253,10 +253,13 @@ Slots.SetMax("tank", 2)
 Slots.SetMax("healer", 3)
 Slots.SetMax("aura", 3)
 Slots.SetMax("dps", 7)
+-- v0.4.131: aura is a tag, so "full" means every SEAT cap is met and the
+-- aura coverage target is reached by tagged members - not by seating three
+-- people into a separate aura role that no longer exists.
 for _, n in ipairs({ "a", "b" }) do Slots.Assign(n, "tank") end
 for _, n in ipairs({ "c", "d", "e" }) do Slots.Assign(n, "healer") end
-for _, n in ipairs({ "f", "g", "h" }) do Slots.Assign(n, "aura") end
 for i = 1, 7 do Slots.Assign("d" .. i, "dps") end
+for _, n in ipairs({ "c", "d1", "d2" }) do Slots.SetAura(n, true) end
 AscensionLFM.Invite.GetGroupSize = function() return 10 end
 whispers = {}
 db.autoRepost = true -- Load preset may not touch this; ensure on

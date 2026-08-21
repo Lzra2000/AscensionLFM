@@ -29,7 +29,7 @@ Database.Init()
 local db = Database.Get()
 
 check("default mode is notify", db.mode == "notify")
-check("defaultsRev is 6", tonumber(db.defaultsRev) == 6)
+check("defaultsRev is 7", tonumber(db.defaultsRev) == 7)
 check("autoKick still off", db.autoKickLevel59 == false)
 check("autoWhisper still off", db.autoWhisper == false)
 check("autoRepost still off", db.autoRepost == false)
@@ -52,7 +52,7 @@ _G.AscensionLFMDB = {
 }
 Database.Init()
 check("migrate off→notify", Database.Get().mode == "notify")
-check("migrate sets defaultsRev 6", tonumber(Database.Get().defaultsRev) == 6)
+check("migrate sets defaultsRev 7", tonumber(Database.Get().defaultsRev) == 7)
 
 -- Do not re-flip after user sets Off post-migration
 Database.SetMode("off")
@@ -89,7 +89,7 @@ _G.AscensionLFMDB = {
 }
 Database.Init()
 local migrated = Database.Get()
-check("full auto migrate rev 6", tonumber(migrated.defaultsRev) == 6)
+check("full auto migrate rev 7", tonumber(migrated.defaultsRev) == 7)
 check("full auto migrate healer on", migrated.roles.healer == true)
 check("full auto migrate aura on", migrated.roles.aura == true)
 
@@ -152,6 +152,49 @@ check("em-dash stock RW message still migrates", Database.Get().roleCheckMessage
 check("em-dash migration lands on current stock default",
     Database.Get().roleCheckMessage == "ROLE CHECK - whisper or party: tank/heal/aura/dps (T/H/A/D)",
     Database.Get().roleCheckMessage)
+
+-- v0.4.131 (rev 7): aura stopped being an exclusive 4th role. Anyone stored
+-- as role=="aura" has no combat seat under the new model and would read as
+-- unassigned, so the migration converts them to "dps" + the aura tag -
+-- nobody loses their seat or their aura coverage on upgrade.
+_G.AscensionLFMDB = {
+    mode = "hosting",
+    defaultsRev = 6,
+    assignedRoles = {
+        tanky = "tank",
+        healy = "healer",
+        auraguy = "aura",
+        auragal = "aura",
+        deeps = "dps",
+    },
+}
+Database.Init()
+local m7 = Database.Get()
+check("rev 7 migration ran", tonumber(m7.defaultsRev) == 7, tostring(m7.defaultsRev))
+check("aura role converted to dps seat", m7.assignedRoles.auraguy == "dps",
+    tostring(m7.assignedRoles.auraguy))
+check("second aura role converted too", m7.assignedRoles.auragal == "dps",
+    tostring(m7.assignedRoles.auragal))
+check("converted member keeps aura coverage", m7.auraFlags.auraguy == true)
+check("second converted member keeps aura coverage", m7.auraFlags.auragal == true)
+check("no assignedRoles entry is left as 'aura'",
+    m7.assignedRoles.tanky == "tank" and m7.assignedRoles.healy == "healer"
+    and m7.assignedRoles.deeps == "dps")
+check("plain dps did NOT gain a bogus aura tag", m7.auraFlags.deeps == nil,
+    tostring(m7.auraFlags.deeps))
+check("tank did NOT gain a bogus aura tag", m7.auraFlags.tanky == nil)
+
+-- A save already at rev 7 must not be touched again.
+_G.AscensionLFMDB = {
+    mode = "hosting",
+    defaultsRev = 7,
+    assignedRoles = { someone = "aura" }, -- hand-edited / stale: left alone
+    auraFlags = {},
+}
+Database.Init()
+check("rev 7 migration is not re-applied",
+    Database.Get().assignedRoles.someone == "aura",
+    tostring(Database.Get().assignedRoles.someone))
 
 io.write(string.format("test_defaults_notify: %d passed, %d failed\n", passed, failed))
 if failed > 0 then

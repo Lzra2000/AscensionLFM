@@ -355,37 +355,41 @@ function Parser.NeededRoles(parsed, wantRoles)
     return out
 end
 
---- Detect which single role a whisper is requesting (hosting).
--- Prefers explicit keywords; returns nil if ambiguous/none.
+--- Detect which combat role a whisper is requesting (hosting), plus
+-- whether the sender also brings an XP aura.
+-- @return role ("tank"/"healer"/"dps") or nil, hasAura (boolean)
+--
+-- Since v0.4.131 aura is an orthogonal TAG, not a fourth seat: "dps aura"
+-- resolves to ("dps", true) instead of collapsing to one of the two and
+-- throwing the other half away. A bare "aura" with no combat role attached
+-- resolves to ("dps", true) - in a Manastorm level run an aura-only signup
+-- is overwhelmingly a DPS, and returning nil would reject someone this
+-- addon has always happily invited.
 -- When the original message is available on parsed.raw / parsed.message,
--- negated roles ("no aura") are excluded. Combat roles beat pure aura
--- when both are mentioned without negation.
+-- negated roles ("no aura") are excluded.
 function Parser.RequestedRole(parsed)
     if type(parsed) ~= "table" or type(parsed.roles) ~= "table" then
-        return nil
+        return nil, false
     end
     local raw = parsed.raw or parsed.message or parsed.text or ""
     local negated = (raw ~= "" and Parser.NegatedRoles(raw)) or {}
-    local found = nil
-    local count = 0
-    for role, info in pairs(parsed.roles) do
-        if info and (info.mentioned or info.open) and not negated[role] then
-            count = count + 1
-            found = role
-        end
-    end
-    if count == 1 then
-        return found
-    end
-    -- Prefer tank > healer > dps > aura if multiple (combat seats first;
-    -- "dps with aura" should land as dps, not steal an aura slot by accident).
-    for _, role in ipairs({ "tank", "healer", "dps", "aura" }) do
+
+    local function wants(role)
         local info = parsed.roles[role]
-        if info and (info.mentioned or info.open) and not negated[role] then
-            return role
+        return info and (info.mentioned or info.open) and not negated[role] and true or false
+    end
+
+    local hasAura = wants("aura")
+    -- Prefer tank > healer > dps for the actual seat.
+    for _, role in ipairs({ "tank", "healer", "dps" }) do
+        if wants(role) then
+            return role, hasAura
         end
     end
-    return nil
+    if hasAura then
+        return "dps", true -- aura-only signup: seat them as DPS, keep the tag
+    end
+    return nil, false
 end
 
 --- Roles explicitly negated in the message ("dps no aura", "tank without aura").
@@ -501,8 +505,20 @@ function Parser.GuessRole(message)
         damage = "dps",
         dmg = "dps",
     }
+    -- Aura is a tag, never the returned seat - "aura" alone seats as DPS
+    -- (see Parser.RequestedRole). Resolve it here so every early-return
+    -- below can report it alongside whatever combat role it found.
+    local auraTagged = (t:find("aura", 1, true) or t:find("exp%s*aura")
+        or t:find("aoe%s*aura") or t:find("arua", 1, true)) and not negated.aura and true or false
+    local function seat(role)
+        if role == "aura" then
+            return "dps", true
+        end
+        return role, auraTagged
+    end
+
     if exact[t] and not negated[exact[t]] then
-        return exact[t]
+        return seat(exact[t])
     end
     -- First-token exact only when the rest of the message does not clearly
     -- name another role (so "aura dps" is not locked to aura by the token).
@@ -516,7 +532,7 @@ function Parser.GuessRole(message)
             if exact[token] ~= "aura" and rest:find("aura", 1, true) and not negated.aura then restHasOther = true end
         end
         if not restHasOther then
-            return exact[token]
+            return seat(exact[token])
         end
     end
 
@@ -537,21 +553,18 @@ function Parser.GuessRole(message)
         and not negated.dps then
         mentioned.dps = true
     end
-    -- Aura only if not negated AND (only-aura message OR explicit aura offer without a combat role)
-    if (t:find("aura", 1, true) or t:find("exp%s*aura") or t:find("aoe%s*aura") or t:find("arua", 1, true))
-        and not negated.aura then
-        mentioned.aura = true
-    end
-
-    -- Prefer combat roles over pure aura when both are offered:
-    -- "dps with aura" / "aura dps" -> dps (they can still be moved to aura later if host needs it)
-    -- "aura" alone -> aura
-    for _, role in ipairs({ "tank", "healer", "dps", "aura" }) do
+    -- Prefer combat roles; the aura tag rides along regardless:
+    -- "dps with aura" / "aura dps" -> ("dps", true)
+    -- "aura" alone                 -> ("dps", true), seat + tag
+    for _, role in ipairs({ "tank", "healer", "dps" }) do
         if mentioned[role] then
-            return role
+            return role, auraTagged
         end
     end
-    return nil
+    if auraTagged then
+        return "dps", true
+    end
+    return nil, false
 end
 
 --- Extract slot totals from a parsed listing (for host caps).

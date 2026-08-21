@@ -1,5 +1,63 @@
 # Changelog
 
+## 0.4.131
+
+- **Aura is no longer a fourth exclusive role - it's now a tag that sits on
+  top of Tank/Heal/DPS.** Adopted from `MSBuilder` (competitor research).
+  Previously `db.assignedRoles[name]` held exactly one string, so a DPS who
+  brought an XP aura had to occupy *either* a DPS seat (aura uncounted) or
+  an "aura seat" (missing as DPS). A raid could fill with 7 non-aura DPS and
+  end up with zero aura coverage.
+  - New `db.auraFlags[nameLower] = true`, orthogonal to the (now purely
+    combat) `db.assignedRoles`. New `Slots.SetAura/HasAura/CountAura/
+    AuraShortfall/SnapshotAuraFlags`; `Slots.Assign()` takes an optional 4th
+    `hasAura` argument (it only ever SETS the tag, never clears it, so a
+    later bare "dps" whisper can't strip a confirmed aura).
+  - `db.slotMax.aura` changed meaning: it is the aura **coverage target**,
+    not a seat cap. `Slots.CountFilled("aura")` therefore returns coverage,
+    which keeps `Slots.Snapshot()` - and with it Poster/MiniHUD/RosterPanel/
+    MainWindow's "A x/y" readouts - working unchanged.
+  - **New: DPS seats are reserved while aura coverage is short.**
+    `Slots.HasOpenSlotFor(role, hasAura)`: tank/healer are never blocked for
+    aura; a DPS *with* an aura is always accepted; a DPS *without* one is
+    accepted only up to `dpsCap - auraShortfall`. Rejections say
+    `"dps seat reserved for aura"` rather than a misleading `"slot full"`.
+  - `db.roles.aura` repurposed: it no longer gates who may apply (aura can
+    never be a reason to reject anyone) - it now toggles that reservation
+    on/off, MSBuilder's `auratarget 0` equivalent. Relabelled
+    **"Reserve for Aura"** in the Hosting tab.
+  - `Parser.RequestedRole()` / `Parser.GuessRole()` now return
+    `role, hasAura`. `"dps aura"` resolves to `("dps", true)` instead of
+    collapsing to one and discarding the other half. A bare `"aura"` seats
+    as DPS + the tag, so people who have always whispered just "aura" still
+    get invited exactly as before. Negation (`"tank no aura"`) still wins.
+  - `RoleCheck.ParseBareRoleWord/ParseWhisperRole` return `role, hasAura`
+    too, and **`RoleCheck.Resync()` now carries the tags across its
+    `ClearAll()`** via `SnapshotAuraFlags()` - without that, every Role
+    Check silently wiped the raid's entire aura coverage.
+  - `AuraBalance.CollectRaidMembers()` reads `isAura` from `db.auraFlags`
+    instead of deriving it from the role. Because a tank can now *also* be
+    an aura carrier, the tank pass and aura pass can match the same person;
+    `PlanRoleMoves` now keeps protected-role members in place and evicts the
+    unprotected one instead of undoing the tank pass. Removed the old
+    `victim.isAura = false` swap hack, which was only safe under the
+    exclusive model.
+  - **Roster tab:** the role picker is now Tank/Heal/DPS/none **plus a
+    separate Aura on/off row** - toggling aura no longer erases someone's
+    combat role. Aura carriers show a gold border and a `+` on their role
+    letter; group cards and the summary count the tag (so a member can
+    legitimately appear in both the DPS and Aura totals). "Aura" removed
+    from the host's own-seat picker (it isn't a seat).
+  - **Migration (`defaultsRev` 6 -> 7):** every stored `role == "aura"` is
+    converted to `"dps"` + the aura tag, so nobody loses their seat or their
+    coverage on upgrade. Verified idempotent (a rev-7 save is untouched).
+  - Regression-tested throughout, each verified to actually fail first:
+    the rev-7 migration, the reservation math (incl. `db.roles.aura = false`
+    disabling it and coverage being satisfiable from non-DPS seats), aura
+    surviving `RoleCheck.Resync()` (reverted -> coverage dropped to 0), and
+    a dual-role tank-with-aura in `SortGroupsNow()` (reverted -> the tank
+    got evicted from its group).
+
 ## 0.4.130
 
 - **New: failed invites free their slot immediately** instead of waiting

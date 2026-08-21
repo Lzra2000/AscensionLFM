@@ -77,6 +77,13 @@ local function GetAssigned(name)
     return nil
 end
 
+local function HasAura(name)
+    if AscensionLFM.Slots and AscensionLFM.Slots.HasAura then
+        return AscensionLFM.Slots.HasAura(name)
+    end
+    return false
+end
+
 local function AssignRole(name, role)
     if type(name) ~= "string" or name == "" then
         return
@@ -91,6 +98,24 @@ local function AssignRole(name, role)
     end
     if AscensionLFM.Print then
         AscensionLFM.Print(string.format("Roster: %s -> %s", name, role ~= "" and role or "unassigned"))
+    end
+    RosterPanel.Refresh()
+end
+
+--- Flip the aura tag WITHOUT touching the combat role - the whole point of
+-- the v0.4.131 model change. Previously "Aura" was a fifth exclusive choice
+-- in this picker, so tagging someone's aura silently erased their tank/heal/
+-- dps assignment.
+local function ToggleAura(name)
+    if type(name) ~= "string" or name == "" then
+        return
+    end
+    local now = not HasAura(name)
+    if AscensionLFM.Slots and AscensionLFM.Slots.SetAura then
+        AscensionLFM.Slots.SetAura(name, now)
+    end
+    if AscensionLFM.Print then
+        AscensionLFM.Print(string.format("Roster: %s aura %s", name, now and "ON" or "OFF"))
     end
     RosterPanel.Refresh()
 end
@@ -112,8 +137,11 @@ local function EnsureRolePicker()
     local f = CreateFrame("Frame", "AscensionLFMRolePicker", UIParent)
     f:SetFrameStrata("TOOLTIP")
     f:SetFrameLevel(200)
-    f:SetWidth(148)
-    f:SetHeight(5 * 28 + 12)
+    f:SetWidth(178)
+    -- 4 combat/none rows + separator gap + 1 aura toggle row. Keep this in
+    -- sync with the row layout below (this codebase has a documented history
+    -- of hardcoded pixel math drifting out of sync with the actual widgets).
+    f:SetHeight(5 * 28 + 16)
     f:EnableMouse(true)
     f:SetClampedToScreen(true)
     local bgPath = (AscensionLFM.Chrome and AscensionLFM.Chrome.BackgroundPath and AscensionLFM.Chrome.BackgroundPath())
@@ -133,7 +161,10 @@ local function EnsureRolePicker()
     inset:SetVertexColor(0.08, 0.07, 0.05, 0.90)
 
     f.rows = {}
-    local roles = { "tank", "healer", "aura", "dps", "" }
+    -- Combat seats + "none". "aura" is deliberately NOT in this list any
+    -- more (v0.4.131) - it's an orthogonal tag, handled by the separate
+    -- toggle row built below, so setting it no longer wipes the seat.
+    local roles = { "tank", "healer", "dps", "" }
     for i, role in ipairs(roles) do
         local row = CreateFrame("Button", nil, f)
         row:SetHeight(26)
@@ -162,6 +193,40 @@ local function EnsureRolePicker()
         f.rows[i] = row
     end
 
+    -- Separator + aura toggle. Its label is refreshed per-open in
+    -- ShowRolePicker() so it reflects the current target's tag state.
+    local sepY = -6 - #roles * 28 + 2
+    local sep = f:CreateTexture(nil, "ARTWORK")
+    sep:SetHeight(1)
+    sep:SetPoint("TOPLEFT", 8, sepY)
+    sep:SetPoint("TOPRIGHT", -8, sepY)
+    sep:SetTexture("Interface\\Buttons\\WHITE8X8")
+    sep:SetVertexColor(0.85, 0.68, 0.22, 0.35)
+
+    local auraRow = CreateFrame("Button", nil, f)
+    auraRow:SetHeight(26)
+    auraRow:SetPoint("TOPLEFT", 6, sepY - 4)
+    auraRow:SetPoint("TOPRIGHT", -6, sepY - 4)
+    local auraIcon = auraRow:CreateTexture(nil, "ARTWORK")
+    auraIcon:SetSize(20, 20)
+    auraIcon:SetPoint("LEFT", 2, 0)
+    auraIcon:SetTexture(ROLE_ICONS["aura"])
+    local auraFS = auraRow:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    auraFS:SetPoint("LEFT", auraIcon, "RIGHT", 6, 0)
+    local auraHi = auraRow:CreateTexture(nil, "HIGHLIGHT")
+    auraHi:SetAllPoints()
+    auraHi:SetTexture("Interface\\Buttons\\WHITE8X8")
+    auraHi:SetVertexColor(1, 1, 1, 0.12)
+    auraRow:SetScript("OnClick", function()
+        if rolePickerTarget then
+            ToggleAura(rolePickerTarget)
+        end
+        HideRolePicker()
+    end)
+    f.auraRow = auraRow
+    f.auraFS = auraFS
+    f.auraIcon = auraIcon
+
     f:SetScript("OnHide", function()
         rolePickerTarget = nil
     end)
@@ -177,6 +242,20 @@ local function ShowRolePicker(anchor, memberName)
     end
     local f = EnsureRolePicker()
     rolePickerTarget = memberName
+    -- Reflect this member's current aura state on the toggle row.
+    if f.auraFS then
+        local on = HasAura(memberName)
+        f.auraFS:SetText(on and "Aura: ON (click to remove)" or "Aura: off (click to add)")
+        local col = ROLE_COLORS["aura"] or { 1, 1, 1 }
+        if on then
+            f.auraFS:SetTextColor(col[1], col[2], col[3], 1)
+        else
+            f.auraFS:SetTextColor(0.6, 0.6, 0.6, 1)
+        end
+        if f.auraIcon then
+            f.auraIcon:SetDesaturated(not on)
+        end
+    end
     f:ClearAllPoints()
     if anchor then
         f:SetPoint("TOPLEFT", anchor, "TOPRIGHT", 4, 4)
@@ -662,12 +741,14 @@ function RosterPanel.BuildData()
                 if subgroup < 1 then subgroup = 1 end
                 if subgroup > 8 then subgroup = 8 end
                 local role = GetAssigned(name) or ""
+                local isAura = HasAura(name)
                 local entry = {
                     name = name,
                     level = tonumber(level) or 0,
                     class = classFile or class or "",
                     online = online ~= 0 and online ~= false,
                     role = role,
+                    isAura = isAura,
                     subgroup = subgroup,
                     unit = "raid" .. i,
                 }
@@ -678,10 +759,12 @@ function RosterPanel.BuildData()
                 end
                 if role == "tank" then counts.tank = counts.tank + 1
                 elseif role == "healer" then counts.healer = counts.healer + 1
-                elseif role == "aura" then counts.aura = counts.aura + 1
                 elseif role == "dps" then counts.dps = counts.dps + 1
                 else counts.unknown = counts.unknown + 1
                 end
+                -- Aura is counted independently of the seat (v0.4.131), so
+                -- this is coverage and can legitimately overlap tank/heal/dps.
+                if isAura then counts.aura = counts.aura + 1 end
             end
         end
     else
@@ -698,12 +781,14 @@ function RosterPanel.BuildData()
                 classFile = cf
             end
             local role = GetAssigned(name) or ""
+            local isAura = HasAura(name)
             local entry = {
                 name = name,
                 level = tonumber(level) or 0,
                 class = classFile or "",
                 online = true,
                 role = role,
+                isAura = isAura,
                 subgroup = subgroup,
                 unit = unit,
             }
@@ -712,10 +797,10 @@ function RosterPanel.BuildData()
             counts.online = counts.online + 1
             if role == "tank" then counts.tank = counts.tank + 1
             elseif role == "healer" then counts.healer = counts.healer + 1
-            elseif role == "aura" then counts.aura = counts.aura + 1
             elseif role == "dps" then counts.dps = counts.dps + 1
             else counts.unknown = counts.unknown + 1
             end
+            if isAura then counts.aura = counts.aura + 1 end
         end
         add("player", 1)
         local party = (type(GetNumPartyMembers) == "function" and GetNumPartyMembers()) or 0
@@ -723,7 +808,9 @@ function RosterPanel.BuildData()
             add("party" .. i, 1)
         end
     end
-    local roleRank = { tank = 1, healer = 2, aura = 3, dps = 4, [""] = 5 }
+    -- No "aura" rank: it's not a seat any more, so rows sort purely by
+    -- combat role (aura carriers are marked by the gold tint instead).
+    local roleRank = { tank = 1, healer = 2, dps = 3, [""] = 4 }
     for g = 1, 8 do
         table.sort(groups[g], function(a, b)
             local ra = roleRank[a.role or ""] or 5
@@ -751,7 +838,12 @@ function RosterPanel.FormatSummary(counts, slotMax)
         tonumber(counts.online) or 0, tonumber(counts.total) or 0, tonumber(counts.unknown) or 0)
 end
 
-local function SetRoleButton(btn, role)
+-- @param isAura optional - since v0.4.131 aura is a tag layered ON TOP of the
+--   combat role, so it can't be shown by swapping the icon any more. The
+--   button keeps its tank/heal/dps identity and gets a gold border + a "+"
+--   on the letter instead ("gold = aura" stays the reading, as documented in
+--   the Roster tab hint).
+local function SetRoleButton(btn, role, isAura)
     role = role or ""
     local col = ROLE_COLORS[role] or ROLE_COLORS[""]
     if btn.icon then
@@ -766,11 +858,21 @@ local function SetRoleButton(btn, role)
     end
     if btn.border then
         btn.border:SetTexture("Interface\\Buttons\\WHITE8X8")
-        btn.border:SetVertexColor(col[1], col[2], col[3], 0.9)
+        if isAura then
+            local a = ROLE_COLORS["aura"] or { 0.9, 0.7, 0.2 }
+            btn.border:SetVertexColor(a[1], a[2], a[3], 1)
+        else
+            btn.border:SetVertexColor(col[1], col[2], col[3], 0.9)
+        end
     end
     if btn.letter then
-        btn.letter:SetText(ROLE_SHORT[role] or "?")
-        btn.letter:SetTextColor(1, 1, 1, 0.9)
+        btn.letter:SetText((ROLE_SHORT[role] or "?") .. (isAura and "+" or ""))
+        if isAura then
+            local a = ROLE_COLORS["aura"] or { 0.9, 0.7, 0.2 }
+            btn.letter:SetTextColor(a[1], a[2], a[3], 1)
+        else
+            btn.letter:SetTextColor(1, 1, 1, 0.9)
+        end
     end
 end
 
@@ -1073,7 +1175,7 @@ function RosterPanel.Refresh()
             local list = groups[g] or {}
             local auraN = 0
             for _, m in ipairs(list) do
-                if m.role == "aura" then
+                if m.isAura then
                     auraN = auraN + 1
                 end
             end
@@ -1097,7 +1199,7 @@ function RosterPanel.Refresh()
                     row.kickBtn.memberName = m.name
                     row.moveBtn.memberName = m.name
                     row.moveBtn.memberGroup = m.subgroup
-                    SetRoleButton(row.roleBtn, m.role)
+                    SetRoleButton(row.roleBtn, m.role, m.isAura)
                     local cc = CLASS_COLORS[string.upper(tostring(m.class or ""))] or { 0.85, 0.8, 0.7 }
                     if not m.online then
                         cc = { 0.45, 0.45, 0.45 }

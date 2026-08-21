@@ -1704,10 +1704,15 @@ function MainWindow.Init()
     hostRoles:SetPoint("TOPLEFT", 0, -114)
     hostRoles:SetPoint("TOPRIGHT", 0, -114)
     hostRoles:SetHeight(24)
+    -- Tank/Healer/DPS gate which applicants get invited. "Aura" no longer
+    -- does (v0.4.131) - it's a tag every seat can carry, so it can never be
+    -- a reason to reject someone. It now controls whether the addon holds
+    -- DPS seats open until the aura coverage target is met
+    -- (Slots.HasOpenSlotFor); off = fill DPS with whoever applies.
     MakeRoleCheck(hostRoles, "tank", "Tank", 0, 0, widgets.roleButtonsHost)
     MakeRoleCheck(hostRoles, "healer", "Healer", 90, 0, widgets.roleButtonsHost)
-    MakeRoleCheck(hostRoles, "aura", "Aura", 190, 0, widgets.roleButtonsHost)
-    MakeRoleCheck(hostRoles, "dps", "DPS", 280, 0, widgets.roleButtonsHost)
+    MakeRoleCheck(hostRoles, "dps", "DPS", 190, 0, widgets.roleButtonsHost)
+    MakeRoleCheck(hostRoles, "aura", "Reserve for Aura", 280, 0, widgets.roleButtonsHost)
 
     -- My host role: which role YOU take (Slots.EnsureHostAssigned picks this
     -- when set, instead of guessing). Applies to your own slot immediately -
@@ -1773,10 +1778,13 @@ function MainWindow.Init()
         return btn
     end
 
+    -- Host's OWN seat - combat roles only. "Aura" was a fourth option here
+    -- until v0.4.131; it's a tag now, so picking it as your seat is
+    -- meaningless (Slots.EnsureHostAssigned also rejects a stale "aura"
+    -- hostRole). Tag your own aura in the Roster tab instead.
     MakeHostRoleCheck(hostRoleRow, "tank", "Tank", 0, 0)
     MakeHostRoleCheck(hostRoleRow, "healer", "Healer", 90, 0)
-    MakeHostRoleCheck(hostRoleRow, "aura", "Aura", 190, 0)
-    MakeHostRoleCheck(hostRoleRow, "dps", "DPS", 280, 0)
+    MakeHostRoleCheck(hostRoleRow, "dps", "DPS", 190, 0)
 
     local hostRoleAutoBtn = CreateFrame("Button", nil, hostRoleRow, "UIPanelButtonTemplate")
     if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(hostRoleAutoBtn) end
@@ -1951,7 +1959,10 @@ function MainWindow.Init()
     end)
     widgets.maxParty = maxEdit
 
-    local labels = { tank = "T", healer = "H", aura = "A", dps = "D" }
+    -- T/H/D are seat caps; A is the aura COVERAGE TARGET (v0.4.131 - aura is
+    -- a tag on a combat role, so it never consumes a seat). Marked with "*"
+    -- so the row doesn't read as four equal caps summing past the raid size.
+    local labels = { tank = "T", healer = "H", aura = "A*", dps = "D" }
     local roles = { "tank", "healer", "aura", "dps" }
     local anchor = maxEdit
     for i, role in ipairs(roles) do
@@ -2505,7 +2516,7 @@ function MainWindow.Init()
     rosterHint:SetJustifyH("LEFT")
     if rosterHint.SetWordWrap then rosterHint:SetWordWrap(true) end
     if rosterHint.SetHeight then rosterHint:SetHeight(32) end
-    rosterHint:SetText("Click role icon -> choose Tank/Heal/Aura/DPS  |  X remove  |  gold = aura")
+    rosterHint:SetText("Click role icon -> Tank/Heal/DPS + Aura toggle  |  X remove  |  gold border/+ = aura")
     SetInk(rosterHint, MUTED)
 
     local specBtn = CreateFrame("Button", nil, rosterBar, "UIPanelButtonTemplate")

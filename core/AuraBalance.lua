@@ -140,6 +140,21 @@ function AuraBalance.PlanRoleMoves(members, roleKey, opts)
         end
     end
 
+    -- Which of two equally-matching members should KEEP this group's slot.
+    -- Protected roles win: since v0.4.131 aura is a tag, so a tank can also
+    -- be an aura carrier and would show up in both the tank pass and the
+    -- aura pass. The tank pass runs first and places them correctly; the
+    -- aura pass must then move the *other* aura in that group, not undo the
+    -- tank's placement. Ties fall back to raid index for stable ordering.
+    local function keepsSlot(a, b)
+        local pa = protect[a.role] and 1 or 0
+        local pb = protect[b.role] and 1 or 0
+        if pa ~= pb then
+            return pa > pb
+        end
+        return (tonumber(a.index) or 0) < (tonumber(b.index) or 0)
+    end
+
     local excess = {}
     for g = 1, 8 do
         local matches = byGroup[g].matches
@@ -147,17 +162,13 @@ function AuraBalance.PlanRoleMoves(members, roleKey, opts)
             -- Every matching-role member here is out-of-bounds (e.g. a
             -- tank sitting alone in group 5 when only 1/2 are allowed) -
             -- all of them must move, not just the overflow past #1.
-            table.sort(matches, function(a, b)
-                return (tonumber(a.index) or 0) < (tonumber(b.index) or 0)
-            end)
+            table.sort(matches, keepsSlot)
             for i = 1, #matches do
                 table.insert(excess, matches[i])
             end
             byGroup[g].matches = {}
         elseif #matches > 1 then
-            table.sort(matches, function(a, b)
-                return (tonumber(a.index) or 0) < (tonumber(b.index) or 0)
-            end)
+            table.sort(matches, keepsSlot)
             for i = 2, #matches do
                 table.insert(excess, matches[i])
             end
@@ -264,9 +275,15 @@ function AuraBalance.PlanRoleMoves(members, roleKey, opts)
                     removePerson(from, m.name)
                     removePerson(to, victim.name)
                     addPerson(to, m)
-                    if roleKey == "aura" then
-                        victim.isAura = false
-                    end
+                    -- NOTE: the victim keeps their own isAura/role untouched.
+                    -- This used to force victim.isAura = false on the aura
+                    -- pass, which was only ever "safe" because aura was an
+                    -- exclusive role back then (a swap victim picked by
+                    -- pickSwapVictim never had it by construction). Under the
+                    -- v0.4.131 tag model that assumption is gone and clearing
+                    -- it would fabricate a bogus loss of aura coverage in the
+                    -- plan - pickSwapVictim already guarantees the victim
+                    -- doesn't match this pass's role.
                     addPerson(from, victim)
                     placed = true
                     break
@@ -298,6 +315,10 @@ local function CollectRaidMembers()
     end
     local db = DB()
     local map = (db and db.assignedRoles) or {}
+    -- Since v0.4.131 the aura tag is its own table: a member can be BOTH a
+    -- tank/healer/dps and an aura carrier, so isAura is no longer derivable
+    -- from their (now purely combat) role.
+    local auraMap = (db and db.auraFlags) or {}
     for i = 1, raid do
         local name, _, subgroup = GetRaidRosterInfo(i)
         if type(name) == "string" and name ~= "" then
@@ -307,7 +328,7 @@ local function CollectRaidMembers()
                 name = name,
                 index = i,
                 subgroup = tonumber(subgroup) or 1,
-                isAura = role == "aura",
+                isAura = auraMap[key] and true or false,
                 role = role,
             })
         end

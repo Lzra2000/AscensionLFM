@@ -50,7 +50,17 @@ check("non-member carl", RoleCheck.IsGroupMemberName("Carl", present) == false)
 -- Whisper → role
 check("whisper tank", RoleCheck.ParseWhisperRole("tank") == "tank")
 check("whisper heal", RoleCheck.ParseWhisperRole("heal") == "healer")
-check("whisper aura", RoleCheck.ParseWhisperRole("aura") == "aura")
+-- v0.4.131: aura is a tag on a combat seat, so a bare "aura" reply resolves
+-- to dps + the tag rather than to an "aura" role that no longer exists.
+local wr, wa = RoleCheck.ParseWhisperRole("aura")
+check("whisper aura seats as dps", wr == "dps", tostring(wr))
+check("whisper aura carries the tag", wa == true, tostring(wa))
+wr, wa = RoleCheck.ParseWhisperRole("dps with aura")
+check("whisper 'dps with aura' seats as dps", wr == "dps", tostring(wr))
+check("whisper 'dps with aura' carries the tag", wa == true, tostring(wa))
+wr, wa = RoleCheck.ParseWhisperRole("tank no aura")
+check("whisper 'tank no aura' seats as tank", wr == "tank", tostring(wr))
+check("whisper 'tank no aura' has no tag", wa == false, tostring(wa))
 check("whisper dps", RoleCheck.ParseWhisperRole("dps please") == "dps")
 check("whisper inv ms tank", RoleCheck.ParseWhisperRole("inv ms tank") == "tank")
 check("whisper garbage nil", RoleCheck.ParseWhisperRole("hello world xyz") == nil)
@@ -165,7 +175,8 @@ _G._now = 3000
 ok = RoleCheck.StartCheck()
 check("restart ok", ok == true)
 RoleCheck.HandleWhisper("Bob", "aura")
-check("bob aura", Slots.GetAssigned("Bob") == "aura")
+check("bob seats as dps", Slots.GetAssigned("Bob") == "dps", tostring(Slots.GetAssigned("Bob")))
+check("bob tagged as aura carrier", Slots.HasAura("Bob") == true)
 _G._now = 3000 + 61
 local tick = RoleCheck.Tick(_G._now)
 check("tick ended", tick == "ended")
@@ -266,6 +277,42 @@ check("no false-positive assignment", Slots.GetAssigned("Thapuckyman") == nil,
 -- Not a group member: no match, no assignment.
 local strangerOk = RoleCheck.HandlePassiveGroupChat("SomeRandomPerson", "dps")
 check("non-group-member raid chat ignored", strangerOk == false, tostring(strangerOk))
+
+--------------------------------------------------------------------
+-- Regression (v0.4.131): RoleCheck.Resync() rebuilds the whole assignment
+-- map via Slots.ClearAll() + re-Assign(). Aura is its own table now, so
+-- without SnapshotAuraFlags() being carried across that ClearAll every
+-- single Role Check would silently wipe the raid's entire aura coverage.
+--------------------------------------------------------------------
+_G.GetNumRaidMembers = function() return 3 end
+_G.GetRaidRosterInfo = function(i)
+    return ({ "Host", "Alice", "Bob" })[i]
+end
+_G.UnitName = function(u)
+    if u == "player" or u == "raid1" then return "Host" end
+    if u == "raid2" then return "Alice" end
+    if u == "raid3" then return "Bob" end
+    return nil
+end
+_G._now = 9000
+
+RoleCheck._ResetForTests()
+Slots.ClearAll()
+Slots.Assign("Host", "tank")
+Slots.Assign("Alice", "healer", nil, true) -- healer WITH an aura
+Slots.Assign("Bob", "dps", nil, true)      -- dps WITH an aura
+check("pre-resync: aura coverage is 2", Slots.CountAura() == 2, tostring(Slots.CountAura()))
+
+RoleCheck.Resync()
+
+check("resync keeps Alice's healer seat", Slots.GetAssigned("Alice") == "healer",
+    tostring(Slots.GetAssigned("Alice")))
+check("resync keeps Bob's dps seat", Slots.GetAssigned("Bob") == "dps",
+    tostring(Slots.GetAssigned("Bob")))
+check("resync preserves Alice's aura tag", Slots.HasAura("Alice") == true)
+check("resync preserves Bob's aura tag", Slots.HasAura("Bob") == true)
+check("resync does not invent an aura tag for the tank", Slots.HasAura("Host") == false)
+check("post-resync: aura coverage still 2", Slots.CountAura() == 2, tostring(Slots.CountAura()))
 
 if failed > 0 then
     io.stderr:write(string.format("test_rolecheck: %d failed, %d passed\n", failed, passed))

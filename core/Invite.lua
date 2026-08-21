@@ -262,7 +262,8 @@ function Invite.RememberRole(name, role)
     end
 end
 
-function Invite.InvitePlayer(name, role)
+-- @param hasAura optional - tag the invitee as an aura carrier on assign.
+function Invite.InvitePlayer(name, role, hasAura)
     local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
     local ok, reason = CanInvite(name, db)
     if not ok then
@@ -279,7 +280,7 @@ function Invite.InvitePlayer(name, role)
     lastInviteAt[LowerName(name)] = Now()
     lastInviteGlobal = Now()
     if role and AscensionLFM.Slots and AscensionLFM.Slots.Assign then
-        AscensionLFM.Slots.Assign(name, role)
+        AscensionLFM.Slots.Assign(name, role, nil, hasAura)
         table.insert(pendingInviteVerify, {
             name = name,
             role = role,
@@ -356,10 +357,15 @@ end
 -- in TryLfgInvite, so a whisper applicant asking for dps in the last 1-2
 -- raid seats got auto-invited immediately while an LFG-chat dps applicant
 -- in the exact same situation got held back. Same policy, same code path now.
+-- "aura" is deliberately absent from both orders since v0.4.131: it stopped
+-- being a seat someone can occupy and became a tag on top of a combat role,
+-- so it can never be the answer to "which open seat should this person take".
+-- Holding the last seats for aura specifically is now handled far more
+-- precisely by Slots.HasOpenSlotFor()'s DPS reservation.
 local function FirstOpenHostRole(db, preferSupport)
-    local order = { "tank", "healer", "aura", "dps" }
+    local order = { "tank", "healer", "dps" }
     if preferSupport then
-        order = { "tank", "healer", "aura" }
+        order = { "tank", "healer" }
     end
     for _, role in ipairs(order) do
         if db.roles and db.roles[role] then
@@ -384,7 +390,11 @@ end
 --- True when the applicant asked for DPS, only 1-2 raid seats remain, an
 -- accepted support role still has room, AND a support applicant is already
 -- waiting in the queue (otherwise empty seats were wasted while nobody was
--- actually applying as tank/heal/aura).
+-- actually applying as tank/heal).
+-- "aura" is no longer counted as support here (v0.4.131): it's a tag, so a
+-- queued "aura" applicant is really a queued DPS and holding a seat for them
+-- over another DPS would be pointless. Aura coverage is protected by
+-- Slots.HasOpenSlotFor()'s reservation instead.
 local function QueueHasPendingSupport()
     if not (AscensionLFM.Queue and AscensionLFM.Queue.Recent) then
         return false
@@ -394,11 +404,11 @@ local function QueueHasPendingSupport()
         local st = tostring(q.status or "")
         if st == "pending" or st == "blocked" then
             local r = q.role
-            if r == "tank" or r == "healer" or r == "aura" then
+            if r == "tank" or r == "healer" then
                 return true
             end
             local lab = tostring(q.roleLabel or "")
-            if lab:find("tank", 1, true) or lab:find("heal", 1, true) or lab:find("aura", 1, true) then
+            if lab:find("tank", 1, true) or lab:find("heal", 1, true) then
                 return true
             end
         end
@@ -486,9 +496,12 @@ function Invite.TryHostInvite(sender, message, retryAttempts)
     end
     -- Queue + sound even when auto-invite is off (manual Queue actions)
     local parsed = AscensionLFM.Parser.Parse(message)
-    local role = parsed and AscensionLFM.Parser.RequestedRole(parsed) or nil
+    local role, hasAura
+    if parsed then
+        role, hasAura = AscensionLFM.Parser.RequestedRole(parsed)
+    end
     if not role and AscensionLFM.Parser.GuessRole then
-        role = AscensionLFM.Parser.GuessRole(message)
+        role, hasAura = AscensionLFM.Parser.GuessRole(message)
     end
 
     PlayApplicantSound(db)
@@ -539,16 +552,17 @@ function Invite.TryHostInvite(sender, message, retryAttempts)
         AfterHostResult(sender, message, role, false, "role filtered")
         return false, "role filtered"
     end
-    if AscensionLFM.Slots and AscensionLFM.Slots.HasOpenSlot then
-        if not AscensionLFM.Slots.HasOpenSlot(role) then
-            -- Dual-role fallback: "dps with aura" / "got aura dps" when DPS is
-            -- full but an offered support role still has a seat.
+    if AscensionLFM.Slots and AscensionLFM.Slots.HasOpenSlotFor then
+        if not AscensionLFM.Slots.HasOpenSlotFor(role, hasAura) then
+            -- Dual-role fallback: someone who offered e.g. both tank and dps
+            -- can still get in via the other seat when their first choice is
+            -- full. Only real seats are candidates - "aura" isn't one.
             local alt = nil
             local offered = AscensionLFM.Parser and AscensionLFM.Parser.OfferedRoles
                 and AscensionLFM.Parser.OfferedRoles(message) or {}
-            for _, r in ipairs({ "tank", "healer", "aura", "dps" }) do
+            for _, r in ipairs({ "tank", "healer", "dps" }) do
                 if r ~= role and offered[r] and db.roles and db.roles[r]
-                    and AscensionLFM.Slots.HasOpenSlot(r) then
+                    and AscensionLFM.Slots.HasOpenSlotFor(r, hasAura) then
                     alt = r
                     break
                 end
@@ -561,8 +575,16 @@ function Invite.TryHostInvite(sender, message, retryAttempts)
                 end
                 role = alt
             else
-                AfterHostResult(sender, message, role, false, "slot full")
-                return false, "slot full"
+                -- Distinguish "no seat at all" from "seat held open for an
+                -- aura carrier", so the host (and the reject reply) can tell
+                -- why a plain DPS got turned away at e.g. 4/7 DPS.
+                local why = "slot full"
+                if role == "dps" and not hasAura and AscensionLFM.Slots.HasOpenSlot
+                    and AscensionLFM.Slots.HasOpenSlot("dps") then
+                    why = "dps seat reserved for aura"
+                end
+                AfterHostResult(sender, message, role, false, why)
+                return false, why
             end
         end
     end
@@ -576,7 +598,7 @@ function Invite.TryHostInvite(sender, message, retryAttempts)
     -- tested hosting flow (a private reply to your LFM) - so the correct fix
     -- is to drop the dead gate rather than start enforcing it. Any recognized
     -- role is accepted here, matching the behavior this always actually had.
-    local ok, reason = Invite.InvitePlayer(sender, role)
+    local ok, reason = Invite.InvitePlayer(sender, role, hasAura)
     AfterHostResult(sender, message, role, ok, reason)
     if not ok and (reason == "global cooldown" or reason == "per-name cooldown") then
         ScheduleRetry("whisper", sender, message, Now(), retryAttempts)
@@ -584,8 +606,9 @@ function Invite.TryHostInvite(sender, message, retryAttempts)
     return ok, reason
 end
 
+-- Combat seats only - "aura" is a tag, not something to seat someone into.
 local function FirstOpenAcceptedRole(db, parsed)
-    local order = { "tank", "healer", "aura", "dps" }
+    local order = { "tank", "healer", "dps" }
     for _, role in ipairs(order) do
         if db.roles and db.roles[role] then
             local info = parsed and parsed.roles and parsed.roles[role]
@@ -665,7 +688,10 @@ function Invite.TryLfgInvite(leader, message, parsed, retryAttempts)
         return false, "not lfg"
     end
 
-    local role = AscensionLFM.Parser and AscensionLFM.Parser.RequestedRole and AscensionLFM.Parser.RequestedRole(parsed)
+    local role, hasAura
+    if AscensionLFM.Parser and AscensionLFM.Parser.RequestedRole then
+        role, hasAura = AscensionLFM.Parser.RequestedRole(parsed)
+    end
     if parsed.genericNeed and not db.lfgInviteWithoutRole then
         role = nil
     elseif not role then
@@ -677,11 +703,19 @@ function Invite.TryLfgInvite(leader, message, parsed, retryAttempts)
         end
     end
     if not role then
-        local guess = AscensionLFM.Parser and AscensionLFM.Parser.GuessRole
-            and AscensionLFM.Parser.GuessRole(message)
+        local guess, guessAura
+        if AscensionLFM.Parser and AscensionLFM.Parser.GuessRole then
+            guess, guessAura = AscensionLFM.Parser.GuessRole(message)
+        end
         if guess then
             role = guess
+            hasAura = hasAura or guessAura
         end
+    end
+    -- A seat resolved by fallback (FirstOpenAcceptedRole/FirstOpenHostRole)
+    -- carries no aura info, so read the tag straight off the post text.
+    if hasAura == nil and AscensionLFM.Parser and AscensionLFM.Parser.OfferedRoles then
+        hasAura = AscensionLFM.Parser.OfferedRoles(message).aura and true or false
     end
     if not role then
         if AscensionLFM.Queue and AscensionLFM.Queue.Push then
@@ -701,14 +735,14 @@ function Invite.TryLfgInvite(leader, message, parsed, retryAttempts)
         AfterHostResult(leader, message, role, false, "role filtered")
         return false, "role filtered"
     end
-    if AscensionLFM.Slots and AscensionLFM.Slots.HasOpenSlot then
-        if not AscensionLFM.Slots.HasOpenSlot(role) then
+    if AscensionLFM.Slots and AscensionLFM.Slots.HasOpenSlotFor then
+        if not AscensionLFM.Slots.HasOpenSlotFor(role, hasAura) then
             local alt = nil
             local offered = AscensionLFM.Parser and AscensionLFM.Parser.OfferedRoles
                 and AscensionLFM.Parser.OfferedRoles(message) or {}
-            for _, r in ipairs({ "tank", "healer", "aura", "dps" }) do
+            for _, r in ipairs({ "tank", "healer", "dps" }) do
                 if r ~= role and offered[r] and db.roles and db.roles[r]
-                    and AscensionLFM.Slots.HasOpenSlot(r) then
+                    and AscensionLFM.Slots.HasOpenSlotFor(r, hasAura) then
                     alt = r
                     break
                 end
@@ -716,14 +750,19 @@ function Invite.TryLfgInvite(leader, message, parsed, retryAttempts)
             if alt then
                 role = alt
             else
-                AfterHostResult(leader, message, role, false, "slot full")
-                return false, "slot full"
+                local why = "slot full"
+                if role == "dps" and not hasAura and AscensionLFM.Slots.HasOpenSlot
+                    and AscensionLFM.Slots.HasOpenSlot("dps") then
+                    why = "dps seat reserved for aura"
+                end
+                AfterHostResult(leader, message, role, false, why)
+                return false, why
             end
         end
     end
 
     PlayApplicantSound(db)
-    local ok, reason = Invite.InvitePlayer(leader, role)
+    local ok, reason = Invite.InvitePlayer(leader, role, hasAura)
     AfterHostResult(leader, message, role, ok, reason)
     if not ok and (reason == "global cooldown" or reason == "per-name cooldown") then
         ScheduleRetry("lfg", leader, message, Now(), retryAttempts)

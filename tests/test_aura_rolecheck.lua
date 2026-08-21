@@ -122,7 +122,10 @@ end
 _G.SwapRaidSubgroup = function() end
 
 local db = AscensionLFM.Database.Get()
-db.assignedRoles = { keep = "aura", moveme = "aura", other = "dps" }
+-- v0.4.131: aura is a tag in db.auraFlags, not a value in db.assignedRoles.
+-- Keep/MoveMe are DPS who both carry an aura and both sit in group 1.
+db.assignedRoles = { keep = "dps", moveme = "dps", other = "dps" }
+db.auraFlags = { keep = true, moveme = true }
 db.autoMoveAura = true
 AB._ResetForTests()
 _G.GetTime = function() return 5000 end
@@ -234,7 +237,9 @@ _G.SetRaidSubgroup = function(i, to)
 end
 _G.SwapRaidSubgroup = function() end
 local db2 = AscensionLFM.Database.Get()
-db2.assignedRoles = { t1 = "tank", t2 = "tank", h1 = "healer", h2 = "healer", a1 = "aura", a2 = "aura" }
+-- A1/A2 are aura-carrying DPS (v0.4.131 tag model), both in group 3.
+db2.assignedRoles = { t1 = "tank", t2 = "tank", h1 = "healer", h2 = "healer", a1 = "dps", a2 = "dps" }
+db2.auraFlags = { a1 = true, a2 = true }
 db2.autoMoveTank = true
 db2.autoMoveHealer = true
 db2.autoMoveAura = true
@@ -292,7 +297,8 @@ _G.SetRaidSubgroup = function(i, to)
 end
 _G.SwapRaidSubgroup = function() end
 local db5 = AscensionLFM.Database.Get()
-db5.assignedRoles = { t1 = "tank", t2 = "tank", a1 = "aura", a2 = "aura" }
+db5.assignedRoles = { t1 = "tank", t2 = "tank", a1 = "dps", a2 = "dps" }
+db5.auraFlags = { a1 = true, a2 = true }
 db5.autoMoveTank = true
 db5.autoMoveHealer = true
 db5.autoMoveAura = true
@@ -436,7 +442,8 @@ _G.SetRaidSubgroup = function(i, to)
 end
 _G.SwapRaidSubgroup = function() end
 local dbSort = AscensionLFM.Database.Get()
-dbSort.assignedRoles = { t1 = "tank", t2 = "tank", h1 = "healer", h2 = "healer", a1 = "aura", a2 = "aura" }
+dbSort.assignedRoles = { t1 = "tank", t2 = "tank", h1 = "healer", h2 = "healer", a1 = "dps", a2 = "dps" }
+dbSort.auraFlags = { a1 = true, a2 = true }
 dbSort.autoMoveTank = true
 dbSort.autoMoveHealer = true
 dbSort.autoMoveAura = true
@@ -456,3 +463,57 @@ local movedSync2 = AB.SortGroupsNow()
 check("SortGroupsNow settles (no more moves needed on a second call)", movedSync2 == 0, tostring(movedSync2))
 
 print("SortGroupsNow tests passed")
+
+--------------------------------------------------------------------
+-- New (v0.4.131): DUAL-ROLE members. Aura is a tag now, so one person can
+-- be matched by BOTH the tank pass (groups 1-2) and the aura pass (groups
+-- 1-3) - structurally impossible under the old exclusive model. The tank
+-- pass places them first; the aura pass must then move the OTHER aura in
+-- that group rather than undoing the tank's placement, and the whole thing
+-- must settle instead of oscillating.
+--------------------------------------------------------------------
+AB._ResetForTests()
+-- Index order matters: the tank-with-aura is deliberately placed AFTER the
+-- plain aura dps. Plain index ordering would keep DpsAura (index 1) and
+-- evict TankAura, undoing the tank pass's placement - only the protected-
+-- role priority in keepsSlot() gets this right, so this fixture actually
+-- exercises the guard instead of passing by luck.
+local rosterDual = {
+    { name = "DpsAura", sub = 1 },  -- plain dps who also carries an aura
+    { name = "TankAura", sub = 1 }, -- tank AND aura carrier
+    { name = "Filler", sub = 1 },
+}
+_G.GetNumRaidMembers = function() return #rosterDual end
+_G.GetRaidRosterInfo = function(i)
+    local r = rosterDual[i]
+    if not r then return end
+    return r.name, nil, r.sub
+end
+local setCallsDual = {}
+_G.SetRaidSubgroup = function(i, to)
+    local r = rosterDual[i]
+    table.insert(setCallsDual, { name = r and r.name, to = to })
+    if r then r.sub = to end
+end
+_G.SwapRaidSubgroup = function() end
+local dbDual = AscensionLFM.Database.Get()
+dbDual.assignedRoles = { tankaura = "tank", dpsaura = "dps", filler = "dps" }
+dbDual.auraFlags = { tankaura = true, dpsaura = true }
+dbDual.autoMoveTank = true
+dbDual.autoMoveHealer = true
+dbDual.autoMoveAura = true
+_G.GetTime = function() return 11000 end
+
+local movedDual = AB.SortGroupsNow()
+check("dual-role sort applies at least one move", movedDual >= 1, tostring(movedDual))
+check("the tank-with-aura KEEPS group 1 (tank pass wins, aura pass yields)",
+    rosterDual[2].sub == 1, tostring(rosterDual[2].sub))
+check("the plain aura dps is the one moved out", rosterDual[1].sub ~= 1,
+    tostring(rosterDual[1].sub))
+check("moved aura dps lands inside the aura-allowed groups 1-3",
+    rosterDual[1].sub >= 1 and rosterDual[1].sub <= 3, tostring(rosterDual[1].sub))
+
+local movedDual2 = AB.SortGroupsNow()
+check("dual-role sort settles instead of oscillating", movedDual2 == 0, tostring(movedDual2))
+
+print("dual-role (tag model) tests passed")

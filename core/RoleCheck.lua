@@ -129,53 +129,57 @@ end
 -- "heal" reply does). Also accepts short phrases used in raid chat during
 -- a Role Check ("tank no aura", "im dps", "dps with aura") - still refuses
 -- long free-form sentences by requiring a leading/dominant role token.
+-- @return role ("tank"/"healer"/"dps") or nil, hasAura (boolean)
+--   Since v0.4.131 a bare "a"/"aura" reply resolves to ("dps", true) - aura
+--   is a tag layered on a combat seat, not a seat of its own.
 function RoleCheck.ParseBareRoleWord(message, allowPhrases)
     local t = tostring(message or ""):lower()
     t = t:gsub("^%s+", ""):gsub("%s+$", ""):gsub("[!%?%.%,%;%:]+$", "")
     if t == "" then
-        return nil
+        return nil, false
     end
     -- Reject raid banter that only talks ABOUT aura/roles
     if IsRoleBanterText(t) then
-        return nil
+        return nil, false
     end
     if t == "t" or t == "tank" or t == "tanks" or t == "ot" or t == "mt" or t == "tanj" or t == "tnk" then
-        return "tank"
+        return "tank", false
     end
     if t == "h" or t == "heal" or t == "heals" or t == "healer" or t == "healers" or t == "heiler" or t == "hps" then
-        return "healer"
+        return "healer", false
     end
     if t == "a" or t == "aura" or t == "auras" then
-        return "aura"
+        return "dps", true
     end
     if t == "d" or t == "dps" or t == "dd" or t == "damage" or t == "dmg" then
-        return "dps"
+        return "dps", false
     end
     -- Phrases only during active Role Check (allowPhrases), still short
     if allowPhrases and #t <= 28 and AscensionLFM.Parser and AscensionLFM.Parser.GuessRole then
-        local role = AscensionLFM.Parser.GuessRole(t)
+        local role, hasAura = AscensionLFM.Parser.GuessRole(t)
         if role then
-            return role
+            return role, hasAura and true or false
         end
     end
-    return nil
+    return nil, false
 end
 
+-- @return role, hasAura - see ParseBareRoleWord.
 function RoleCheck.ParseWhisperRole(message)
     -- GuessRole first so "dps no aura" / "tank without aura" win over the
     -- multi-keyword path that used to prefer aura whenever the word appeared.
     if AscensionLFM.Parser and AscensionLFM.Parser.GuessRole then
-        local role = AscensionLFM.Parser.GuessRole(message)
+        local role, hasAura = AscensionLFM.Parser.GuessRole(message)
         if role then
-            return role
+            return role, hasAura and true or false
         end
     end
     if AscensionLFM.Parser and AscensionLFM.Parser.Parse then
         local parsed = AscensionLFM.Parser.Parse(message)
         if parsed and AscensionLFM.Parser.RequestedRole then
-            local role = AscensionLFM.Parser.RequestedRole(parsed)
+            local role, hasAura = AscensionLFM.Parser.RequestedRole(parsed)
             if role then
-                return role
+                return role, hasAura and true or false
             end
         end
     end
@@ -461,13 +465,19 @@ function RoleCheck.Resync()
         -- timestamps in the same tick.
         local prevAssignedAt = AscensionLFM.Slots and AscensionLFM.Slots.SnapshotAssignedAt
             and AscensionLFM.Slots.SnapshotAssignedAt()
+        -- Aura tags must be carried across the ClearAll() the same way the
+        -- assignedAt timestamps are, or every Role Check silently wipes the
+        -- whole raid's aura coverage (v0.4.131).
+        local prevAura = AscensionLFM.Slots and AscensionLFM.Slots.SnapshotAuraFlags
+            and AscensionLFM.Slots.SnapshotAuraFlags() or {}
         if AscensionLFM.Slots and AscensionLFM.Slots.ClearAll then
             AscensionLFM.Slots.ClearAll()
         end
         for name, role in pairs(newMap) do
             if AscensionLFM.Slots and AscensionLFM.Slots.Assign then
-                local prevT = prevAssignedAt and prevAssignedAt[LowerName(name)]
-                AscensionLFM.Slots.Assign(name, role, prevT)
+                local key = LowerName(name)
+                local prevT = prevAssignedAt and prevAssignedAt[key]
+                AscensionLFM.Slots.Assign(name, role, prevT, prevAura[key])
             end
         end
     else
@@ -621,9 +631,9 @@ function RoleCheck.HandleWhisper(sender, message)
     if not IsGroupMember(sender) then
         return false
     end
-    local role = RoleCheck.ParseBareRoleWord(message, true)
+    local role, hasAura = RoleCheck.ParseBareRoleWord(message, true)
     if not role then
-        role = RoleCheck.ParseWhisperRole(message)
+        role, hasAura = RoleCheck.ParseWhisperRole(message)
     end
     if role then
         local tl = tostring(message or ""):lower()
@@ -638,10 +648,11 @@ function RoleCheck.HandleWhisper(sender, message)
     responses[LowerName(sender)] = role
     lastReplyAt = Now()
     if AscensionLFM.Slots and AscensionLFM.Slots.Assign then
-        AscensionLFM.Slots.Assign(sender, role)
+        AscensionLFM.Slots.Assign(sender, role, nil, hasAura)
     end
     if AscensionLFM.Print then
-        AscensionLFM.Print("Role Check: " .. tostring(sender) .. " -> " .. role)
+        AscensionLFM.Print("Role Check: " .. tostring(sender) .. " -> " .. role
+            .. (hasAura and " (+aura)" or ""))
     end
     -- Only ack when role is new or changed so we don't spam on repeats.
     if prev ~= role then
@@ -665,7 +676,7 @@ function RoleCheck.HandlePassiveGroupChat(sender, message)
     if not IsGroupMember(sender) then
         return false
     end
-    local role = RoleCheck.ParseBareRoleWord(message)
+    local role, hasAura = RoleCheck.ParseBareRoleWord(message)
     if not role then
         return false
     end
@@ -673,10 +684,11 @@ function RoleCheck.HandlePassiveGroupChat(sender, message)
     responses[LowerName(sender)] = role
     lastReplyAt = Now()
     if AscensionLFM.Slots and AscensionLFM.Slots.Assign then
-        AscensionLFM.Slots.Assign(sender, role)
+        AscensionLFM.Slots.Assign(sender, role, nil, hasAura)
     end
     if AscensionLFM.Print then
-        AscensionLFM.Print("Role Check: " .. tostring(sender) .. " -> " .. role .. " (raid chat)")
+        AscensionLFM.Print("Role Check: " .. tostring(sender) .. " -> " .. role
+            .. (hasAura and " (+aura)" or "") .. " (raid chat)")
     end
     if prev ~= role then
         AckRoleToPlayer(sender, role, "raid chat")

@@ -66,7 +66,11 @@ Invite._ResetCooldowns()
 invited = {}
 ok = Invite.TryHostInvite("Ann", "aura ready")
 check("aura accepted when role enabled", ok == true)
-check("aura assigned", Slots.GetAssigned("Ann") == "aura")
+-- v0.4.131: aura is a tag, not a seat - an aura-only signup takes a DPS
+-- seat and carries the tag, instead of occupying an "aura slot".
+check("aura-only signup seats as dps", Slots.GetAssigned("Ann") == "dps",
+    tostring(Slots.GetAssigned("Ann")))
+check("aura-only signup gets the aura tag", Slots.HasAura("Ann") == true)
 
 Invite._ResetCooldowns()
 invited = {}
@@ -112,7 +116,9 @@ Invite._ResetCooldowns()
 invited = {}
 ok = Invite.TryHostInvite("AuraGuy", "Aura of Exp")
 check("Aura of Exp invite", ok == true)
-check("Aura of Exp role", Slots.GetAssigned("AuraGuy") == "aura")
+check("Aura of Exp seats as dps", Slots.GetAssigned("AuraGuy") == "dps",
+    tostring(Slots.GetAssigned("AuraGuy")))
+check("Aura of Exp gets the aura tag", Slots.HasAura("AuraGuy") == true)
 
 -- No role = no blind invite
 Invite._ResetCooldowns()
