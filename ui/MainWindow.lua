@@ -468,7 +468,7 @@ function MainWindow.RefreshKicks()
                     fs:SetText(string.format("|cfff5ebd1%s|r - |cffff6b52%s|r",
                         tostring(k.name or "?"), tostring(reason)))
                 else
-                    fs:SetText(string.format("|cfff5ebd1%s|r at level |cffff6b52%s|r",
+                    fs:SetText(string.format("|cfff5ebd1%s|r auf Stufe |cffff6b52%s|r",
                         tostring(k.name or "?"), tostring(k.level or "?")))
                 end
                 fs:Show()
@@ -737,7 +737,7 @@ local function SyncWidgetsFromDB()
     end
     if presetLabelFS then
         local names = AscensionLFM.Presets and AscensionLFM.Presets.List and AscensionLFM.Presets.List() or {}
-        presetLabelFS:SetText("Presets: " .. table.concat(names, ", "))
+        presetLabelFS:SetText("Vorlagen: " .. table.concat(names, ", "))
     end
     SyncSlotEdits()
     RefreshStatus()
@@ -1007,26 +1007,17 @@ function MainWindow.Init()
         })
     end
 
-    local titleBg = CreateFrame("Frame", nil, frame)
-    titleBg:SetPoint("TOP", frame, "TOP", 0, -2)
-    titleBg:SetSize(280, 34)
-    if titleBg.SetFrameLevel and frame.GetFrameLevel then
-        titleBg:SetFrameLevel((frame:GetFrameLevel() or 0) + 22)
-    end
-    if titleBg.SetBackdrop then
-        titleBg:SetBackdrop(nil)
-    end
-
     local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:ClearAllPoints()
-    title:SetParent(titleBg)
-    title:SetDrawLayer("OVERLAY")
-    title:SetPoint("TOP", titleBg, "TOP", 0, -6)
     title:SetText("AscensionLFM")
 
-    local sub = titleBg:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    sub:SetPoint("TOP", title, "BOTTOM", 0, -2)
+    local sub = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     sub:SetText("Manastorm Level-Run LFM/LFG · v" .. tostring(AscensionLFM.VERSION or "?"))
+
+    if not (AscensionLFM.Chrome and AscensionLFM.Chrome.AnchorDialogTitle
+        and AscensionLFM.Chrome.AnchorDialogTitle(frame, title, sub)) then
+        title:SetPoint("TOP", frame, "TOP", 0, -18)
+        sub:SetPoint("TOP", title, "BOTTOM", 0, -2)
+    end
 
     local shell = CreateFrame("Frame", FRAME_NAME .. "Shell", frame)
     shell:SetPoint("TOPLEFT", frame, "TOPLEFT", 16, -54)
@@ -1713,7 +1704,7 @@ function MainWindow.Init()
     local rtY = hy - TOGGLE_ROW_H - 12
     local rtLbl = hosting:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     rtLbl:SetPoint("TOPLEFT", 4, rtY)
-    rtLbl:SetText("Reject tmpl")
+    rtLbl:SetText("Ablehnungs-Vorlage")
     SetInk(rtLbl, INK)
     local rtEdit = CreateStyledEditBox( "AscensionLFMRejectTmpl", hosting, "InputBoxTemplate")
     rtEdit:SetSize(320, 18)
@@ -1739,7 +1730,7 @@ function MainWindow.Init()
         end)
 
     local presetSecY = hy - TOGGLE_ROW_H - 16
-    CreateSectionLabel(hosting, "Presets", presetSecY)
+    CreateSectionLabel(hosting, "Vorlagen", presetSecY)
     local presetRow = CreateFrame("Frame", nil, hosting)
     presetRow:SetPoint("TOPLEFT", 0, presetSecY - 18)
     presetRow:SetPoint("TOPRIGHT", 0, presetSecY - 18)
@@ -1767,12 +1758,12 @@ function MainWindow.Init()
     pName:SetPoint("LEFT", loadSmall, "RIGHT", 8, 0)
     pName:SetAutoFocus(false)
     pName:SetMaxLetters(24)
-    pName:SetText("My MS")
+    pName:SetText("Mein MS")
     local pSave = CreateFrame("Button", nil, presetRow, "UIPanelButtonTemplate")
     if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(pSave) end
     pSave:SetSize(50, 20)
     pSave:SetPoint("LEFT", pName, "RIGHT", 4, 0)
-    pSave:SetText("Save")
+    pSave:SetText("Speichern")
     pSave:SetScript("OnClick", function()
         if AscensionLFM.Presets then AscensionLFM.Presets.Save(pName:GetText()) end
         SyncWidgetsFromDB()
@@ -1792,7 +1783,7 @@ function MainWindow.Init()
 
     local maxLabel = slotRow:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     maxLabel:SetPoint("LEFT", 4, 0)
-    maxLabel:SetText("Max size")
+    maxLabel:SetText("Max. Groesse")
     SetInk(maxLabel, INK)
 
     local maxEdit = CreateStyledEditBox( "AscensionLFMMaxPartyEdit", slotRow, "InputBoxTemplate")
@@ -1892,7 +1883,7 @@ function MainWindow.Init()
     local rcFieldsY = rcY - 18 - TOGGLE_STEP * 4 - TOGGLE_ROW_H - 12
     local rcMsgLbl = hosting:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     rcMsgLbl:SetPoint("TOPLEFT", 4, rcFieldsY)
-    rcMsgLbl:SetText("RW message")
+    rcMsgLbl:SetText("RW-Nachricht")
     SetInk(rcMsgLbl, INK)
     local rcMsg = CreateStyledEditBox( "AscensionLFMRoleCheckMsg", hosting, "InputBoxTemplate")
     rcMsg:SetSize(340, 18)
@@ -1910,7 +1901,7 @@ function MainWindow.Init()
 
     local rcWinLbl = hosting:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     rcWinLbl:SetPoint("TOPLEFT", 4, rcFieldsY - 26)
-    rcWinLbl:SetText("Window (sec)")
+    rcWinLbl:SetText("Fenster (Sek.)")
     SetInk(rcWinLbl, INK)
     local rcWin = CreateStyledEditBox( "AscensionLFMRoleCheckWindow", hosting, "InputBoxTemplate")
     rcWin:SetSize(40, 18)
@@ -1962,7 +1953,7 @@ function MainWindow.Init()
     if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(resyncBtn) end
     resyncBtn:SetSize(130, 22)
     resyncBtn:SetPoint("LEFT", rwBtn, "RIGHT", 6, 0)
-    resyncBtn:SetText("Resync roles now")
+    resyncBtn:SetText("Rollen jetzt syncen")
     resyncBtn:SetScript("OnClick", function()
         if AscensionLFM.RoleCheck and AscensionLFM.RoleCheck.ResyncNow then
             AscensionLFM.RoleCheck.ResyncNow()
@@ -2050,7 +2041,7 @@ function MainWindow.Init()
 
     local chNameLbl = post:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     chNameLbl:SetPoint("TOPLEFT", 4, -136)
-    chNameLbl:SetText("Channel name")
+    chNameLbl:SetText("Kanalname")
     SetInk(chNameLbl, INK)
 
     local chNameEdit = CreateStyledEditBox( "AscensionLFMPostChannelName", post, "InputBoxTemplate")
@@ -2076,7 +2067,7 @@ function MainWindow.Init()
     if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(rebuildBtn) end
     rebuildBtn:SetSize(110, 22)
     rebuildBtn:SetPoint("LEFT", 0, 0)
-    rebuildBtn:SetText("Rebuild")
+    rebuildBtn:SetText("Neu bauen")
     rebuildBtn:SetScript("OnClick", function()
         if AscensionLFM.Poster and AscensionLFM.Poster.RefreshMessage then
             AscensionLFM.Poster.RefreshMessage()
@@ -2088,7 +2079,7 @@ function MainWindow.Init()
     if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(scanBtn) end
     scanBtn:SetSize(120, 22)
     scanBtn:SetPoint("LEFT", rebuildBtn, "RIGHT", 6, 0)
-    scanBtn:SetText("Scan raid/party")
+    scanBtn:SetText("Raid/Gruppe scannen")
     scanBtn:SetScript("OnClick", function()
         local unassigned = 0
         if AscensionLFM.Slots and AscensionLFM.Slots.ScanRaid then
@@ -2113,7 +2104,7 @@ function MainWindow.Init()
     if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(postBtn) end
     postBtn:SetSize(90, 22)
     postBtn:SetPoint("LEFT", scanBtn, "RIGHT", 6, 0)
-    postBtn:SetText("Post once")
+    postBtn:SetText("Einmal posten")
     postBtn:SetScript("OnClick", function()
         local msg = postPreviewEdit and postPreviewEdit.GetText and postPreviewEdit:GetText() or ""
         local db = AscensionLFM.Database.Get()
@@ -2149,7 +2140,7 @@ function MainWindow.Init()
     if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(postResyncBtn) end
     postResyncBtn:SetSize(130, 22)
     postResyncBtn:SetPoint("LEFT", postRwBtn, "RIGHT", 6, 0)
-    postResyncBtn:SetText("Resync roles now")
+    postResyncBtn:SetText("Rollen jetzt syncen")
     postResyncBtn:SetScript("OnClick", function()
         if AscensionLFM.RoleCheck and AscensionLFM.RoleCheck.ResyncNow then
             AscensionLFM.RoleCheck.ResyncNow()
@@ -2170,8 +2161,8 @@ function MainWindow.Init()
 
     CreateSectionLabel(post, "Auto-Repost", -250)
     widgets.autoRepost = CreateToggleRow(post, -268,
-        "Enable auto-repost (Hosting only)",
-        "Rebuild LFM from slots each tick. Stops when full or disabled. Default OFF.",
+        "Auto-Repost aktivieren (nur Hosten)",
+        "LFM aus Slots bei jedem Tick neu bauen. Stoppt wenn voll oder aus. Standard aus.",
         false,
         function(on)
             local db = AscensionLFM.Database.Get()
@@ -2182,15 +2173,15 @@ function MainWindow.Init()
             MainWindow.RefreshPost()
         end)
     widgets.announceFull = CreateToggleRow(post, -268 - TOGGLE_STEP,
-        "Announce FULL when stopping",
-        "Optional one public FULL line when auto-repost stops. Default OFF.",
+        "FULL melden beim Stoppen",
+        "Optionale oeffentliche FULL-Zeile wenn Auto-Repost stoppt. Standard aus.",
         false,
         function(on)
             AscensionLFM.Database.Get().announceFull = on and true or false
         end)
     widgets.postShowAllRoles = CreateToggleRow(post, -268 - TOGGLE_STEP * 2,
-        "LFM shows filled roles too",
-        "Post e.g. 2/2 Tanks | 1/3 Healers instead of only open slots. Default OFF.",
+        "LFM zeigt belegte Rollen mit",
+        "Postet z. B. 2/2 Tanks | 1/3 Healer statt nur freie Slots. Standard aus.",
         false,
         function(on)
             local db = AscensionLFM.Database.Get()
@@ -2206,7 +2197,7 @@ function MainWindow.Init()
 
     local intLbl = post:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     intLbl:SetPoint("TOPLEFT", 4, intY)
-    intLbl:SetText("Interval (sec, min 30)")
+    intLbl:SetText("Intervall (Sek., min. 30)")
     SetInk(intLbl, INK)
 
     local intEdit = CreateStyledEditBox( "AscensionLFMRepostInterval", post, "InputBoxTemplate")
@@ -2262,7 +2253,7 @@ function MainWindow.Init()
     qHint:SetPoint("TOPLEFT", 4, -20)
     qHint:SetPoint("RIGHT", -4, 0)
     qHint:SetJustifyH("LEFT")
-    qHint:SetText("Hosting whispers land here. Invite uses InviteUnit; Reject sends re-whisper once.")
+    qHint:SetText("Hosten-Whispers landen hier. Einladen nutzt InviteUnit; Ablehnen sendet einmal Whisper zurueck.")
     SetInk(qHint, MUTED)
 
     local qy = -44
@@ -2296,7 +2287,7 @@ function MainWindow.Init()
     if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(inv) end
         inv:SetSize(64, 20)
         inv:SetPoint("TOPRIGHT", -8, -6)
-        inv:SetText("Invite")
+        inv:SetText("Einladen")
         inv:SetScript("OnClick", function()
             if row.name and AscensionLFM.Queue then
                 AscensionLFM.Queue.Invite(row.name)
@@ -2308,7 +2299,7 @@ function MainWindow.Init()
     if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(rej) end
         rej:SetSize(110, 20)
         rej:SetPoint("TOPRIGHT", -8, -28)
-        rej:SetText("Reject+whisp")
+        rej:SetText("Ablehnen+Whisp")
         rej:SetScript("OnClick", function()
             if row.name and AscensionLFM.Queue then
                 AscensionLFM.Queue.Reject(row.name)
@@ -2338,7 +2329,7 @@ function MainWindow.Init()
     if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(favAdd) end
     favAdd:SetSize(50, 20)
     favAdd:SetPoint("LEFT", favEdit, "RIGHT", 4, 0)
-    favAdd:SetText("Add")
+    favAdd:SetText("Hinzufuegen")
     favAdd:SetScript("OnClick", function()
         local name = favEdit:GetText() or ""
         if AscensionLFM.Database.AddFavoriteApplicant(name) then
@@ -2351,7 +2342,7 @@ function MainWindow.Init()
     if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(favRem) end
     favRem:SetSize(64, 20)
     favRem:SetPoint("LEFT", favAdd, "RIGHT", 4, 0)
-    favRem:SetText("Remove")
+    favRem:SetText("Entfernen")
     favRem:SetScript("OnClick", function()
         local name = favEdit:GetText() or ""
         AscensionLFM.Database.RemoveFavoriteApplicant(name)
@@ -2375,14 +2366,14 @@ function MainWindow.Init()
     rosterHint:SetJustifyH("LEFT")
     if rosterHint.SetWordWrap then rosterHint:SetWordWrap(true) end
     if rosterHint.SetHeight then rosterHint:SetHeight(32) end
-    rosterHint:SetText("Click role icon -> Tank/Heal/DPS + Aura toggle  |  X remove  |  gold border/+ = aura")
+    rosterHint:SetText("Rollen-Icon tippen -> Tank/Heal/DPS + Aura umschalten  |  X entfernen  |  goldener Rand/+ = Aura")
     SetInk(rosterHint, MUTED)
 
     local specBtn = CreateFrame("Button", nil, rosterBar, "UIPanelButtonTemplate")
     if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(specBtn) end
     specBtn:SetSize(88, 22)
     specBtn:SetPoint("TOPRIGHT", -8, -10)
-    specBtn:SetText("My Spec")
+    specBtn:SetText("Meine Spec")
     specBtn:SetScript("OnClick", function()
         if AscensionLFM.SpecRole and AscensionLFM.SpecRole.ApplyToSelf then
             AscensionLFM.SpecRole.ApplyToSelf()
@@ -2409,7 +2400,7 @@ function MainWindow.Init()
         note:SetPoint("TOPRIGHT", 0, -22)
         note:SetJustifyH("LEFT")
         SetInk(note, MUTED)
-        note:SetText("Switching type doesn't clear the other type's settings - your Raid preset and M+ dungeon/level are both remembered, only one is shown/tagged at a time.")
+        note:SetText("Typ wechseln loescht die anderen Einstellungen nicht — Raid-Vorlage und M+-Dungeon/Stufe bleiben gespeichert; angezeigt und getaggt wird jeweils nur einer.")
         if note.SetWordWrap then note:SetWordWrap(true) end
 
         local typeBtns = {}
@@ -2469,7 +2460,7 @@ function MainWindow.Init()
         msNote:SetAllPoints()
         msNote:SetJustifyH("LEFT")
         SetInk(msNote, INK)
-        msNote:SetText("MS (default): standard LFM post, no content tag added. Slot caps are set on the Hosting tab.")
+        msNote:SetText("MS (Standard): normaler LFM-Post ohne Inhalts-Tag. Slot-Limits setzt du unter Hosten.")
         if msNote.SetWordWrap then msNote:SetWordWrap(true) end
 
         -- Raid pane: the three size presets.
@@ -2482,7 +2473,7 @@ function MainWindow.Init()
             rNote:SetPoint("TOPRIGHT", 0, 0)
             rNote:SetJustifyH("LEFT")
             SetInk(rNote, INK)
-            rNote:SetText("Tags the LFM post [RAID]. Pick a size to set Tank/Healer/DPS seat caps plus an aura coverage target (editable individually afterward on Hosting):")
+            rNote:SetText("Markiert den LFM-Post [RAID]. Groesse waehlen setzt Tank/Healer/DPS-Slots plus Aura-Ziel (danach einzeln unter Hosten anpassbar):")
             if rNote.SetWordWrap then rNote:SetWordWrap(true) end
 
             -- tank+healer+dps must equal the raid size; the aura figure is a
@@ -2540,7 +2531,7 @@ function MainWindow.Init()
 
             local lLabel = mplusPane:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
             lLabel:SetPoint("TOPLEFT", 0, -30)
-            lLabel:SetText("Level")
+            lLabel:SetText("Stufe")
             SetInk(lLabel, MUTED)
 
             local lEdit = CreateStyledEditBox( "AscensionLFMMPlusLevel", mplusPane, "InputBoxTemplate")
@@ -2560,7 +2551,7 @@ function MainWindow.Init()
 
             local minLabel = mplusPane:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
             minLabel:SetPoint("TOPLEFT", 0, -96)
-            minLabel:SetText("Min level to show")
+            minLabel:SetText("Mindeststufe anzeigen")
             SetInk(minLabel, MUTED)
 
             local minEdit = CreateStyledEditBox( "AscensionLFMMPlusMinLevel", mplusPane, "InputBoxTemplate")
@@ -2575,7 +2566,7 @@ function MainWindow.Init()
             minHint:SetPoint("TOPLEFT", 170, -94)
             minHint:SetPoint("RIGHT", 0, 0)
             minHint:SetJustifyH("LEFT")
-            minHint:SetText("0 = off. Hides only \"[Dungeon +N]\"-tagged posts below this.")
+            minHint:SetText("0 = aus. Blendet nur \"[Dungeon +N]\"-Posts unter dieser Stufe aus.")
             SetInk(minHint, MUTED)
             if minHint.SetWordWrap then minHint:SetWordWrap(true) end
 
@@ -2604,7 +2595,7 @@ function MainWindow.Init()
                 if AscensionLFM.Poster and AscensionLFM.Poster.MPlusPrefix then
                     prefix = AscensionLFM.Poster.MPlusPrefix(dbNow.mplusDungeon, dbNow.mplusLevel)
                 end
-                preview:SetText(prefix ~= "" and ("Preview: " .. prefix .. "LFM MS ...") or "Preview: (set both fields to tag the post)")
+                preview:SetText(prefix ~= "" and ("Vorschau: " .. prefix .. "LFM MS ...") or "Vorschau: (beide Felder setzen, um den Post zu markieren)")
                 if AscensionLFM.Poster and AscensionLFM.Poster.RefreshMessage then
                     AscensionLFM.Poster.RefreshMessage()
                 end
@@ -2639,8 +2630,8 @@ function MainWindow.Init()
     local kick = BuildCategoryPage(pageHost, CAT_KICK, 300)
     CreateSectionLabel(kick, "Level-59 Auto-Kick", -4)
     widgets.autoKick = CreateToggleRow(kick, -22,
-        "Enable kick at level 59 + raid warning every 10s",
-        "Hosting/Full Auto * lead/assist * ignores self * RW then kick (deferred). /alfm status shows why. Default OFF.",
+        "Kick auf Stufe 59 + Raid-Warnung alle 10 s",
+        "Hosten/Full Auto · Lead/Assist · ignoriert dich selbst · RW, dann Kick (verzoegert). /alfm status zeigt warum. Standard aus.",
         true,
         function(on)
             AscensionLFM.Database.Get().autoKickLevel59 = on and true or false
@@ -2705,13 +2696,13 @@ function MainWindow.Init()
     if sessionSummaryFS.SetNonSpaceWrap then sessionSummaryFS:SetNonSpaceWrap(true) end
     sessionSummaryFS:SetHeight(30)
     SetInk(sessionSummaryFS, INK)
-    sessionSummaryFS:SetText("Session (0m): 0 invited, 0 rejected, 0 kicked, 0 matches, 0 posts")
+    sessionSummaryFS:SetText("Sitzung (0m): 0 eingeladen, 0 abgelehnt, 0 gekickt, 0 Matches, 0 Posts")
 
     local sessionResetBtn = CreateFrame("Button", nil, log, "UIPanelButtonTemplate")
     if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(sessionResetBtn) end
     sessionResetBtn:SetSize(96, 20)
     sessionResetBtn:SetPoint("TOPRIGHT", -4, -248)
-    sessionResetBtn:SetText("Reset session")
+    sessionResetBtn:SetText("Sitzung zuruecksetzen")
     sessionResetBtn:SetScript("OnClick", function()
         if AscensionLFM.Activity and AscensionLFM.Activity.ResetSession then
             AscensionLFM.Activity.ResetSession()

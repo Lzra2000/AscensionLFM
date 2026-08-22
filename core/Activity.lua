@@ -145,7 +145,7 @@ function Activity.FormatSessionSummary(summary)
     else
         timeStr = string.format("%dm", mins)
     end
-    local line = string.format("Session (%s): %d invited, %d rejected, %d kicked, %d matches, %d posts",
+    local line = string.format("Sitzung (%s): %d eingeladen, %d abgelehnt, %d gekickt, %d Matches, %d Posts",
         timeStr,
         tonumber(summary.invited) or 0,
         tonumber(summary.rejected) or 0,
@@ -160,7 +160,7 @@ function Activity.FormatSessionSummary(summary)
     local cleared = tonumber(summary.manastormCleared) or 0
     local failed = tonumber(summary.manastormFailed) or 0
     if cleared > 0 or failed > 0 then
-        line = line .. string.format(", %d levels cleared, %d failed", cleared, failed)
+        line = line .. string.format(", %d Stufen geschafft, %d fehlgeschlagen", cleared, failed)
     end
 
     return line

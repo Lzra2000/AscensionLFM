@@ -90,12 +90,12 @@ check("HandleFailed false on module without Push", ok == false, tostring(ok))
 local zeroSummary = { invited = 2, rejected = 0, kicked = 0, matched = 1, posted = 1,
     manastormCleared = 0, manastormFailed = 0, elapsedSeconds = 60 }
 local line = Activity.FormatSessionSummary(zeroSummary)
-check("no level stats appended when both zero", not line:find("levels cleared"), line)
+check("no level stats appended when both zero", not line:find("Stufen geschafft"), line)
 
 local nonZeroSummary = { invited = 2, rejected = 0, kicked = 0, matched = 1, posted = 1,
     manastormCleared = 3, manastormFailed = 1, elapsedSeconds = 60 }
 line = Activity.FormatSessionSummary(nonZeroSummary)
-check("level stats appended when non-zero", line:find("3 levels cleared, 1 failed") ~= nil, line)
+check("level stats appended when non-zero", line:find("3 Stufen geschafft, 1 fehlgeschlagen") ~= nil, line)
 
 --------------------------------------------------------------------
 -- WoW event wiring: the module-level `if type(CreateFrame) == "function"`

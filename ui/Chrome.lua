@@ -300,6 +300,51 @@ function Chrome.SkinActionButton(button)
     return button
 end
 
+--- Floating popup / picker: tooltip inset (Interface Options menus), not
+-- DialogBox gold or WHITE8X8 hairlines.
+function Chrome.ApplyTooltipPopup(frame)
+    if type(frame) ~= "table" or type(frame.SetBackdrop) ~= "function" then
+        return
+    end
+    if frame._alfmTooltipPopup then
+        return
+    end
+    frame._alfmTooltipPopup = true
+    frame:SetBackdrop(Chrome.INSET_FALLBACK)
+    local cr, cg, cb, ca = 0.09, 0.09, 0.11, 0.92
+    local br, bgc, bb = 0.5, 0.5, 0.5
+    if TOOLTIP_DEFAULT_BACKGROUND_COLOR then
+        cr = TOOLTIP_DEFAULT_BACKGROUND_COLOR.r or cr
+        cg = TOOLTIP_DEFAULT_BACKGROUND_COLOR.g or cg
+        cb = TOOLTIP_DEFAULT_BACKGROUND_COLOR.b or cb
+    end
+    if TOOLTIP_DEFAULT_COLOR then
+        br = TOOLTIP_DEFAULT_COLOR.r or br
+        bgc = TOOLTIP_DEFAULT_COLOR.g or bgc
+        bb = TOOLTIP_DEFAULT_COLOR.b or bb
+    end
+    if frame.SetBackdropColor then frame:SetBackdropColor(cr, cg, cb, ca) end
+    if frame.SetBackdropBorderColor then frame:SetBackdropBorderColor(br, bgc, bb, 1) end
+end
+
+--- Title + subtitle on the DialogBox header banner (RaidInfo / CallBoard).
+function Chrome.AnchorDialogTitle(frame, titleFs, subFs)
+    if type(frame) ~= "table" or type(titleFs) ~= "table" then
+        return false
+    end
+    local header = frame._alfmDialogHeader
+    if type(header) ~= "table" or type(titleFs.SetPoint) ~= "function" then
+        return false
+    end
+    titleFs:ClearAllPoints()
+    titleFs:SetPoint("TOP", header, "TOP", 0, -14)
+    if type(subFs) == "table" and subFs.SetPoint then
+        subFs:ClearAllPoints()
+        subFs:SetPoint("TOP", titleFs, "BOTTOM", 0, -2)
+    end
+    return true
+end
+
 -- ---- Debug tools ----
 local function chat(msg)
     if type(DEFAULT_CHAT_FRAME) == "table" and DEFAULT_CHAT_FRAME.AddMessage then

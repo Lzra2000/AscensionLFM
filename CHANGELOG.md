@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.141
+
+- **AscensionUI polish (UI only).** Follow-up to v0.4.140:
+  - MainWindow title/subtitle anchor on the DialogBox header banner
+    (`Chrome.AnchorDialogTitle`) — RaidInfo / CallBoard family.
+  - Floating pickers (role menu, group menu, drag ghost) use tooltip inset
+    via `Chrome.ApplyTooltipPopup` instead of DialogBox fill + WHITE8X8 hairlines.
+  - **German (du)** for remaining English chrome: Posten toggles/buttons,
+    Hosten labels, Warteschlange, Kick, LFG/LFM notes, Roster hint/tooltips,
+    Protokoll session line + reset button. Sitzungs-Zusammenfassung auf Deutsch.
+  - No protocol / slash / Safe-API change.
+
 ## 0.4.140
 
 - **AscensionUI visual bar (layout only).** Official AscensionUI / CallBoard /

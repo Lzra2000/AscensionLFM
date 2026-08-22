@@ -233,6 +233,8 @@ check("Chrome.StyleEditBox exists", type(AscensionLFM.Chrome.StyleEditBox) == "f
 check("Chrome.CreateInset exists", type(AscensionLFM.Chrome.CreateInset) == "function")
 check("Chrome.ApplyCategoryButton exists", type(AscensionLFM.Chrome.ApplyCategoryButton) == "function")
 check("Chrome.ApplyInsetShadows exists", type(AscensionLFM.Chrome.ApplyInsetShadows) == "function")
+check("Chrome.ApplyTooltipPopup exists", type(AscensionLFM.Chrome.ApplyTooltipPopup) == "function")
+check("Chrome.AnchorDialogTitle exists", type(AscensionLFM.Chrome.AnchorDialogTitle) == "function")
 check("Chrome.BUTTON_H is 22", AscensionLFM.Chrome.BUTTON_H == 22)
 check("Chrome.EDIT_INK present", type(AscensionLFM.Chrome.EDIT_INK) == "table")
 

@@ -144,21 +144,9 @@ local function EnsureRolePicker()
     f:SetHeight(5 * 28 + 16)
     f:EnableMouse(true)
     f:SetClampedToScreen(true)
-    local bgPath = (AscensionLFM.Chrome and AscensionLFM.Chrome.BackgroundPath and AscensionLFM.Chrome.BackgroundPath())
-        or "Interface\\DialogFrame\\UI-DialogBox-Background"
-    local bg = f:CreateTexture(nil, "BACKGROUND")
-    bg:SetAllPoints()
-    bg:SetTexture(bgPath)
-    bg:SetAlpha(0.97)
-    local border = f:CreateTexture(nil, "BORDER")
-    border:SetAllPoints()
-    border:SetTexture("Interface\\Buttons\\WHITE8X8")
-        border:SetVertexColor(0.50, 0.50, 0.50, 0.70)
-    local inset = f:CreateTexture(nil, "BORDER")
-    inset:SetPoint("TOPLEFT", 1, -1)
-    inset:SetPoint("BOTTOMRIGHT", -1, 1)
-    inset:SetTexture("Interface\\Buttons\\WHITE8X8")
-    inset:SetVertexColor(0.08, 0.07, 0.05, 0.90)
+    if AscensionLFM.Chrome and AscensionLFM.Chrome.ApplyTooltipPopup then
+        AscensionLFM.Chrome.ApplyTooltipPopup(f)
+    end
 
     f.rows = {}
     -- Combat seats + "none". "aura" is deliberately NOT in this list any
@@ -378,7 +366,7 @@ local function CheckPendingMove()
             AscensionLFM.Print("Roster: " .. name .. " still in Group " .. landed
                 .. " - target group may be full (5/5), or you may lack the raid rights to move them")
         else
-            AscensionLFM.Print("Roster: " .. name .. " no longer found in raid")
+            AscensionLFM.Print("Roster: " .. name .. " nicht mehr im Raid gefunden")
         end
     end
 end
@@ -405,19 +393,9 @@ local function EnsureDragGhost()
     g:SetFrameStrata("TOOLTIP")
     g:SetSize(140, 22)
     g:EnableMouse(false)
-    local bg = g:CreateTexture(nil, "BACKGROUND")
-    bg:SetAllPoints()
-    bg:SetTexture("Interface\\Buttons\\WHITE8X8")
-    bg:SetVertexColor(0.08, 0.07, 0.05, 0.92)
-    local border = g:CreateTexture(nil, "BORDER")
-    border:SetAllPoints()
-    border:SetTexture("Interface\\Buttons\\WHITE8X8")
-    border:SetVertexColor(0.50, 0.50, 0.50, 0.85)
-    local inset = g:CreateTexture(nil, "ARTWORK")
-    inset:SetPoint("TOPLEFT", 1, -1)
-    inset:SetPoint("BOTTOMRIGHT", -1, 1)
-    inset:SetTexture("Interface\\Buttons\\WHITE8X8")
-    inset:SetVertexColor(0.08, 0.07, 0.05, 0.92)
+    if AscensionLFM.Chrome and AscensionLFM.Chrome.ApplyTooltipPopup then
+        AscensionLFM.Chrome.ApplyTooltipPopup(g)
+    end
     local fs = g:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     fs:SetAllPoints()
     fs:SetJustifyH("CENTER")
@@ -552,21 +530,9 @@ local function EnsureGroupPicker()
     f:SetHeight(8 * 22 + 12)
     f:EnableMouse(true)
     f:SetClampedToScreen(true)
-    local bgPath = (AscensionLFM.Chrome and AscensionLFM.Chrome.BackgroundPath and AscensionLFM.Chrome.BackgroundPath())
-        or "Interface\\DialogFrame\\UI-DialogBox-Background"
-    local bg = f:CreateTexture(nil, "BACKGROUND")
-    bg:SetAllPoints()
-    bg:SetTexture(bgPath)
-    bg:SetAlpha(0.97)
-    local border = f:CreateTexture(nil, "BORDER")
-    border:SetAllPoints()
-    border:SetTexture("Interface\\Buttons\\WHITE8X8")
-        border:SetVertexColor(0.50, 0.50, 0.50, 0.70)
-    local inset = f:CreateTexture(nil, "BORDER")
-    inset:SetPoint("TOPLEFT", 1, -1)
-    inset:SetPoint("BOTTOMRIGHT", -1, 1)
-    inset:SetTexture("Interface\\Buttons\\WHITE8X8")
-    inset:SetVertexColor(0.08, 0.07, 0.05, 0.90)
+    if AscensionLFM.Chrome and AscensionLFM.Chrome.ApplyTooltipPopup then
+        AscensionLFM.Chrome.ApplyTooltipPopup(f)
+    end
 
     f.rows = {}
     for g = 1, 8 do
@@ -978,7 +944,7 @@ local function EnsureCards(parent)
                 if not self.memberName then return end
                 GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
                 GameTooltip:AddLine(self.memberName)
-                GameTooltip:AddLine("Click to open role menu", 0.7, 0.7, 0.7)
+                GameTooltip:AddLine("Klicken fuer Rollen-Menue", 0.7, 0.7, 0.7)
                 GameTooltip:Show()
             end)
             roleBtn:SetScript("OnLeave", function()
@@ -1015,7 +981,7 @@ local function EnsureCards(parent)
                 GameTooltip:SetOwner(self, "ANCHOR_LEFT")
                 GameTooltip:AddLine(self.memberName)
                 GameTooltip:AddLine("Kick", 0.7, 0.7, 0.7)
-                GameTooltip:AddLine("Shift+Click: kick + block from future invites (private)", 0.7, 0.7, 0.7)
+                GameTooltip:AddLine("Shift+Klick: kicken + fuer kuenftige Invites blockieren (privat)", 0.7, 0.7, 0.7)
                 GameTooltip:Show()
             end)
             kickBtn:SetScript("OnLeave", function()
@@ -1047,7 +1013,7 @@ local function EnsureCards(parent)
                 if not self.memberName then return end
                 GameTooltip:SetOwner(self, "ANCHOR_LEFT")
                 GameTooltip:AddLine(self.memberName)
-                GameTooltip:AddLine("Click to move to another group", 0.7, 0.7, 0.7)
+                GameTooltip:AddLine("Klicken zum Verschieben in andere Gruppe", 0.7, 0.7, 0.7)
                 GameTooltip:Show()
             end)
             moveBtn:SetScript("OnLeave", function()

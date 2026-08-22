@@ -2,7 +2,7 @@
 ## Title: AscensionLFM
 ## Notes: Manastorm-LFM-Helfer fuer Ascension.gg (Wildcard Levelrun)
 ## Author: Lazra
-## Version: 0.4.140
+## Version: 0.4.141
 ## SavedVariables: AscensionLFMDB
 ## DefaultState: enabled
 ## X-Website: https://ascension.gg

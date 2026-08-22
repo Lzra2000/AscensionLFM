@@ -8,7 +8,7 @@ if type(AscensionLFM) ~= "table" then
     _G.AscensionLFM = AscensionLFM
 end
 
-AscensionLFM.VERSION = "0.4.140"
+AscensionLFM.VERSION = "0.4.141"
 AscensionLFM.ADDON_NAME = "AscensionLFM"
 
 -- Safe lives in AscensionAPI.lua (loads first). Keep a late fallback if

@@ -75,18 +75,18 @@ local text = Activity.FormatSessionSummary({
     invited = 23, rejected = 4, kicked = 2, matched = 15, posted = 1, elapsedSeconds = 600,
 })
 check("format shows minutes for < 1h", text:find("10m", 1, true) ~= nil, text)
-check("format shows invited count", text:find("23 invited", 1, true) ~= nil, text)
-check("format shows rejected count", text:find("4 rejected", 1, true) ~= nil, text)
-check("format shows kicked count", text:find("2 kicked", 1, true) ~= nil, text)
-check("format shows matched count", text:find("15 matches", 1, true) ~= nil, text)
-check("format shows posted count", text:find("1 posts", 1, true) ~= nil, text)
+check("format shows invited count", text:find("23 eingeladen", 1, true) ~= nil, text)
+check("format shows rejected count", text:find("4 abgelehnt", 1, true) ~= nil, text)
+check("format shows kicked count", text:find("2 gekickt", 1, true) ~= nil, text)
+check("format shows matched count", text:find("15 Matches", 1, true) ~= nil, text)
+check("format shows posted count", text:find("1 Posts", 1, true) ~= nil, text)
 check("format uses ASCII only (no em-dash)", text:find("\226\128\148", 1, true) == nil, text)
 
 local textHours = Activity.FormatSessionSummary({ elapsedSeconds = 3725 }) -- 1h 2m 5s
 check("format shows hours when >= 1h", textHours:find("1h2m", 1, true) ~= nil, textHours)
 
 local textZero = Activity.FormatSessionSummary(nil)
-check("format is nil-safe", textZero:find("0 invited", 1, true) ~= nil, textZero)
+check("format is nil-safe", textZero:find("0 eingeladen", 1, true) ~= nil, textZero)
 
 --------------------------------------------------------------------
 -- ResetSession: clears counters and restarts the clock, leaves the
