@@ -26,6 +26,7 @@ _G.time = function() return _G._now end
 -- files with a WoW-event-driven tail (see Invite.lua/Poster.lua).
 
 dofile("core/Database.lua")
+dofile("core/AscensionAPI.lua")
 dofile("core/Activity.lua")
 dofile("core/ManastormTracker.lua")
 

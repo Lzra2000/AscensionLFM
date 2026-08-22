@@ -19,6 +19,7 @@ _G.SendChatMessage = function(msg, chan, lang, target)
 end
 
 dofile("core/Database.lua")
+dofile("core/AscensionAPI.lua")
 dofile("core/Parser.lua")
 dofile("core/Slots.lua")
 dofile("core/Activity.lua")

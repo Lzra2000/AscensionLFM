@@ -71,6 +71,9 @@ Repo: `Lzra2000/AscensionLFM`. Direct-pushes to `main`, no PR workflow.
 
 ## Module map
 
+- `core/AscensionAPI.lua` — `AscensionLFM.Safe` + read-only Manastorm/LFG
+  wrappers (`AscensionLFM.API`). Extract-verified only; see
+  `docs/NOTES-ascension-apis.md`. No `Enter`/`Leave`/`C_Wildcard` rolls.
 - `core/Database.lua` — SavedVariables schema + defaults +
   version-gated migrations (`defaultsRev`). **Never edit a historical
   migration step retroactively** - the migration chain is order-
@@ -90,10 +93,9 @@ Repo: `Lzra2000/AscensionLFM`. Direct-pushes to `main`, no PR workflow.
 - `core/Invite.lua` / `core/Poster.lua` — both have their own
   `IsHostInsideInstance()` (duplicated, not shared - matches this
   codebase's existing convention). Prefers
-  `C_Manastorm.IsInManastorm()` over the generic `IsInInstance()` when
-  available - confirmed CoA-only (absent on Bronzebeard/Epoch server
-  variants), always falls back to `IsInInstance()` if `C_Manastorm`
-  isn't a table.
+  `AscensionLFM.API.IsHostInsideInstance()` (`C_Manastorm.IsInManastorm`
+  when present) over the generic `IsInInstance()` — CoA-only API,
+  always falls back if `C_Manastorm` isn't a table.
 - `core/Kick.lua` / `ui/RosterPanel.lua` — both independently learned
   the "no Lua error ≠ it worked" lesson for `UninviteUnit`: it's
   fire-and-forget and can silently no-op (privilege, combat). Both
@@ -101,8 +103,9 @@ Repo: `Lzra2000/AscensionLFM`. Direct-pushes to `main`, no PR workflow.
 - `core/Activity.lua` — bounded rolling log + uncapped session-total
   counters, feeds the Log tab's session summary.
 - `core/ManastormTracker.lua` — feeds `MANASTORM_LEVEL_COMPLETED`/
-  `MANASTORM_FAILED` into Activity. CoA-only events, same fallback
-  posture as the instance check above.
+  `MANASTORM_FAILED` into Activity; level fallback via
+  `API.GetActiveLevel`. CoA-only events, same fallback posture as the
+  instance check above.
 - `ui/MainWindow.lua` — the big one (2300+ lines). Category-tab layout
   (`CreateSectionLabel`/`CreateToggleRow`/`BuildCategoryPage`) uses
   **symbolic constants** (`TOGGLE_STEP = 74`, `TOGGLE_ROW_H = 66`) for

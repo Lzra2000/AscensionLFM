@@ -112,13 +112,11 @@ function API.GetGroupRewardBonusPercent()
     if not id then
         return nil
     end
-    local endR, encR, groupEnd, groupEnc = API.GetRewardModifier(id)
+    local _, _, groupEnd, groupEnc = API.GetRewardModifier(id)
     local groupMulti = math.max(tonumber(groupEnd) or 1, tonumber(groupEnc) or 1)
     if groupMulti > 1 then
         return (groupMulti - 1) * 100
     end
-    -- Silence unused base rewards (always ~1.0 noise for LFM).
-    endR, encR = endR, encR
     return nil
 end
 
@@ -256,6 +254,40 @@ function API.IsHostInsideInstance()
     end
     local inInstance = Safe(_G.IsInInstance)
     return inInstance and true or false
+end
+
+--- Average item level for a unit token.
+-- Ascension native (extract): UnitAverageItemLevel(unit) — used by
+-- PaperDollFrame_SetItemLevel and CallBoardRender. C_Player:GetAverageItemLevel
+-- and GetAverageItemLevel() are thin player-only wrappers around the same.
+-- Returns nil when the API is missing, errors, or reports <= 0 (no invent).
+-- Chat LFM leaders / whisper applicants without a unit token cannot be read.
+function API.GetAverageItemLevel(unit)
+    unit = unit or "player"
+    local fn = _G.UnitAverageItemLevel
+    if type(fn) == "function" then
+        local v = tonumber(Safe(fn, unit))
+        if v and v > 0 then
+            return v
+        end
+    end
+    if unit == "player" then
+        local g = _G.GetAverageItemLevel
+        if type(g) == "function" then
+            local v = tonumber(Safe(g))
+            if v and v > 0 then
+                return v
+            end
+        end
+        local ns = NS("C_Player")
+        if ns and type(ns.GetAverageItemLevel) == "function" then
+            local v = tonumber(Safe(ns.GetAverageItemLevel, ns))
+            if v and v > 0 then
+                return v
+            end
+        end
+    end
+    return nil
 end
 
 return API

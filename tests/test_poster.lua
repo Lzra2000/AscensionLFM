@@ -2,6 +2,7 @@
 package.path = "./?.lua;./core/?.lua;" .. (package.path or "")
 
 dofile("core/Database.lua")
+dofile("core/AscensionAPI.lua")
 dofile("core/Slots.lua")
 dofile("core/Poster.lua")
 
