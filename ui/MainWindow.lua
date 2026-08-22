@@ -1139,18 +1139,28 @@ function MainWindow.Init()
 
     -- DragonUI chrome via shared helper (ui/Chrome.lua). Full-size profile
     -- (75/75/32) matches bag/bank/TradeSkillFrame sizing used previously.
+    -- Without DragonUI: DialogBox backdrop + header + UIPanelCloseButton
+    -- (proven AscFastRoll / RaidInfo path — never PortraitFrame).
+    local hasDUI = AscensionLFM.Chrome and AscensionLFM.Chrome.HasDragonUI
+        and AscensionLFM.Chrome.HasDragonUI()
     if AscensionLFM.Chrome and AscensionLFM.Chrome.ApplyMetalChrome then
-        if AscensionLFM.Chrome and AscensionLFM.Chrome.ApplyMetalChrome then AscensionLFM.Chrome.ApplyMetalChrome(frame, "full") end
+        AscensionLFM.Chrome.ApplyMetalChrome(frame, "full")
+    end
+    if not hasDUI and AscensionLFM.Chrome and AscensionLFM.Chrome.ApplyClassicChrome then
+        AscensionLFM.Chrome.ApplyClassicChrome(frame, {
+            header = true,
+            headerWidth = 420,
+            closeButton = true,
+            onClose = function() frame:Hide() end,
+        })
     end
 
     -- Hide the oversized UIPanelDialogTemplate close button, then place a
     -- DragonUI-sized (18x18) X in the top-right metal corner so it sits
     -- 1:1 inside the chrome piece (same redbutton2x atlas as bags/bank).
-    -- Skipped entirely without DragonUI: the native close button (already
-    -- correctly sized for the classic SetBackdrop chrome applied above)
-    -- stays exactly as-is instead of being replaced with a texture that
-    -- doesn't exist on disk.
-    if AscensionLFM.Chrome and AscensionLFM.Chrome.HasDragonUI and AscensionLFM.Chrome.HasDragonUI() then
+    -- Skipped without DragonUI: classic UIPanelCloseButton from
+    -- ApplyClassicChrome above stays as-is.
+    if hasDUI then
         local function hideClose(btn)
             if not btn then return end
             btn:Hide()
@@ -1337,7 +1347,7 @@ function MainWindow.Init()
     if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(closeBtn) end
     closeBtn:SetSize(90, 22)
     closeBtn:SetPoint("RIGHT", 0, 0)
-    closeBtn:SetText("Schliessen")
+    closeBtn:SetText("Schließen")
     closeBtn:SetScript("OnClick", function()
         frame:Hide()
     end)

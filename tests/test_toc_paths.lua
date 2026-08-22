@@ -17,10 +17,10 @@ end
 local toc = f:read("*a")
 f:close()
 
-if not toc:find("## Version: 0.4.135", 1, true) then
-    Fail("toc version should be 0.4.135")
+if not toc:find("## Version: 0.4.136", 1, true) then
+    Fail("toc version should be 0.4.136")
 end
-Ok("version 0.4.135")
+Ok("version 0.4.136")
 
 -- Forward-slash lua paths break Ascension load for many clients.
 if toc:find("core/Database.lua", 1, true)
@@ -30,6 +30,11 @@ if toc:find("core/Database.lua", 1, true)
     Fail("toc still has forward-slash lua paths — Ascension may not load /alfm")
 end
 Ok("no forward-slash lua paths")
+
+if not toc:find("AscensionAPI", 1, true) then
+    Fail("core\\AscensionAPI.lua missing from toc")
+end
+Ok("AscensionAPI in toc")
 
 local files = {}
 for line in toc:gmatch("[^\r\n]+") do

@@ -2,7 +2,7 @@
 ## Title: AscensionLFM
 ## Notes: Manastorm-LFM-Helfer fuer Ascension.gg (Wildcard Levelrun)
 ## Author: Lazra
-## Version: 0.4.135
+## Version: 0.4.136
 ## SavedVariables: AscensionLFMDB
 ## DefaultState: enabled
 ## X-Website: https://ascension.gg
@@ -14,6 +14,7 @@ core\ChatFilter.lua
 core\Slots.lua
 core\RaidMarks.lua
 core\SpecRole.lua
+core\ItemLevel.lua
 core\Queue.lua
 core\Reject.lua
 core\Invite.lua

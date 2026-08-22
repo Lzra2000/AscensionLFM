@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.136
+
+- **Classic DialogBox chrome actually wired on MainWindow.** v0.4.135 documented
+  UI-DialogBox-Header + UIPanelCloseButton for non-DragonUI, but Init still
+  only called ApplyMetalChrome (backdrop only). Without DragonUI the window
+  now gets header + corner + panel close via ApplyClassicChrome({header=true}).
+  MiniHUD stays header-free. Footer label uses **Schließen** (du-tone).
+
 ## 0.4.135
 
 - **Season-10 quality pass (chrome + German + Safe).** Raise AscensionLFM toward
@@ -18,8 +26,11 @@
     MiniHUD stays header-free (compact).
   - **`AscensionLFM.Safe` + `core/AscensionAPI.lua`:** Safe wrappers for
     verified Manastorm/LFG read APIs (`docs/NOTES-ascension-apis.md`).
-    Bootstrap keeps a Safe fallback if the API file is missing.
-    Remember: pcall success ≠ server acted (Sort Groups / UninviteUnit).
+    Invite/Poster/MiniHUD/ManastormTracker routed through `API`. No mutate
+    (`Enter`/`Leave`/`C_Wildcard` rolls). Bootstrap keeps a Safe fallback
+    if the API file is missing. Remember: pcall success ≠ server acted
+    (Sort Groups / UninviteUnit). `check.sh` allowlist:
+    `C_Manastorm|C_LFG|C_GameMode`.
   - **German (du):** category nav, footer Schliessen/Leeren, Minimap tooltip,
     Roster labels (Gruppe/Bereit/Sortieren), TOC Notes, status ModeLabel.
     Section headers no longer `string.upper` (Umlaut trap).
