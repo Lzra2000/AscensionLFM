@@ -31,11 +31,6 @@ if toc:find("core/Database.lua", 1, true)
 end
 Ok("no forward-slash lua paths")
 
-if not toc:find("AscensionAPI", 1, true) then
-    Fail("core\\AscensionAPI.lua missing from toc")
-end
-Ok("AscensionAPI in toc")
-
 local files = {}
 for line in toc:gmatch("[^\r\n]+") do
     local path = line:match("^(%S+%.lua)%s*$")
@@ -47,6 +42,19 @@ if #files < 12 then
     Fail("expected >= 12 lua files in toc, got " .. tostring(#files))
 end
 Ok(#files .. " lua files in toc")
+
+local hasItemLevel, hasAscensionAPI = false, false
+for _, path in ipairs(files) do
+    if path:find("ItemLevel", 1, true) then hasItemLevel = true end
+    if path:find("AscensionAPI", 1, true) then hasAscensionAPI = true end
+end
+if not hasAscensionAPI then
+    Fail("core\\AscensionAPI.lua missing from toc")
+end
+if not hasItemLevel then
+    Fail("core\\ItemLevel.lua missing from toc")
+end
+Ok("AscensionAPI + ItemLevel in toc")
 
 -- MiniHUD must load before MainWindow (settings toggle references it)
 local miniIdx, mainIdx
