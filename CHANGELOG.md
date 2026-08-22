@@ -36,6 +36,16 @@
     Section headers no longer `string.upper` (Umlaut trap).
   - Interface stays **30300**. Live AddOns folder synced from repo.
 
+- **ilvl display + Min-ilvl filter (API-backed only).** Extract-verified
+  Ascension `UnitAverageItemLevel(unit)` (PaperDoll / CallBoard;
+  `GetAverageItemLevel` / `C_Player:GetAverageItemLevel` are player wrappers).
+  - `API.GetAverageItemLevel` + `core/ItemLevel.lua`: Safe reads, short
+    name cache, roster column `59·142` when known, queue badge `i142`.
+  - `db.minIlvl` / Hosten edit / `/alfm minilvl` — invite filter only when
+    ilvl is known; unknown applicants always pass (never invent).
+  - Reject reason `ilvl low` (German du template). Chat LFM lists stay
+    without fake ilvl — no unit token → documented gap in NOTES + AGENTS.
+
 ## 0.4.134
 
 - **Fixed: "Sort Groups" replanned the same swap on every click.** Reported

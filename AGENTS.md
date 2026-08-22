@@ -201,6 +201,12 @@ Documented so nobody re-investigates these from scratch:
   groups - confirmed via Ascension's own `CompactRaidFrameManager.lua`
   usage. Also checked and ruled out: `GetRaidRosterInfo`'s 10th field
   is the old MAINTANK/MAINASSIST marking flag, not a combat role.
+- **Average ilvl for remote chat LFM/LFG names.** Ascension exposes
+  `UnitAverageItemLevel(unit)` (PaperDoll / CallBoard / `C_Player` and
+  `GetAverageItemLevel` are player wrappers). That needs a unit token.
+  Chat leaders and whisper applicants have none — do not invent. See
+  `docs/NOTES-ascension-apis.md` → Item level; `core/ItemLevel.lua`
+  shows/filters only when the API (or short cache) has a real value.
 
 ## Where the Ascension/DragonUI source research lives
 

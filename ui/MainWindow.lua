@@ -645,6 +645,9 @@ local function SyncWidgetsFromDB()
     if widgets.requireRole and widgets.requireRole.SetChecked then
         widgets.requireRole:SetChecked(db.requireRoleWhisper ~= false)
     end
+    if widgets.minIlvlEdit and widgets.minIlvlEdit.SetText then
+        widgets.minIlvlEdit:SetText(tostring(db.minIlvl or 0))
+    end
     if widgets.autoKick and widgets.autoKick.SetChecked then
         widgets.autoKick:SetChecked(db.autoKickLevel59 and true or false)
     end

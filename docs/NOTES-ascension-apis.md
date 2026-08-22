@@ -149,9 +149,30 @@ Module: `core/AscensionAPI.lua` (loads early). Primitive: `AscensionLFM.Safe`.
 | `GetNumLoadoutSlots` / `GetLoadoutSpellAtIndex` / `GetAvailableLoadoutSpells` | loadout reads |
 | `CanUseManastorm` / `CanUseGroupFinder` | `C_LFG` |
 | `IsGameModeActive` | `C_GameMode` |
+| `GetAverageItemLevel(unit)` | `UnitAverageItemLevel(unit)` (+ player fallbacks `GetAverageItemLevel` / `C_Player:GetAverageItemLevel`) |
 
 **Not wrapped (mutate):** `Enter`, `Leave`, `SetLoadoutSpellAtIndex`, any
 `C_Wildcard.*` roll/repurchase.
+
+---
+
+## Item level (average)
+
+| API | Kind | Notes |
+|---|---|---|
+| `UnitAverageItemLevel(unit)` | read | **Canonical.** PaperDoll `PaperDollFrame_SetItemLevel(statFrame, unit)` and AscensionUI CallBoard use this. Takes a unit token. |
+| `GetAverageItemLevel()` | read | UnitUtil.lua → `UnitAverageItemLevel("player")` only |
+| `C_Player:GetAverageItemLevel()` | read | Same player-only wrapper; used by `C_LFG` random-dungeon gate |
+
+**Missing for AscensionLFM chat lists:** there is **no** API that returns average
+ilvl for a remote LFM leader or whisper applicant by name. Without a unit
+token (`player` / `partyN` / `raidN` / inspect target), the addon cannot show
+or filter ilvl — and must not invent one. Display/filter therefore only apply
+when the player is already group-visible (or still in the short ItemLevel
+cache after leaving).
+
+Shipped surface: `AscensionLFM.API.GetAverageItemLevel` + `core/ItemLevel.lua`
+(roster column `59·142`, queue badge `i142`, `db.minIlvl` / `/alfm minilvl`).
 
 ---
 
@@ -159,4 +180,6 @@ Module: `core/AscensionAPI.lua` (loads early). Primitive: `AscensionLFM.Safe`.
 
 `ALLOWED_C_API` may list only extract-verified namespaces this addon
 references on purpose: `C_Manastorm`, `C_LFG`, `C_GameMode`. Adding a name
-requires a row in this NOTES file first.
+requires a row in this NOTES file first. `C_Player` is not on the allowlist —
+ilvl uses the `UnitAverageItemLevel` global (string/`NS` lookup only for the
+optional player fallback).
