@@ -559,8 +559,17 @@ function MainWindow.RefreshQueue()
                 -- while someone's already queued.
                 local star = (AscensionLFM.Database and AscensionLFM.Database.IsFavoriteApplicant
                     and AscensionLFM.Database.IsFavoriteApplicant(q.name)) and "|cffffd200*|r " or ""
-                row.label:SetText(string.format("%s|cfff5ebd1%s|r  |cffd1c299[%s]|r  %s\n%s",
-                    star, tostring(q.name or "?"), role or "?", st, tostring(q.message or ""):sub(1, 60)))
+                local ilvlBit = ""
+                if AscensionLFM.ItemLevel and AscensionLFM.ItemLevel.GetForName
+                    and AscensionLFM.ItemLevel.FormatBadge then
+                    local avg = AscensionLFM.ItemLevel.GetForName(q.name)
+                    local badge = AscensionLFM.ItemLevel.FormatBadge(avg)
+                    if badge ~= "" then
+                        ilvlBit = "  |cff9ad1ff" .. badge .. "|r"
+                    end
+                end
+                row.label:SetText(string.format("%s|cfff5ebd1%s|r  |cffd1c299[%s]|r  %s%s\n%s",
+                    star, tostring(q.name or "?"), role or "?", st, ilvlBit, tostring(q.message or ""):sub(1, 60)))
                 if row.icon then
                     local path = role and row.ROLE_ICONS and row.ROLE_ICONS[role]
                     row.icon:SetTexture(path or row.ROLE_ICON_UNKNOWN)
@@ -1860,13 +1869,56 @@ function MainWindow.Init()
         end)
     hy = hy - TOGGLE_STEP
     widgets.requireRole = CreateToggleRow(hosting, hy,
-        "Require role in whisper / LFG",
-        "Default-deny whispers/LFG lines with no tank/heal/aura/dps cue.",
+        "Rolle im Whisper / LFG verlangen",
+        "Whisper/LFG ohne tank/heal/dps-Hinweis werden abgelehnt.",
         false,
         function(on)
             AscensionLFM.Database.Get().requireRoleWhisper = on and true or false
         end)
     hy = hy - TOGGLE_STEP
+
+    -- Min-ilvl: only filters when UnitAverageItemLevel is known (roster /
+    -- cache). Unknown applicants always pass — never invent an ilvl.
+    local ilvlRow = CreateFrame("Frame", nil, hosting)
+    ilvlRow:SetSize(520, 40)
+    ilvlRow:SetPoint("TOPLEFT", 4, hy)
+    local ilvlLbl = ilvlRow:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    ilvlLbl:SetPoint("TOPLEFT", 0, 0)
+    ilvlLbl:SetText("Min-ilvl fuer Invites")
+    SetInk(ilvlLbl, INK)
+    local ilvlEdit = CreateStyledEditBox("AscensionLFMMinIlvl", ilvlRow, "InputBoxTemplate")
+    ilvlEdit:SetSize(48, 20)
+    ilvlEdit:SetPoint("LEFT", ilvlLbl, "RIGHT", 10, 0)
+    ilvlEdit:SetAutoFocus(false)
+    ilvlEdit:SetMaxLetters(4)
+    ilvlEdit:SetNumeric(true)
+    do
+        local db0 = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
+        ilvlEdit:SetText(tostring((db0 and db0.minIlvl) or 0))
+    end
+    widgets.minIlvlEdit = ilvlEdit
+    local ilvlHint = ilvlRow:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    ilvlHint:SetPoint("TOPLEFT", 0, -20)
+    ilvlHint:SetPoint("RIGHT", 0, 0)
+    ilvlHint:SetJustifyH("LEFT")
+    ilvlHint:SetText("0 = aus. Greift nur, wenn Ascension die ilvl kennt (Roster/Gruppe). Unbekannt = durchlassen.")
+    SetInk(ilvlHint, MUTED)
+    if ilvlHint.SetWordWrap then ilvlHint:SetWordWrap(true) end
+    local function ApplyMinIlvl(self)
+        local n = tonumber(self:GetText())
+        local dbNow = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
+        if not n or n < 0 then n = 0 end
+        if n > 999 then n = 999 end
+        if dbNow then
+            dbNow.minIlvl = n
+        end
+        self:SetText(tostring(n))
+        self:ClearFocus()
+    end
+    ilvlEdit:SetScript("OnEnterPressed", ApplyMinIlvl)
+    ilvlEdit:SetScript("OnEditFocusLost", ApplyMinIlvl)
+    hy = hy - 52
+
     widgets.rejectRewhisper = CreateToggleRow(hosting, hy,
         "Reject re-whisper (slot/group full / no role)",
         "Whisper templates with {role} {filled} {max}. Rate-limited; ignore list. Default OFF.",
