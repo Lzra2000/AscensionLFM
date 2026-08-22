@@ -30,6 +30,8 @@ local DEFAULT_TEMPLATES = {
     ["role filtered"] = "Not looking for {role} right now - thanks!",
     ["prefer support seat"] = "Saving the last seats for tank/heal or an aura carrier - try again if one opens up!",
     ["dps seat reserved for aura"] = "DPS seats are held for aura carriers right now - whisper again with 'aura' if you have one!",
+    -- Only fired when Ascension UnitAverageItemLevel is known and below db.minIlvl.
+    ["ilvl low"] = "Sorry, dein ilvl liegt unter unserem Minimum ({ilvl} / min {min}).",
 }
 
 local REJECTABLE = {
@@ -43,6 +45,7 @@ local REJECTABLE = {
     -- "prefer support seat"), so they get told why instead of being
     -- silently dropped - and the reply tells them how to get in.
     ["dps seat reserved for aura"] = true,
+    ["ilvl low"] = true,
 }
 
 local function Now()
@@ -79,8 +82,8 @@ local function IsIgnoredName(name)
     return false
 end
 
---- Pure: substitute {role} {filled} {max} in a template.
-function Reject.FormatTemplate(template, role, filled, max)
+--- Pure: substitute {role} {filled} {max} [{ilvl} {min}] in a template.
+function Reject.FormatTemplate(template, role, filled, max, ilvl, minIlvl)
     template = tostring(template or "")
     role = tostring(role or "role")
     filled = tostring(filled ~= nil and filled or "?")
@@ -88,6 +91,8 @@ function Reject.FormatTemplate(template, role, filled, max)
     template = template:gsub("{role}", role)
     template = template:gsub("{filled}", filled)
     template = template:gsub("{max}", max)
+    template = template:gsub("{ilvl}", tostring(ilvl ~= nil and ilvl or "?"))
+    template = template:gsub("{min}", tostring(minIlvl ~= nil and minIlvl or "?"))
     return template
 end
 
@@ -128,16 +133,20 @@ local function CountsForReason(reason, role, db)
     return filled, max
 end
 
-function Reject.BuildMessage(reason, role, db)
+function Reject.BuildMessage(reason, role, db, extra)
     db = db or DB()
     local filled, max = CountsForReason(reason, role, db)
     local tmpl = Reject.TemplateForReason(reason, db)
-    return Reject.FormatTemplate(tmpl, role or "role", filled, max)
+    extra = type(extra) == "table" and extra or {}
+    return Reject.FormatTemplate(
+        tmpl, role or "role", filled, max,
+        extra.ilvl, extra.minIlvl or (db and db.minIlvl))
 end
 
 --- Send reject whisper if enabled + rate-limit / ignore allow.
+-- @param extra optional { ilvl=, minIlvl= } for "ilvl low" templates
 -- @return ok, err
-function Reject.TryRewhisper(name, reason, role)
+function Reject.TryRewhisper(name, reason, role, extra)
     local db = DB()
     if not db or not db.rejectRewhisper then
         return false, "disabled"
@@ -182,7 +191,7 @@ function Reject.TryRewhisper(name, reason, role)
     if type(SendChatMessage) ~= "function" then
         return false, "SendChatMessage missing"
     end
-    local msg = Reject.BuildMessage(reason, role, db)
+    local msg = Reject.BuildMessage(reason, role, db, extra)
     if msg == "" then
         return false, "empty"
     end

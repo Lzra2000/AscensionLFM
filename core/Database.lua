@@ -44,6 +44,7 @@ local DEFAULTS = {
     minimapIconShown = true, -- draggable minimap icon (mode/activity tooltip, click to open settings)
     minimapAngle = 220, -- degrees around the minimap where the icon sits
     minKeystoneLevel = 0, -- 0 = off; hides only explicitly "[Dungeon +N]"-tagged posts below N
+    minIlvl = 0, -- 0 = off; invite filter only when UnitAverageItemLevel is known (never invent)
     lfmChatTabEnabled = false, -- dedicated chat tab that only receives matched LFM/LFG lines
     requireRoleWhisper = true, -- default-deny blind invites without a role
     passiveRoleDetect = true, -- catch exact bare role words in raid/party chat continuously, not just during an active Role Check
