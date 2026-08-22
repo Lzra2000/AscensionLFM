@@ -409,7 +409,7 @@ function MiniHUD.ActionRoleCheck()
     if AscensionLFM.RoleCheck and AscensionLFM.RoleCheck.BuildMessage then
         msg = AscensionLFM.RoleCheck.BuildMessage(db and db.roleCheckMessage)
     else
-        msg = "ROLE CHECK - whisper or party: tank/heal/aura/dps (T/H/A/D)"
+        msg = "ROLE CHECK - whisper or party: tank/heal/dps - add aura if you bring one (T/H/D)"
     end
 
     -- Full listen-window when Hosting / Full Auto

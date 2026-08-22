@@ -29,7 +29,7 @@ Database.Init()
 local db = Database.Get()
 
 check("default mode is notify", db.mode == "notify")
-check("defaultsRev is 8", tonumber(db.defaultsRev) == 8)
+check("defaultsRev is 9", tonumber(db.defaultsRev) == 9)
 check("autoKick still off", db.autoKickLevel59 == false)
 check("autoWhisper still off", db.autoWhisper == false)
 check("autoRepost still off", db.autoRepost == false)
@@ -37,8 +37,9 @@ check("fullAutoHosting still off", db.fullAutoHosting == false)
 check("rejectRewhisper still off", db.rejectRewhisper == false)
 check("repostInterval default 60", tonumber(db.repostInterval) == 60)
 check("postChannel default YELL", db.postChannel == "YELL")
-check("roleCheckMessage mentions T/H/A/D",
-    tostring(db.roleCheckMessage):find("T/H/A/D", 1, true) ~= nil)
+check("roleCheckMessage mentions T/H/D + aura tag",
+    tostring(db.roleCheckMessage):find("T/H/D", 1, true) ~= nil
+        and tostring(db.roleCheckMessage):find("aura", 1, true) ~= nil)
 
 -- Fresh defaults table
 local defs = Database.Defaults()
@@ -52,7 +53,7 @@ _G.AscensionLFMDB = {
 }
 Database.Init()
 check("migrate off→notify", Database.Get().mode == "notify")
-check("migrate sets defaultsRev 8", tonumber(Database.Get().defaultsRev) == 8)
+check("migrate sets defaultsRev 9", tonumber(Database.Get().defaultsRev) == 9)
 
 -- Do not re-flip after user sets Off post-migration
 Database.SetMode("off")
@@ -67,7 +68,7 @@ _G.AscensionLFMDB = {
 }
 Database.Init()
 check("migrate shortens stock RW msg",
-    tostring(Database.Get().roleCheckMessage):find("T/H/A/D", 1, true) ~= nil)
+    tostring(Database.Get().roleCheckMessage):find("T/H/D", 1, true) ~= nil)
 check("migrate mentions party replies",
     tostring(Database.Get().roleCheckMessage):find("party", 1, true) ~= nil)
 _G.AscensionLFMDB = {
@@ -89,7 +90,7 @@ _G.AscensionLFMDB = {
 }
 Database.Init()
 local migrated = Database.Get()
-check("full auto migrate rev 8", tonumber(migrated.defaultsRev) == 8)
+check("full auto migrate rev 9", tonumber(migrated.defaultsRev) == 9)
 check("full auto migrate healer on", migrated.roles.healer == true)
 check("full auto migrate aura on", migrated.roles.aura == true)
 
@@ -147,10 +148,10 @@ _G.AscensionLFMDB = {
 }
 Database.Init()
 check("em-dash stock RW message still migrates", Database.Get().roleCheckMessage == Database.Get().roleCheckMessage
-    and Database.Get().roleCheckMessage:find("T/H/A/D", 1, true) ~= nil,
+    and Database.Get().roleCheckMessage:find("T/H/D", 1, true) ~= nil,
     Database.Get().roleCheckMessage)
 check("em-dash migration lands on current stock default",
-    Database.Get().roleCheckMessage == "ROLE CHECK - whisper or party: tank/heal/aura/dps (T/H/A/D)",
+    Database.Get().roleCheckMessage == "ROLE CHECK - whisper or party: tank/heal/dps - add aura if you bring one (T/H/D)",
     Database.Get().roleCheckMessage)
 
 -- v0.4.131 (rev 7): aura stopped being an exclusive 4th role. Anyone stored
@@ -170,7 +171,7 @@ _G.AscensionLFMDB = {
 }
 Database.Init()
 local m7 = Database.Get()
-check("rev 7 migration ran (chain now ends at 8)", tonumber(m7.defaultsRev) == 8, tostring(m7.defaultsRev))
+check("rev 7 migration ran (chain now ends at 9)", tonumber(m7.defaultsRev) == 9, tostring(m7.defaultsRev))
 check("aura role converted to dps seat", m7.assignedRoles.auraguy == "dps",
     tostring(m7.assignedRoles.auraguy))
 check("second aura role converted too", m7.assignedRoles.auragal == "dps",
@@ -241,6 +242,27 @@ Database.Init()
 check("rev 7 migration is not re-applied",
     Database.Get().assignedRoles.someone == "aura",
     tostring(Database.Get().assignedRoles.someone))
+
+
+-- v0.4.137 (rev 9): aura-as-tag Role Check copy
+_G.AscensionLFMDB = {
+    mode = "notify",
+    defaultsRev = 8,
+    roleCheckMessage = "ROLE CHECK - whisper or party: tank/heal/aura/dps (T/H/A/D)",
+    rejectTemplates = {
+        ["no role"] = "Please whisper a role: tank/heal/aura/dps (or T/H/A/D).",
+        ["no parse"] = "Please whisper a role: tank/heal/aura/dps (or T/H/A/D).",
+    },
+}
+Database.Init()
+local m9 = Database.Get()
+check("rev 9 migration ran", tonumber(m9.defaultsRev) == 9, tostring(m9.defaultsRev))
+check("rev 9 refreshes roleCheckMessage",
+    m9.roleCheckMessage == "ROLE CHECK - whisper or party: tank/heal/dps - add aura if you bring one (T/H/D)",
+    m9.roleCheckMessage)
+check("rev 9 refreshes no-role reject",
+    m9.rejectTemplates["no role"]:find("add 'aura'", 1, true) ~= nil,
+    m9.rejectTemplates["no role"])
 
 io.write(string.format("test_defaults_notify: %d passed, %d failed\n", passed, failed))
 if failed > 0 then

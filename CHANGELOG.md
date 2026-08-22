@@ -1,12 +1,26 @@
 # Changelog
 
+## 0.4.137
+
+- **Fixed: stock Role Check / reject copy still listed aura as a fourth seat.**
+  Follow-up from the v0.4.133 note. Defaults + migration (`defaultsRev` 8→9)
+  refresh:
+  - Role Check RW: `tank/heal/dps - add aura if you bring one (T/H/D)`
+  - Reject `no role` / `no parse`: same tag wording as `Reject.lua`
+  - MiniHUD / RoleCheck fallbacks match
+  Custom host text is left alone. Fresh installs and stock-only saves migrate.
+
+- **ilvl:** extract-verified `UnitAverageItemLevel` path unchanged (PaperDoll /
+  CallBoard / `GetAverageItemLevel` player wrappers). Unknown applicants still
+  pass `minIlvl` (never invent). Added `tests/test_itemlevel.lua`.
+
 ## 0.4.136
 
 - **Classic DialogBox chrome actually wired on MainWindow.** v0.4.135 documented
   UI-DialogBox-Header + UIPanelCloseButton for non-DragonUI, but Init still
   only called ApplyMetalChrome (backdrop only). Without DragonUI the window
   now gets header + corner + panel close via ApplyClassicChrome({header=true}).
-  MiniHUD stays header-free. Footer label uses **Schließen** (du-tone).
+  MiniHUD stays header-free. Footer label uses **Schliessen** (du-tone).
 
 ## 0.4.135
 

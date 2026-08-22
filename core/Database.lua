@@ -14,7 +14,7 @@ AscensionLFM.Database = Database
 -- Default "notify": Log fills from public LFM/LFG MS lines; kick/auto-invite stay off.
 local DEFAULTS = {
     mode = "notify",
-    defaultsRev = 8, -- bumped when shipping default-mode / stock-copy changes
+    defaultsRev = 9, -- bumped when shipping default-mode / stock-copy changes
     roles = {
         tank = true,
         healer = false,
@@ -122,8 +122,8 @@ local DEFAULTS = {
     rejectTemplates = {
         ["slot full"] = "Sorry, {role} is full ({filled}/{max}).",
         full = "Group is full - thanks!",
-        ["no role"] = "Please whisper a role: tank/heal/aura/dps (or T/H/A/D).",
-        ["no parse"] = "Please whisper a role: tank/heal/aura/dps (or T/H/A/D).",
+        ["no role"] = "Please whisper a role: tank / heal / dps - add 'aura' if you bring one.",
+        ["no parse"] = "Please whisper a role: tank / heal / dps - add 'aura' if you bring one.",
         ["role filtered"] = "Not looking for {role} right now - thanks!",
         ["ilvl low"] = "Sorry, dein ilvl liegt unter unserem Minimum ({ilvl} / min {min}).",
     },
@@ -138,7 +138,8 @@ local DEFAULTS = {
     soundOnMatch = false,
     soundOnApplicant = false,
     -- RW Role Check + Aura 1-per-subgroup auto-move
-    roleCheckMessage = "ROLE CHECK - whisper or party: tank/heal/aura/dps (T/H/A/D)",
+    -- Aura is a tag on tank/heal/dps, not a fourth exclusive seat (v0.4.131+).
+    roleCheckMessage = "ROLE CHECK - whisper or party: tank/heal/dps - add aura if you bring one (T/H/D)",
     roleCheckDuration = 60,
     roleCheckWindow = 60,
     roleCheckMinInterval = 30,
@@ -289,6 +290,39 @@ function Database.Init()
             end
             _G.AscensionLFMDB.defaultsRev = 8
             rev = 8
+        end
+        -- v0.4.137: aura is a tag, not a seat — refresh stock Role Check +
+        -- reject copy that still lists "aura" as a fourth exclusive role.
+        if rev < 9 then
+            local oldRw = {
+                ["ROLE CHECK - whisper or party: tank/heal/aura/dps (T/H/A/D)"] = true,
+                ["ROLE CHECK - whisper tank/heal/aura/dps (or T/H/A/D)"] = true,
+                ["ROLE CHECK - whisper me tank / heal / aura / dps to sync MS slots"] = true,
+                ["ROLE CHECK - whisper tank / heal / aura / dps"] = true,
+                ["ROLE CHECK \226\128\148 whisper me tank / heal / aura / dps to sync MS slots"] = true,
+                ["ROLE CHECK \226\128\148 whisper tank / heal / aura / dps"] = true,
+                ["ROLE CHECK \226\128\148 whisper tank/heal/aura/dps (or T/H/A/D)"] = true,
+            }
+            if oldRw[tostring(_G.AscensionLFMDB.roleCheckMessage or "")] then
+                _G.AscensionLFMDB.roleCheckMessage = DEFAULTS.roleCheckMessage
+            end
+            local rt = _G.AscensionLFMDB.rejectTemplates
+            if type(rt) == "table" then
+                local oldReject = {
+                    ["Please whisper a role: tank/heal/aura/dps (or T/H/A/D)."] = true,
+                    ["Please whisper a role: tank / heal / aura / dps."] = true,
+                }
+                for _, key in ipairs({ "no role", "no parse" }) do
+                    if oldReject[tostring(rt[key] or "")] then
+                        rt[key] = DEFAULTS.rejectTemplates[key]
+                    end
+                end
+                if rt["ilvl low"] == nil then
+                    rt["ilvl low"] = DEFAULTS.rejectTemplates["ilvl low"]
+                end
+            end
+            _G.AscensionLFMDB.defaultsRev = 9
+            rev = 9
         end
     end
 end

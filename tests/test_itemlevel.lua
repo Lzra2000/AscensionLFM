@@ -32,7 +32,7 @@ check("FormatBadge zero", IL.FormatBadge(0) == "")
 check("FormatBadge rounds", IL.FormatBadge(141.6) == "i142")
 
 check("FormatRoster level only", IL.FormatRoster(59, nil) == "59")
-check("FormatRoster both", IL.FormatRoster(59, 141.6) == "59·142")
+check("FormatRoster both", IL.FormatRoster(59, 141.6) == "59" .. string.char(194, 183) .. "142")
 check("FormatRoster ilvl only", IL.FormatRoster(0, 120) == "i120")
 check("FormatRoster empty", IL.FormatRoster(0, nil) == "")
 
@@ -57,7 +57,7 @@ IL._ResetCacheForTests()
 local avg = IL.GetForUnit("player")
 check("GetForUnit returns API value", avg and math.abs(avg - 133.4) < 0.01, tostring(avg))
 check("GetForName uses cache after leave", IL.GetCached("Host") ~= nil)
--- No unit → still cached
+-- No unit -> still cached
 _G.GetNumRaidMembers = function() return 0 end
 _G.GetNumPartyMembers = function() return 0 end
 check("GetForName cache hit", math.abs((IL.GetForName("Host") or 0) - 133.4) < 0.01)

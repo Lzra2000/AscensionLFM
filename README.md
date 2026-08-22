@@ -72,12 +72,12 @@ Open **Post** in `/alfm` (separate from Hosting to avoid crowding).
 4. **Scan raid/party** recounts filled from the current roster + assigned roles; while Mode is **Hosting** (or auto-repost is on), roster events auto-refresh fills and the preview.
 5. **Auto-repost** (default **OFF**): interval seconds (default **60**, minimum **30**). Only while Mode=**Hosting**. Rebuilds the message each tick; **stops** when all role caps are filled or the group hits Max size. Optional **Announce FULL** posts one public FULL line when stopping.
 
-## RW Role Check (resync tank / heal / aura / dps)
+## RW Role Check (resync tank / heal / dps + aura tag)
 
 While **Mode = Hosting** (or Full Auto) and you are raid lead/assist (party lead → party/yell fallback):
 
 1. `/alfm` → **Hosting** (or **Post**) → **RW Role Check**
-2. Sends a configurable raid warning (default mentions whisper **or party** `tank/heal/aura/dps`)
+2. Sends a configurable raid warning (default mentions whisper **or party** `tank/heal/dps` and optional aura tag)
 3. Opens a **listening window** (default **60s**): party/raid members who whisper **or type in party/raid chat** a role update slot assignments live
 4. Status shows `Role check active — Xs left · N responses`
 5. When the window ends (if **Auto-resync** is on) — or anytime via **Resync roles now** — leavers are removed, whispered roles re-applied, filled counts and the LFM preview refresh
@@ -162,7 +162,7 @@ Native DialogFrame with a left **Categories** sidebar:
 Im Modus **Hosting** (oder Full Auto), als Raid-Lead/Assist:
 
 1. `/alfm` → **Hosting** (oder **Post**) → **RW Role Check**
-2. Raid Warning (Standard erwähnt Whisper **oder Party**: tank/heal/aura/dps)
+2. Raid Warning (Standard erwähnt Whisper **oder Party**: tank/heal/dps, optional aura)
 3. Mitglieder antworten per Whisper **oder Party/Raid-Chat**; Slot-Zuordnung live (~60s Fenster)
 4. **Resync roles now** (oder Auto-Resync am Ende): Abgänger raus, Rollen anwenden, Filled-Zähler + LFM-Vorschau neu
 5. **Auto-move Auras (1 per raid group)** (Standard AN): höchstens **eine Aura pro Raid-Gruppe (1–8)**; weitere Auras werden automatisch in freie Gruppen verschoben (Lead/Assist)

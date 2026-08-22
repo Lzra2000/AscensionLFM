@@ -11,7 +11,7 @@ end
 local RoleCheck = {}
 AscensionLFM.RoleCheck = RoleCheck
 
-local DEFAULT_MSG = "ROLE CHECK - whisper or party: tank/heal/aura/dps (T/H/A/D)"
+local DEFAULT_MSG = "ROLE CHECK - whisper or party: tank/heal/dps - add aura if you bring one (T/H/D)"
 local DEFAULT_DURATION = 60
 local MIN_RW_GAP = 30
 local MIN_DURATION = 15
@@ -588,7 +588,7 @@ function RoleCheck.StartCheck(msgOrNow)
     end
     if AscensionLFM.Print then
         AscensionLFM.Print(
-            "Role Check open - whisper or party/raid chat: tank / heal / aura / dps (" .. dur .. "s)"
+            "Role Check open - whisper or party/raid: tank / heal / dps (+aura) (" .. dur .. "s)"
         )
     end
     RoleCheck.EnsureTicker()
