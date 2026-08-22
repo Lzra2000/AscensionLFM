@@ -153,7 +153,7 @@ local function EnsureRolePicker()
     local border = f:CreateTexture(nil, "BORDER")
     border:SetAllPoints()
     border:SetTexture("Interface\\Buttons\\WHITE8X8")
-    border:SetVertexColor(0.85, 0.68, 0.22, 0.55)
+        border:SetVertexColor(0.50, 0.50, 0.50, 0.70)
     local inset = f:CreateTexture(nil, "BORDER")
     inset:SetPoint("TOPLEFT", 1, -1)
     inset:SetPoint("BOTTOMRIGHT", -1, 1)
@@ -181,8 +181,9 @@ local function EnsureRolePicker()
         fs:SetTextColor(col[1], col[2], col[3], 1)
         local hi = row:CreateTexture(nil, "HIGHLIGHT")
         hi:SetAllPoints()
-        hi:SetTexture("Interface\\Buttons\\WHITE8X8")
-        hi:SetVertexColor(1, 1, 1, 0.12)
+        hi:SetTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
+        if hi.SetBlendMode then pcall(function() hi:SetBlendMode("ADD") end) end
+        hi:SetVertexColor(1, 1, 1, 0.7)
         row.role = role
         row:SetScript("OnClick", function(self)
             if rolePickerTarget then
@@ -201,7 +202,7 @@ local function EnsureRolePicker()
     sep:SetPoint("TOPLEFT", 8, sepY)
     sep:SetPoint("TOPRIGHT", -8, sepY)
     sep:SetTexture("Interface\\Buttons\\WHITE8X8")
-    sep:SetVertexColor(0.85, 0.68, 0.22, 0.35)
+    sep:SetVertexColor(0.50, 0.50, 0.50, 0.45)
 
     local auraRow = CreateFrame("Button", nil, f)
     auraRow:SetHeight(26)
@@ -215,8 +216,9 @@ local function EnsureRolePicker()
     auraFS:SetPoint("LEFT", auraIcon, "RIGHT", 6, 0)
     local auraHi = auraRow:CreateTexture(nil, "HIGHLIGHT")
     auraHi:SetAllPoints()
-    auraHi:SetTexture("Interface\\Buttons\\WHITE8X8")
-    auraHi:SetVertexColor(1, 1, 1, 0.12)
+    auraHi:SetTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
+    if auraHi.SetBlendMode then pcall(function() auraHi:SetBlendMode("ADD") end) end
+    auraHi:SetVertexColor(1, 1, 1, 0.7)
     auraRow:SetScript("OnClick", function()
         if rolePickerTarget then
             ToggleAura(rolePickerTarget)
@@ -410,7 +412,7 @@ local function EnsureDragGhost()
     local border = g:CreateTexture(nil, "BORDER")
     border:SetAllPoints()
     border:SetTexture("Interface\\Buttons\\WHITE8X8")
-    border:SetVertexColor(0.85, 0.68, 0.22, 0.9)
+    border:SetVertexColor(0.50, 0.50, 0.50, 0.85)
     local inset = g:CreateTexture(nil, "ARTWORK")
     inset:SetPoint("TOPLEFT", 1, -1)
     inset:SetPoint("BOTTOMRIGHT", -1, 1)
@@ -466,7 +468,7 @@ local function HighlightCard(overGroup)
             if g == overGroup then
                 card:SetBackdropBorderColor(0.4, 0.9, 0.5, 0.95)
             else
-                card:SetBackdropBorderColor(0.85, 0.68, 0.22, 0.50)
+                card:SetBackdropBorderColor(0.50, 0.50, 0.50, 0.70)
             end
         end
     end
@@ -559,7 +561,7 @@ local function EnsureGroupPicker()
     local border = f:CreateTexture(nil, "BORDER")
     border:SetAllPoints()
     border:SetTexture("Interface\\Buttons\\WHITE8X8")
-    border:SetVertexColor(0.85, 0.68, 0.22, 0.55)
+        border:SetVertexColor(0.50, 0.50, 0.50, 0.70)
     local inset = f:CreateTexture(nil, "BORDER")
     inset:SetPoint("TOPLEFT", 1, -1)
     inset:SetPoint("BOTTOMRIGHT", -1, 1)
@@ -577,8 +579,9 @@ local function EnsureGroupPicker()
         fs:SetText("Gruppe " .. g)
         local hi = row:CreateTexture(nil, "HIGHLIGHT")
         hi:SetAllPoints()
-        hi:SetTexture("Interface\\Buttons\\WHITE8X8")
-        hi:SetVertexColor(1, 1, 1, 0.12)
+        hi:SetTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
+        if hi.SetBlendMode then pcall(function() hi:SetBlendMode("ADD") end) end
+        hi:SetVertexColor(1, 1, 1, 0.7)
         row.group = g
         row.fs = fs
         row:SetScript("OnClick", function(self)
@@ -900,12 +903,12 @@ local function EnsureCards(parent)
         if card.SetBackdrop then
             card:SetBackdrop({
                 bgFile = nil,
-                edgeFile = "Interface\\Buttons\\WHITE8X8",
-                edgeSize = 1,
-                insets = { left = 1, right = 1, top = 1, bottom = 1 },
+                edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+                tile = true, tileSize = 16, edgeSize = 12,
+                insets = { left = 3, right = 3, top = 3, bottom = 3 },
             })
             if card.SetBackdropBorderColor then
-                card:SetBackdropBorderColor(0.85, 0.68, 0.22, 0.50)
+                card:SetBackdropBorderColor(0.50, 0.50, 0.50, 0.70)
             end
             if card.SetBackdropColor then
                 card:SetBackdropColor(0, 0, 0, 0)
@@ -915,7 +918,6 @@ local function EnsureCards(parent)
         local title = card:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         title:SetPoint("TOPLEFT", 8, -6)
         title:SetText("Gruppe " .. g)
-        title:SetTextColor(1, 0.82, 0.28)
         card.titleFS = title
 
         local aura = card:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")

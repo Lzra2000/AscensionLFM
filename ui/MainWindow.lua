@@ -1,8 +1,8 @@
 -- AscensionLFM: ui/MainWindow.lua
 -- Native DialogFrame settings with Categories sidebar (Allgemein / Suchen /
 -- Hosten / Post / …). Matches docs/sketch/ascension-lfm-mockup.html.
--- Chrome: Ascension-native DialogBox + InsetFrame wells only (no DragonUI).
--- No PortraitFrame (EditBox parenting stays on scroll content children).
+-- Chrome: AscensionUI discipline — DialogBox outer, InsetFrame wells,
+-- GameFont hierarchy, stock UIPanelButtons. No DragonUI / no PortraitFrame.
 
 local AscensionLFM = _G.AscensionLFM
 if type(AscensionLFM) ~= "table" then
@@ -60,7 +60,7 @@ local CATEGORIES = {
       sub = "Level-59-Kick + Aura-Buff-Scan (idle, wenn Buffs bei anderen versteckt sind). Standard aus." },
     { id = CAT_APPEARANCE, label = "Darstellung",
       title = "Darstellung",
-      sub = "Ascension-natives DialogBox- und InsetFrame-Chrome. Debug: /alfmchrome." },
+      sub = "AscensionUI-Niveau: InsetFrame, GameFont, UIPanel-Buttons. Debug: /alfmchrome." },
     { id = CAT_LOG, label = "Protokoll",
       title = "Protokoll",
       sub = "Match-Verlauf + Aktivität (Posts, Invites, Rejects, Matches)." },
@@ -141,88 +141,48 @@ local function PanelBgPath()
     return "Interface\\DialogFrame\\UI-DialogBox-Background"
 end
 
---- DialogBox stone fill + gold-tinted tooltip border (Ascension CA-like,
--- no DragonUI). Applied once per panel.
-local function ApplyStonePanel(f, borderA, bgA)
-    if type(f) ~= "table" then
-        return
-    end
-    if f._alfmRockApplied == true then
-        return
-    end
-    f._alfmRockApplied = true
-    local path = PanelBgPath()
-    if type(f.CreateTexture) == "function" then
-        local bg = f:CreateTexture(nil, "BACKGROUND")
-        bg:SetAllPoints(f)
-        bg:SetTexture(path)
-        bg:SetAlpha(type(bgA) == "number" and bgA or 0.97)
-        f._alfmRockBg = bg
-    end
-    if f.SetBackdrop then
-        f:SetBackdrop({
-            bgFile = nil,
-            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-            tile = true, tileSize = 16, edgeSize = 12,
-            insets = { left = 3, right = 3, top = 3, bottom = 3 },
-        })
-        local a = type(borderA) == "number" and borderA or 0.75
-        if f.SetBackdropBorderColor then
-            f:SetBackdropBorderColor(0.72, 0.58, 0.28, a)
-        end
-        if f.SetBackdropColor then
-            f:SetBackdropColor(0, 0, 0, 0)
-        end
-    end
-end
-
-local function ApplyParchment(f)
-    ApplyStonePanel(f, 0.55, 0.97)
-end
-
-local function ApplySidebar(f)
-    ApplyStonePanel(f, 0.50, 0.97)
-end
-
+--- Quiet well: tooltip inset, no gold hairline (Interface Options / CallBoard).
 local function ApplyInset(f)
-    ApplyStonePanel(f, 0.70, 0.95)
+    if type(f) ~= "table" or type(f.SetBackdrop) ~= "function" then
+        return
+    end
+    if f._alfmQuietWell == true then
+        return
+    end
+    f._alfmQuietWell = true
+    f:SetBackdrop({
+        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 16, edgeSize = 12,
+        insets = { left = 3, right = 3, top = 3, bottom = 3 },
+    })
+    if f.SetBackdropColor then
+        f:SetBackdropColor(0, 0, 0, 0.35)
+    end
+    if f.SetBackdropBorderColor then
+        f:SetBackdropBorderColor(0.50, 0.50, 0.50, 0.70)
+    end
 end
 
-local function ApplyToggleRow(f)
-    ApplyStonePanel(f, 0.45, 0.94)
+local function ApplyParchment(_f)
+end
+
+local function ApplySidebar(_f)
+end
+
+local function ApplyToggleRow(_f)
 end
 
 local function ApplyNavButton(f, selected)
-    if type(f) ~= "table" then
+    if AscensionLFM.Chrome and AscensionLFM.Chrome.ApplyCategoryButton then
+        AscensionLFM.Chrome.ApplyCategoryButton(f, selected)
         return
     end
-    if type(f.CreateTexture) == "function" and type(f._alfmNavBg) ~= "table" then
-        f._alfmNavBg = f:CreateTexture(nil, "BACKGROUND")
-        f._alfmNavBg:SetPoint("TOPLEFT", 1, -1)
-        f._alfmNavBg:SetPoint("BOTTOMRIGHT", -1, 1)
-        f._alfmNavBg:SetTexture(PanelBgPath())
-    end
-    if type(f._alfmNavBg) == "table" and f._alfmNavBg.SetAlpha then
-        f._alfmNavBg:SetAlpha(selected and 1.0 or 0.92)
-    end
-    if f.SetBackdrop then
-        f:SetBackdrop({
-            bgFile = nil,
-            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-            tile = true, tileSize = 12, edgeSize = 10,
-            insets = { left = 2, right = 2, top = 2, bottom = 2 },
-        })
+    if type(f) == "table" and f._label and f._label.SetTextColor then
         if selected then
-            if f.SetBackdropBorderColor then
-                f:SetBackdropBorderColor(0.95, 0.82, 0.30, 0.95)
-            end
+            f._label:SetTextColor(1.00, 0.82, 0.00, 1)
         else
-            if f.SetBackdropBorderColor then
-                f:SetBackdropBorderColor(0.55, 0.42, 0.18, 0.45)
-            end
-        end
-        if f.SetBackdropColor then
-            f:SetBackdropColor(0, 0, 0, 0)
+            f._label:SetTextColor(1.00, 1.00, 1.00, 1)
         end
     end
 end
@@ -377,7 +337,7 @@ function MainWindow.RefreshSlots()
 end
 
 function MainWindow.RefreshRoleCheck()
-    local text = "Role check idle"
+    local text = "Role Check bereit"
     if AscensionLFM.RoleCheck and AscensionLFM.RoleCheck.GetStatus then
         local st = AscensionLFM.RoleCheck.GetStatus()
         if st and st.status then
@@ -399,7 +359,7 @@ local function FormatLastPostWall()
     local db = AscensionLFM.Database.Get()
     local t = tonumber(db.lastPostAt) or 0
     if t <= 0 then
-        return "never"
+        return "noch nie"
     end
     if type(date) == "function" then
         return date("%H:%M:%S", t)
@@ -423,19 +383,19 @@ function MainWindow.RefreshPost()
         local bits = {}
         if st.enabled then
             if st.isFull then
-                table.insert(bits, "Auto-repost STOPPED (full)")
+                table.insert(bits, "Auto-Repost gestoppt (voll)")
             elseif st.mode ~= "hosting" then
-                table.insert(bits, "Auto-repost idle (set Mode=Hosting)")
+                table.insert(bits, "Auto-Repost wartet (Modus = Hosten)")
             elseif st.countdown and st.countdown > 0 then
-                table.insert(bits, string.format("Next repost in %ds", st.countdown))
+                table.insert(bits, string.format("Nächster Repost in %ds", st.countdown))
             else
-                table.insert(bits, "Next repost soon")
+                table.insert(bits, "Nächster Repost bald")
             end
         else
-            table.insert(bits, "Auto-repost OFF")
+            table.insert(bits, "Auto-Repost aus")
         end
-        table.insert(bits, "Last post: " .. FormatLastPostWall())
-        table.insert(bits, "Channel: " .. tostring(st.channel or "YELL"))
+        table.insert(bits, "Letzter Post: " .. FormatLastPostWall())
+        table.insert(bits, "Kanal: " .. tostring(st.channel or "YELL"))
         postStatusFS:SetText(table.concat(bits, "  *  "))
     end
     if widgets.autoRepost and widgets.autoRepost.SetChecked then
@@ -484,7 +444,7 @@ function MainWindow.RefreshMatches()
             else
                 fs:SetText("")
                 if i == 1 then
-                    fs:SetText("|cffd1c299No matches yet.|r")
+                    fs:SetText("|cffd1c299Noch keine Matches.|r")
                     fs:Show()
                 else
                     fs:Hide()
@@ -515,7 +475,7 @@ function MainWindow.RefreshKicks()
             else
                 fs:SetText("")
                 if i == 1 then
-                    fs:SetText("|cffd1c299No kicks yet.|r")
+                    fs:SetText("|cffd1c299Noch keine Kicks.|r")
                     fs:Show()
                 else
                     fs:Hide()
@@ -541,7 +501,7 @@ function MainWindow.RefreshActivity()
             else
                 fs:SetText("")
                 if i == 1 then
-                    fs:SetText("|cffd1c299No activity yet.|r")
+                    fs:SetText("|cffd1c299Noch keine Aktivität.|r")
                     fs:Show()
                 else
                     fs:Hide()
@@ -593,7 +553,7 @@ function MainWindow.RefreshQueue()
                 if row.rejectBtn then row.rejectBtn:Show() end
             else
                 row.name = nil
-                row.label:SetText(i == 1 and "|cffd1c299No applicants yet.|r" or "")
+                row.label:SetText(i == 1 and "|cffd1c299Noch keine Bewerber.|r" or "")
                 if row.icon then
                     row.icon:SetTexture(i == 1 and row.ROLE_ICON_UNKNOWN or nil)
                 end
@@ -805,11 +765,11 @@ local function SetRole(role, on)
 end
 
 local function CreateSectionLabel(parent, text, y)
-    local label = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local label = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     label:SetPoint("TOPLEFT", 4, y)
     -- Kein string.upper: Chrome lässt Umlaute klein stehen.
+    -- GameFontNormal is official gold — no extra SetInk wash.
     label:SetText(text)
-    SetInk(label, SECTION)
     return label
 end
 
@@ -835,8 +795,6 @@ local function CreateToggleRow(parent, y, title, description, danger, onToggle)
     titleFs:SetText(TruncateText(title, 64))
     if danger then
         SetInk(titleFs, DANGER)
-    else
-        SetInk(titleFs, INK)
     end
 
     local descFs = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -845,7 +803,6 @@ local function CreateToggleRow(parent, y, title, description, danger, onToggle)
     descFs:SetJustifyH("LEFT")
     FitText(descFs, nil, 36)
     descFs:SetText(description)
-    SetInk(descFs, MUTED)
 
     return check
 end
@@ -936,13 +893,7 @@ local function SetCategoryHighlight(id)
         if button then
             local selected = (catId == id)
             ApplyNavButton(button, selected)
-            if button._label then
-                if selected then
-                    button._label:SetTextColor(1.00, 0.92, 0.55, 1)
-                else
-                    button._label:SetTextColor(0.90, 0.84, 0.68, 1)
-                end
-            end
+            -- Label color comes from Chrome.ApplyCategoryButton.
         end
     end
 end
@@ -1012,9 +963,10 @@ local function BuildAppearanceCategory(pageHost)
         return fs
     end
     note(appearance,
-        "Fenster nutzen Ascension-natives DialogBox- und InsetFrame-Chrome "
-            .. "(WoW 3.3.5a FrameXML). Keine Fremd-Addon-Texturen. "
-            .. "Debug: /alfmchrome oder /alfmchrome hud",
+        "Chrome folgt AscensionUI: DialogBox außen, InsetFrame-Wells mit "
+            .. "ShadowOverlay, Kategorien wie Interface-Optionen "
+            .. "(QuestTitleHighlight + GameFont), UIPanel-Buttons ohne Gold-Wash. "
+            .. "Keine Fremd-Addon-Texturen. Debug: /alfmchrome oder /alfmchrome hud",
         y)
 end
 
@@ -1038,8 +990,7 @@ function MainWindow.Init()
         tinsert(UISpecialFrames, FRAME_NAME)
     end
 
-    -- Ascension-native DialogBox + header + UIPanelCloseButton (AscFastRoll /
-    -- RaidInfo path). Never PortraitFrame; no DragonUI textures.
+    -- DialogBox + header + UIPanelCloseButton. Never PortraitFrame.
     if AscensionLFM.Chrome and AscensionLFM.Chrome.ApplyClassicChrome then
         AscensionLFM.Chrome.ApplyClassicChrome(frame, {
             header = true,
@@ -1058,7 +1009,7 @@ function MainWindow.Init()
 
     local titleBg = CreateFrame("Frame", nil, frame)
     titleBg:SetPoint("TOP", frame, "TOP", 0, -2)
-    titleBg:SetSize(260, 34)
+    titleBg:SetSize(280, 34)
     if titleBg.SetFrameLevel and frame.GetFrameLevel then
         titleBg:SetFrameLevel((frame:GetFrameLevel() or 0) + 22)
     end
@@ -1072,61 +1023,64 @@ function MainWindow.Init()
     title:SetDrawLayer("OVERLAY")
     title:SetPoint("TOP", titleBg, "TOP", 0, -6)
     title:SetText("AscensionLFM")
-    SetInk(title, { 1.00, 0.90, 0.35, 1 })
 
     local sub = titleBg:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     sub:SetPoint("TOP", title, "BOTTOM", 0, -2)
     sub:SetText("Manastorm Level-Run LFM/LFG · v" .. tostring(AscensionLFM.VERSION or "?"))
-    SetInk(sub, { 0.88, 0.80, 0.55, 1 })
 
     local shell = CreateFrame("Frame", FRAME_NAME .. "Shell", frame)
-    shell:SetPoint("TOPLEFT", frame, "TOPLEFT", 18, -52)
-    shell:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -18, 18)
+    shell:SetPoint("TOPLEFT", frame, "TOPLEFT", 16, -54)
+    shell:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -16, 16)
 
-    local sidebar = CreateFrame("Frame", FRAME_NAME .. "Sidebar", shell)
+    local sidebar
+    if AscensionLFM.Chrome and AscensionLFM.Chrome.CreateInset then
+        sidebar = AscensionLFM.Chrome.CreateInset(shell, FRAME_NAME .. "Sidebar")
+    else
+        sidebar = CreateFrame("Frame", FRAME_NAME .. "Sidebar", shell)
+    end
     sidebar:SetPoint("TOPLEFT", 0, 0)
     sidebar:SetPoint("BOTTOMLEFT", 0, 0)
     sidebar:SetWidth(SIDEBAR_WIDTH)
     ApplySidebar(sidebar)
+    frame._alfmSidebar = sidebar
 
-    local sideLabel = sidebar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local sideLabel = sidebar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     sideLabel:SetPoint("TOPLEFT", 10, -10)
     sideLabel:SetText("Kategorien")
-    SetInk(sideLabel, { 1.00, 0.84, 0.35, 1 })
 
-    local y = -26
+    local navH = (AscensionLFM.Chrome and AscensionLFM.Chrome.NAV_H) or 22
+    local navGap = (AscensionLFM.Chrome and AscensionLFM.Chrome.NAV_GAP) or 2
+    local y = -30
     for i = 1, #CATEGORIES do
         local cat = CATEGORIES[i]
         local btn = CreateFrame("Button", FRAME_NAME .. "Nav_" .. cat.id, sidebar)
-        btn:SetHeight(26)
-        btn:SetPoint("TOPLEFT", 8, y)
-        btn:SetPoint("TOPRIGHT", -8, y)
-        ApplyNavButton(btn, false)
+        btn:SetHeight(navH)
+        btn:SetPoint("TOPLEFT", 6, y)
+        btn:SetPoint("TOPRIGHT", -6, y)
         local lbl = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        lbl:SetPoint("LEFT", 10, 0)
+        lbl:SetPoint("LEFT", 8, 0)
         lbl:SetText(cat.label)
-        lbl:SetTextColor(0.92, 0.85, 0.65, 1)
         btn._label = lbl
+        ApplyNavButton(btn, false)
         btn:SetScript("OnClick", function()
             MainWindow.SelectCategory(cat.id)
         end)
         categoryButtons[cat.id] = btn
-        y = y - 28
+        y = y - (navH + navGap)
     end
 
     local main = CreateFrame("Frame", FRAME_NAME .. "Main", shell)
     main:SetPoint("TOPLEFT", sidebar, "TOPRIGHT", 8, 0)
-    main:SetPoint("BOTTOMRIGHT", shell, "BOTTOMRIGHT", 0, 30)
+    main:SetPoint("BOTTOMRIGHT", shell, "BOTTOMRIGHT", 0, 28)
     ApplyParchment(main)
 
     categoryHeadTitle = main:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    categoryHeadTitle:SetPoint("TOPLEFT", 12, -10)
+    categoryHeadTitle:SetPoint("TOPLEFT", 10, -8)
     categoryHeadTitle:SetText("Allgemein")
-    SetInk(categoryHeadTitle, TITLE_INK)
 
     categoryHeadSub = main:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    categoryHeadSub:SetPoint("TOPLEFT", categoryHeadTitle, "BOTTOMLEFT", 0, -3)
-    categoryHeadSub:SetPoint("RIGHT", main, "RIGHT", -12, 0)
+    categoryHeadSub:SetPoint("TOPLEFT", categoryHeadTitle, "BOTTOMLEFT", 0, -2)
+    categoryHeadSub:SetPoint("RIGHT", main, "RIGHT", -10, 0)
     if categoryHeadSub.SetHeight then
         categoryHeadSub:SetHeight(28)
     end
@@ -1137,7 +1091,6 @@ function MainWindow.Init()
     if categoryHeadSub.SetNonSpaceWrap then
         categoryHeadSub:SetNonSpaceWrap(true)
     end
-    SetInk(categoryHeadSub, MUTED)
 
     -- Content well: InsetFrame (marble) or tooltip fallback. EditBoxes live
     -- on scroll children under pageHost — never on the metal chrome host.
@@ -1147,8 +1100,8 @@ function MainWindow.Init()
     else
         contentInset = CreateFrame("Frame", FRAME_NAME .. "Inset", main)
     end
-    contentInset:SetPoint("TOPLEFT", 8, -50)
-    contentInset:SetPoint("BOTTOMRIGHT", -8, 6)
+    contentInset:SetPoint("TOPLEFT", 6, -46)
+    contentInset:SetPoint("BOTTOMRIGHT", -6, 4)
     frame._alfmContentInset = contentInset
 
     local pageHost = CreateFrame("Frame", FRAME_NAME .. "PageHost", contentInset)
@@ -1165,9 +1118,10 @@ function MainWindow.Init()
     footerStatus:SetJustifyH("LEFT")
     SetInk(footerStatus, MUTED)
 
+    local btnH = (AscensionLFM.Chrome and AscensionLFM.Chrome.BUTTON_H) or 22
     local closeBtn = CreateFrame("Button", nil, footer, "UIPanelButtonTemplate")
     if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(closeBtn) end
-    closeBtn:SetSize(90, 22)
+    closeBtn:SetSize(90, btnH)
     closeBtn:SetPoint("RIGHT", 0, 0)
     closeBtn:SetText("Schließen")
     closeBtn:SetScript("OnClick", function()
@@ -1176,8 +1130,8 @@ function MainWindow.Init()
 
     clearBtn = CreateFrame("Button", nil, footer, "UIPanelButtonTemplate")
     if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(clearBtn) end
-    clearBtn:SetSize(72, 22)
-    clearBtn:SetPoint("RIGHT", closeBtn, "LEFT", -6, 0)
+    clearBtn:SetSize(72, btnH)
+    clearBtn:SetPoint("RIGHT", closeBtn, "LEFT", -1, 0)
     clearBtn:SetText("Leeren")
     clearBtn:Hide()
     clearBtn:SetScript("OnClick", function()
@@ -1211,7 +1165,7 @@ function MainWindow.Init()
     local statusBox = CreateFrame("Frame", nil, general)
     statusBox:SetPoint("TOPLEFT", 0, 0)
     statusBox:SetPoint("TOPRIGHT", 0, 0)
-    statusBox:SetHeight(48)
+    statusBox:SetHeight(44)
     ApplyInset(statusBox)
     statusFS = statusBox:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     statusFS:SetPoint("TOPLEFT", statusBox, "TOPLEFT", 8, -8)
@@ -2025,14 +1979,14 @@ function MainWindow.Init()
     widgets.roleCheckStatus:SetPoint("RIGHT", -4, 0)
     widgets.roleCheckStatus:SetJustifyH("LEFT")
     SetInk(widgets.roleCheckStatus, MUTED)
-    widgets.roleCheckStatus:SetText("Role check idle")
+    widgets.roleCheckStatus:SetText("Role Check bereit")
     roleCheckStatusFS = widgets.roleCheckStatus
 
     --------------------------------------------------------------------
     -- Post (LFM compose / scan / repost)
     --------------------------------------------------------------------
     local post = BuildCategoryPage(pageHost, CAT_POST, 620)
-    CreateSectionLabel(post, "LFM message", -4)
+    CreateSectionLabel(post, "LFM-Text", -4)
 
     local previewBox = CreateFrame("Frame", nil, post)
     previewBox:SetPoint("TOPLEFT", 0, -22)
@@ -2061,7 +2015,7 @@ function MainWindow.Init()
         end
     end)
 
-    CreateSectionLabel(post, "Channel", -84)
+    CreateSectionLabel(post, "Kanal", -84)
 
     local chRow = CreateFrame("Frame", nil, post)
     chRow:SetPoint("TOPLEFT", 0, -102)
@@ -2212,9 +2166,9 @@ function MainWindow.Init()
     postRoleCheckStatusFS:SetPoint("RIGHT", -4, 0)
     postRoleCheckStatusFS:SetJustifyH("LEFT")
     SetInk(postRoleCheckStatusFS, MUTED)
-    postRoleCheckStatusFS:SetText("Role check idle")
+    postRoleCheckStatusFS:SetText("Role Check bereit")
 
-    CreateSectionLabel(post, "Auto-repost", -250)
+    CreateSectionLabel(post, "Auto-Repost", -250)
     widgets.autoRepost = CreateToggleRow(post, -268,
         "Enable auto-repost (Hosting only)",
         "Rebuild LFM from slots each tick. Stops when full or disabled. Default OFF.",
@@ -2303,7 +2257,7 @@ function MainWindow.Init()
     -- Queue (applicants)
     --------------------------------------------------------------------
     local queue = BuildCategoryPage(pageHost, CAT_QUEUE, 420)
-    CreateSectionLabel(queue, "Recent applicant whispers", -4)
+    CreateSectionLabel(queue, "Aktuelle Bewerber-Whisper", -4)
     local qHint = queue:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     qHint:SetPoint("TOPLEFT", 4, -20)
     qHint:SetPoint("RIGHT", -4, 0)
@@ -2370,7 +2324,7 @@ function MainWindow.Init()
     -- Favorite applicants: a known-good-players whitelist (mirrors the
     -- existing leaderBlacklist), starred in the rows above. Purely
     -- informational - doesn't change invite/accept gating.
-    CreateSectionLabel(queue, "Favorite applicants", -338)
+    CreateSectionLabel(queue, "Lieblings-Bewerber", -338)
     local favLbl = queue:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     favLbl:SetPoint("TOPLEFT", 4, -356)
     favLbl:SetText("Name")
@@ -2448,7 +2402,7 @@ function MainWindow.Init()
     -- LFG/LFM (unified content-type selector: MS / Raid / M+)
     --------------------------------------------------------------------
     local content = BuildCategoryPage(pageHost, CAT_CONTENT, 300)
-    CreateSectionLabel(content, "Content type", -4)
+    CreateSectionLabel(content, "Inhaltstyp", -4)
     do
         local note = content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         note:SetPoint("TOPLEFT", 0, -22)
@@ -2683,7 +2637,7 @@ function MainWindow.Init()
     end
 
     local kick = BuildCategoryPage(pageHost, CAT_KICK, 300)
-    CreateSectionLabel(kick, "Level-59 auto-kick", -4)
+    CreateSectionLabel(kick, "Level-59 Auto-Kick", -4)
     widgets.autoKick = CreateToggleRow(kick, -22,
         "Enable kick at level 59 + raid warning every 10s",
         "Hosting/Full Auto * lead/assist * ignores self * RW then kick (deferred). /alfm status shows why. Default OFF.",
@@ -2693,7 +2647,7 @@ function MainWindow.Init()
             RefreshStatus()
         end)
 
-    CreateSectionLabel(kick, "Recent kicks", -92)
+    CreateSectionLabel(kick, "Letzte Kicks", -92)
     local kickBox = CreateFrame("Frame", nil, kick)
     kickBox:SetPoint("TOPLEFT", 0, -110)
     kickBox:SetPoint("BOTTOMRIGHT", 0, 0)
@@ -2718,7 +2672,7 @@ function MainWindow.Init()
     BuildAppearanceCategory(pageHost)
 
     local log = BuildCategoryPage(pageHost, CAT_LOG, 480)
-    CreateSectionLabel(log, "Recent matches", -4)
+    CreateSectionLabel(log, "Letzte Matches", -4)
     local matchBox = CreateFrame("Frame", nil, log)
     matchBox:SetPoint("TOPLEFT", 0, -20)
     matchBox:SetPoint("TOPRIGHT", 0, -20)
@@ -2737,7 +2691,7 @@ function MainWindow.Init()
         my = my - 38
     end
 
-    CreateSectionLabel(log, "Session summary", -232)
+    CreateSectionLabel(log, "Sitzung", -232)
     sessionSummaryFS = log:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     sessionSummaryFS:SetPoint("TOPLEFT", 4, -250)
     sessionSummaryFS:SetPoint("RIGHT", -110, 0)
@@ -2765,7 +2719,7 @@ function MainWindow.Init()
         MainWindow.RefreshActivity()
     end)
 
-    CreateSectionLabel(log, "Activity (posts / invites / rejects / matches)", -282)
+    CreateSectionLabel(log, "Aktivität (Posts, Invites, Rejects, Matches)", -282)
     local actBox = CreateFrame("Frame", nil, log)
     actBox:SetPoint("TOPLEFT", 0, -300)
     actBox:SetPoint("BOTTOMRIGHT", 0, 0)

@@ -70,5 +70,5 @@ Chrome debug
 /alfmchrome              MainWindow DialogBox chrome dump
 /alfmchrome hud          MiniHUD DialogBox chrome dump
 
-UI uses Ascension-native FrameXML only (DialogBox + InsetFrame). No other
-UI addon (e.g. DragonUI) is required.
+UI follows AscensionUI: DialogBox + InsetFrame wells, GameFont, stock
+UIPanel buttons. No other UI addon (e.g. DragonUI) is required.

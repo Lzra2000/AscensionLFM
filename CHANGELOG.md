@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.4.140
+
+- **AscensionUI visual bar (layout only).** Official AscensionUI / CallBoard /
+  Interface Options is the benchmark — not homemade gold DialogBox boxes.
+  Measured from the client extract (`AscensionUI` SharedGossip insets +
+  `GameFont*` + MagicButton 22px; Interface Options category list).
+  - Category sidebar is an **InsetFrame** well (CallBoard Tabs pattern) with
+    COMMON `ShadowOverlay-*`. Rows use `UI-QuestTitleHighlight` + GameFontNormal
+    (selected) / GameFontHighlightSmall (idle). No gold tooltip boxes.
+  - Content well keeps InsetFrame + the same inner shadow. Toggle rows and the
+    main parchment no longer grow a gold hairline each.
+  - **UIPanelButton** stays stock (no gold vertex wash). Footer pair uses
+    MagicButton 22px / 1px gap.
+  - Typography: GameFontNormal / NormalLarge / HighlightSmall without extra
+    gold `SetInk` on titles and section headers.
+  - Roster cards / pickers: tooltip border instead of WHITE8X8 gold 1px.
+    Role-color chips unchanged.
+  - German (du) chrome leftovers: LFM-Text, Kanal, Auto-Repost, empty states,
+    Role-Check-bereit, Post-Status. No protocol / slash / Safe-API change.
+  - Debug: `/alfmchrome` still dumps DialogBox regions.
+
 ## 0.4.139
 
 - **Verify: DragonUI fully out of runtime.** Grep-clean: no

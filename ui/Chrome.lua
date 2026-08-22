@@ -1,13 +1,11 @@
 -- AscensionLFM: ui/Chrome.lua
--- Ascension-native window chrome only (WoW 3.3.5a / FrameXML).
--- DialogBox backdrop + optional header / UIPanelCloseButton.
--- Content wells: InsetFrameTemplate (marble) with Tooltip backdrop fallback.
+-- Visual bar: official AscensionUI / Interface Options discipline.
+-- Outer window: DialogBox + optional header / UIPanelCloseButton.
+-- Wells: InsetFrameTemplate (marble) + COMMON ShadowOverlay (CallBoard).
+-- Category list: QuestTitleHighlight, GameFontNormal / GameFontHighlightSmall.
+-- Buttons: stock UIPanelButtonTemplate at 22px — no gold vertex wash.
 --
--- No DragonUI: no DragonUI texture paths, nineslice, or HasDragonUI branch.
--- NEVER use PortraitFrameTemplate — Buildschmiede hit empty EditBox /
--- UI errors after PortraitFrame reparenting. Stick to InsetFrame,
--- UIPanelButtonTemplate, DialogBox paths, and keep EditBoxes on content
--- children (not chrome hosts).
+-- No DragonUI. NEVER PortraitFrameTemplate (EditBox parenting).
 -- Engine texture paths only — no proprietary FrameXML copied into the repo.
 
 local AscensionLFM = _G.AscensionLFM
@@ -24,6 +22,20 @@ Chrome.CLASSIC_EDGE   = "Interface\\DialogFrame\\UI-DialogBox-Border"
 Chrome.CLASSIC_HEADER = "Interface\\DialogFrame\\UI-DialogBox-Header"
 Chrome.CLASSIC_CORNER = "Interface\\DialogFrame\\UI-DialogBox-Corner"
 Chrome.MARBLE_BG      = "Interface\\FrameGeneral\\UI-Background-Marble"
+Chrome.NAV_HIGHLIGHT  = "Interface\\QuestFrame\\UI-QuestTitleHighlight"
+Chrome.SHADOW_TOP     = "Interface\\COMMON\\ShadowOverlay-Top"
+Chrome.SHADOW_BOTTOM  = "Interface\\COMMON\\ShadowOverlay-Bottom"
+Chrome.SHADOW_LEFT    = "Interface\\COMMON\\ShadowOverlay-left"
+Chrome.SHADOW_RIGHT   = "Interface\\COMMON\\ShadowOverlay-Right"
+
+-- MagicButton / UIPanelButton height (AscensionUI ButtonTemplates).
+Chrome.BUTTON_H = 22
+Chrome.NAV_H    = 22
+Chrome.NAV_GAP  = 2
+
+-- GameFontNormal gold (WotLK / AscensionUI). Do not invent extra golds.
+Chrome.FONT_NORMAL    = { 1.00, 0.82, 0.00, 1 }
+Chrome.FONT_HIGHLIGHT = { 1.00, 1.00, 1.00, 1 }
 
 -- Light ink for InputBoxTemplate on dark DialogBox / inset panels.
 -- InputBoxTemplate defaults to near-black text — invisible on dark chrome.
@@ -56,6 +68,90 @@ end
 --- Always DialogBox background — no external addon textures.
 function Chrome.BackgroundPath()
     return Chrome.CLASSIC_BG
+end
+
+--- CallBoard-style inner shadow on an InsetFrame (client COMMON overlays).
+function Chrome.ApplyInsetShadows(inset)
+    if type(inset) ~= "table" or type(inset.CreateTexture) ~= "function" then
+        return
+    end
+    if inset._alfmShadows then
+        return
+    end
+    inset._alfmShadows = true
+    local function edge(path, pointA, relA, pointB, relB)
+        local tex = inset:CreateTexture(nil, "OVERLAY")
+        if not tex then return end
+        tex:SetTexture(path)
+        if tex.SetAlpha then tex:SetAlpha(0.45) end
+        if tex.SetPoint then
+            tex:SetPoint(pointA, inset, relA or pointA, 0, 0)
+            if pointB then
+                tex:SetPoint(pointB, inset, relB or pointB, 0, 0)
+            end
+        end
+        if path == Chrome.SHADOW_TOP or path == Chrome.SHADOW_BOTTOM then
+            if tex.SetHeight then tex:SetHeight(20) end
+        else
+            if tex.SetWidth then tex:SetWidth(16) end
+        end
+    end
+    edge(Chrome.SHADOW_TOP, "TOPLEFT", "TOPLEFT", "TOPRIGHT", "TOPRIGHT")
+    edge(Chrome.SHADOW_BOTTOM, "BOTTOMLEFT", "BOTTOMLEFT", "BOTTOMRIGHT", "BOTTOMRIGHT")
+    edge(Chrome.SHADOW_LEFT, "TOPLEFT", "TOPLEFT", "BOTTOMLEFT", "BOTTOMLEFT")
+    edge(Chrome.SHADOW_RIGHT, "TOPRIGHT", "TOPRIGHT", "BOTTOMRIGHT", "BOTTOMRIGHT")
+end
+
+--- Interface Options category row: highlight + GameFont, no gold box.
+function Chrome.ApplyCategoryButton(button, selected)
+    if type(button) ~= "table" then
+        return
+    end
+    if type(button.CreateTexture) == "function" and type(button._alfmNavHi) ~= "table" then
+        local hi = button:CreateTexture(nil, "BACKGROUND")
+        hi:SetTexture(Chrome.NAV_HIGHLIGHT)
+        if hi.SetBlendMode then
+            pcall(function() hi:SetBlendMode("ADD") end)
+        end
+        if hi.SetPoint then
+            hi:SetPoint("TOPLEFT", 2, 0)
+            hi:SetPoint("BOTTOMRIGHT", -2, 0)
+        end
+        if hi.SetAlpha then hi:SetAlpha(0.75) end
+        button._alfmNavHi = hi
+    end
+    local hi = button._alfmNavHi
+    if type(hi) == "table" then
+        if selected then
+            if hi.Show then hi:Show() end
+            if hi.SetAlpha then hi:SetAlpha(0.80) end
+        elseif hi.Hide then
+            hi:Hide()
+        end
+    end
+    if button.SetBackdrop then
+        button:SetBackdrop(nil)
+    end
+    local lbl = button._label
+    if type(lbl) == "table" then
+        if selected then
+            if lbl.SetFontObject then
+                pcall(function() lbl:SetFontObject("GameFontNormal") end)
+            end
+            if lbl.SetTextColor then
+                local c = Chrome.FONT_NORMAL
+                lbl:SetTextColor(c[1], c[2], c[3], c[4] or 1)
+            end
+        else
+            if lbl.SetFontObject then
+                pcall(function() lbl:SetFontObject("GameFontHighlightSmall") end)
+            end
+            if lbl.SetTextColor then
+                local c = Chrome.FONT_HIGHLIGHT
+                lbl:SetTextColor(c[1], c[2], c[3], c[4] or 1)
+            end
+        end
+    end
 end
 
 --- Apply DialogBox chrome. opts.header / opts.closeButton optional.
@@ -138,6 +234,7 @@ function Chrome.CreateInset(parent, name)
                 end
             end)
             inset._alfmInsetKind = "InsetFrameTemplate"
+            Chrome.ApplyInsetShadows(inset)
             return inset
         end
         -- Template name accepted but no Bg region (sandbox / stub) — fall through.
@@ -162,6 +259,7 @@ function Chrome.CreateInset(parent, name)
         if inset.SetBackdropBorderColor then inset:SetBackdropBorderColor(br, bgc, bb, 1) end
     end
     inset._alfmInsetKind = "tooltip-fallback"
+    Chrome.ApplyInsetShadows(inset)
     return inset
 end
 
@@ -196,20 +294,10 @@ function Chrome.CreatePanelCloseButton(parent, onClick)
     return btn
 end
 
---- Tint UIPanelButtonTemplate toward gold/dark chrome (no custom atlas).
+--- Stock UIPanelButton — AscensionUI / Interface Options do not gold-wash
+-- the atlas. Hook kept so call sites stay stable; height is set at create.
 function Chrome.SkinActionButton(button)
-    if type(button) ~= "table" then return end
-    if button.GetFontString and button:GetFontString() then
-        button:GetFontString():SetTextColor(1.00, 0.82, 0.24)
-    end
-    local function tint(tex)
-        if tex and tex.SetVertexColor then
-            tex:SetVertexColor(0.85, 0.72, 0.45)
-        end
-    end
-    if button.GetNormalTexture then tint(button:GetNormalTexture()) end
-    if button.GetPushedTexture then tint(button:GetPushedTexture()) end
-    if button.GetDisabledTexture then tint(button:GetDisabledTexture()) end
+    return button
 end
 
 -- ---- Debug tools ----

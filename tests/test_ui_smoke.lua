@@ -231,6 +231,9 @@ check("GetFrame exists", type(MW.GetFrame) == "function")
 
 check("Chrome.StyleEditBox exists", type(AscensionLFM.Chrome.StyleEditBox) == "function")
 check("Chrome.CreateInset exists", type(AscensionLFM.Chrome.CreateInset) == "function")
+check("Chrome.ApplyCategoryButton exists", type(AscensionLFM.Chrome.ApplyCategoryButton) == "function")
+check("Chrome.ApplyInsetShadows exists", type(AscensionLFM.Chrome.ApplyInsetShadows) == "function")
+check("Chrome.BUTTON_H is 22", AscensionLFM.Chrome.BUTTON_H == 22)
 check("Chrome.EDIT_INK present", type(AscensionLFM.Chrome.EDIT_INK) == "table")
 
 MW.Init()
@@ -242,6 +245,7 @@ check("frame size height", f._height == 600)
 check("default category general", MW.GetActiveCategory() == "general")
 check("UISpecialFrames registered", UISpecialFrames[1] == "AscensionLFMFrame")
 check("content inset present", type(f._alfmContentInset) == "table")
+check("sidebar inset present", type(f._alfmSidebar) == "table")
 
 -- Regression: InputBoxTemplate on dark chrome must get light ink (v0.4.135).
 local whisper = _G.AscensionLFMWhisperEdit

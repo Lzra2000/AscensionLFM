@@ -55,7 +55,11 @@ Repo: `Lzra2000/AscensionLFM`. Direct-pushes to `main`, no PR workflow.
    into `AscensionLFM-<version>.zip`, present it to the user - the repo
    isn't directly installable, only the zip is.
 
-## UI chrome rules (Season 10 bar)
+## UI chrome rules (AscensionUI bar)
+
+The visual benchmark is official **AscensionUI** (CallBoard insets,
+GameFont, MagicButton 22px) plus Interface Options category lists — not
+homemade gold boxes on every widget.
 
 - **Never `PortraitFrameTemplate`** for windows that host EditBoxes /
   multiline text. Buildschmiede hit empty / clipped export text after
@@ -64,13 +68,18 @@ Repo: `Lzra2000/AscensionLFM`. Direct-pushes to `main`, no PR workflow.
 - Every `InputBoxTemplate` must go through `Chrome.StyleEditBox` (or
   `CreateStyledEditBox` in MainWindow) so ink stays readable on dark
   DialogBox / inset panels. Do not rely on the template default.
+- Category rows: `Chrome.ApplyCategoryButton` (QuestTitleHighlight +
+  GameFontNormal / GameFontHighlightSmall). Do not wrap nav in gold
+  tooltip borders.
+- Buttons stay **stock** `UIPanelButtonTemplate` at `Chrome.BUTTON_H`
+  (22). Do not gold-wash vertex colors.
 - User-facing German uses **du**, short sentences. No `string.upper` on
   labels that may contain Umlaute.
 - Ascension APIs: prefer `AscensionLFM.Safe` / `pcall`; remember
   **pcall success ≠ server acted** (see Sort Groups / UninviteUnit).
-- **No DragonUI.** Chrome is Ascension FrameXML DialogBox only
-  (`ui/Chrome.lua`). Do not reintroduce `Interface\AddOns\DragonUI\…`
-  texture paths, `HasDragonUI`, or metal nineslice.
+- **No DragonUI.** Chrome is Ascension FrameXML only (`ui/Chrome.lua`).
+  Do not reintroduce `Interface\AddOns\DragonUI\…` texture paths,
+  `HasDragonUI`, or metal nineslice.
 
 ## Module map
 
@@ -130,13 +139,16 @@ Repo: `Lzra2000/AscensionLFM`. Direct-pushes to `main`, no PR workflow.
 
 ## Chrome (Ascension-native only)
 
-As of v0.4.138 there is **no DragonUI** in this addon:
+As of v0.4.140 chrome targets **AscensionUI** discipline (no DragonUI):
 
 - `ui/Chrome.lua` — DialogBox backdrop, optional header / UIPanelCloseButton,
-  InsetFrame wells. `ApplyMetalChrome` is an alias that always calls
+  InsetFrame wells + COMMON ShadowOverlay, `ApplyCategoryButton`, stock
+  buttons. `ApplyMetalChrome` is an alias that always calls
   `ApplyClassicChrome`.
 - Do **not** reintroduce `Interface\AddOns\DragonUI\…` paths, `HasDragonUI`,
   metal nineslice, or Appearance offset knobs for foreign textures.
+- Do **not** gold-box every toggle / nav row — that is below the
+  AscensionUI bar.
 - Diagnostics: `/alfmchrome`, `/alfmhuddebug`, `/alfmmaindebug` measure
   native chrome regions — use them instead of guessing.
 

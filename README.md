@@ -11,8 +11,8 @@ WotLK **3.3.5a** addon for Ascension that scans chat and whispers for **Manastor
 
 See `INSTALL.txt` inside the zip for a short checklist.
 
-**UI:** Ascension-native FrameXML only (DialogBox / InsetFrame / UIPanel*).
-No DragonUI (or other UI-replacement addon) is required.
+**UI:** AscensionUI-Niveau — DialogBox außen, InsetFrame-Wells, GameFont,
+stock UIPanel-Buttons. Kein DragonUI nötig.
 
 ## Installation (DE)
 

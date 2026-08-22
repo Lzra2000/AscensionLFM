@@ -1375,13 +1375,11 @@ local function BuildFrame()
     local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     title:SetPoint("TOPLEFT", 8, -6)
     title:SetText("AscensionLFM")
-    title:SetTextColor(1, 0.82, 0.24)
     f.titleFS = title
 
     local chip = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     chip:SetPoint("LEFT", title, "RIGHT", 8, 0)
     chip:SetText("HOST")
-    chip:SetTextColor(0.92, 0.84, 0.50)
     f.chipFS = chip
 
     -- Collapsed-state icon shown instead of the abbreviated "ALFM" text
