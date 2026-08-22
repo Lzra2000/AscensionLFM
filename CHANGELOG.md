@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.4.135
+
+- **Season-10 quality pass (chrome + German + Safe).** Raise AscensionLFM toward
+  the same bar as AscBuildschmiede: readable dark EditBoxes, no PortraitFrame
+  traps, `AscensionLFM.Safe`, and du-tone German on primary chrome.
+  - **EditBox ink:** `Chrome.StyleEditBox` + `MainWindow.CreateStyledEditBox`
+    force light text on every `InputBoxTemplate` (18 boxes previously used the
+    default near-black ink — invisible on DragonUI rock; Appearance "Corner
+    size" was the live report). Regression in `test_ui_smoke.lua`.
+  - **No PortraitFrame:** documented and enforced in Chrome/MainWindow —
+    Buildschmiede's empty-export bug came from nesting EditBoxes under
+    PortraitFrame chrome. Content wells use `Chrome.CreateInset`
+    (InsetFrameTemplate / tooltip fallback); EditBoxes stay on scroll children.
+  - **Classic DialogBox fallback:** without DragonUI, MainWindow gets
+    `UI-DialogBox-Header` + `UIPanelCloseButton` (AscFastRoll / RaidInfo path).
+    MiniHUD stays header-free (compact).
+  - **`AscensionLFM.Safe` + `core/AscensionAPI.lua`:** Safe wrappers for
+    verified Manastorm/LFG read APIs (`docs/NOTES-ascension-apis.md`).
+    Bootstrap keeps a Safe fallback if the API file is missing.
+    Remember: pcall success ≠ server acted (Sort Groups / UninviteUnit).
+  - **German (du):** category nav, footer Schliessen/Leeren, Minimap tooltip,
+    Roster labels (Gruppe/Bereit/Sortieren), TOC Notes, status ModeLabel.
+    Section headers no longer `string.upper` (Umlaut trap).
+  - Interface stays **30300**. Live AddOns folder synced from repo.
+
 ## 0.4.134
 
 - **Fixed: "Sort Groups" replanned the same swap on every click.** Reported

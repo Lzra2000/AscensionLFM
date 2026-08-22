@@ -37,10 +37,10 @@ local function SetAngle(angleDeg)
 end
 
 local MODE_LABEL = {
-    off = "Off",
+    off = "Aus",
     notify = "Notify",
-    seeking = "Seeking",
-    hosting = "Hosting",
+    seeking = "Suchen",
+    hosting = "Hosten",
 }
 
 local function PendingCount()
@@ -82,7 +82,7 @@ local function BuildTooltip(self)
     GameTooltip:SetText("AscensionLFM", 1, 0.82, 0.24)
     local db = DB()
     local mode = (db and MODE_LABEL[db.mode]) or "Notify"
-    GameTooltip:AddLine("Mode: " .. mode, 0.9, 0.9, 0.9)
+    GameTooltip:AddLine("Modus: " .. mode, 0.9, 0.9, 0.9)
     if AscensionLFM.Activity and AscensionLFM.Activity.GetSessionSummary and AscensionLFM.Activity.FormatSessionSummary then
         local ok, summary = pcall(AscensionLFM.Activity.GetSessionSummary)
         if ok and summary then
@@ -94,12 +94,12 @@ local function BuildTooltip(self)
     end
     local pending = PendingCount()
     if pending > 0 then
-        GameTooltip:AddLine(pending .. " applicant(s) waiting in Queue", 1, 0.6, 0.3)
+        GameTooltip:AddLine(pending .. " Bewerber in der Warteschlange", 1, 0.6, 0.3)
     end
     GameTooltip:AddLine(" ")
-    GameTooltip:AddLine("Left-click: open settings", 0.6, 0.8, 1)
-    GameTooltip:AddLine("Right-click: toggle Mini HUD", 0.6, 0.8, 1)
-    GameTooltip:AddLine("Drag: move", 0.6, 0.8, 1)
+    GameTooltip:AddLine("Linksklick: Einstellungen", 0.6, 0.8, 1)
+    GameTooltip:AddLine("Rechtsklick: Mini-HUD umschalten", 0.6, 0.8, 1)
+    GameTooltip:AddLine("Ziehen: verschieben", 0.6, 0.8, 1)
     GameTooltip:Show()
 end
 

@@ -125,12 +125,9 @@ local function NewFrame()
             return function(self)
                 self._allPoints = true
             end
-        elseif key == "ClearAllPoints"
-            or key == "EnableMouse" or key == "RegisterForDrag" or key == "SetMovable"
-            or key == "StartMoving" or key == "StopMovingOrSizing"
-            or key == "SetAutoFocus" or key == "ClearFocus"
+        elseif key == "SetAutoFocus" or key == "ClearFocus"
             or key == "SetNumeric" or key == "SetMaxLetters"
-            or key == "SetJustifyH" or key == "SetTextColor"
+            or key == "SetJustifyH"
             or key == "SetBackdrop" or key == "SetBackdropColor" or key == "SetBackdropBorderColor"
             or key == "SetFrameStrata" or key == "SetFrameLevel" or key == "SetID"
             or key == "RegisterForClicks"
@@ -138,6 +135,10 @@ local function NewFrame()
             or key == "SetVerticalScroll" or key == "GetVerticalScroll"
             or key == "GetVerticalScrollRange" then
             return Noop
+        elseif key == "SetTextColor" then
+            return function(self, r, g, b, a)
+                self._textColor = { r, g, b, a or 1 }
+            end
         end
         return Noop
     end
@@ -228,6 +229,10 @@ check("SelectCategory exists", type(MW.SelectCategory) == "function")
 check("GetActiveCategory exists", type(MW.GetActiveCategory) == "function")
 check("GetFrame exists", type(MW.GetFrame) == "function")
 
+check("Chrome.StyleEditBox exists", type(AscensionLFM.Chrome.StyleEditBox) == "function")
+check("Chrome.CreateInset exists", type(AscensionLFM.Chrome.CreateInset) == "function")
+check("Chrome.EDIT_INK present", type(AscensionLFM.Chrome.EDIT_INK) == "table")
+
 MW.Init()
 local f = MW.GetFrame()
 check("frame created", type(f) == "table")
@@ -236,6 +241,15 @@ check("frame size width", f._width == 760)
 check("frame size height", f._height == 600)
 check("default category general", MW.GetActiveCategory() == "general")
 check("UISpecialFrames registered", UISpecialFrames[1] == "AscensionLFMFrame")
+check("content inset present", type(f._alfmContentInset) == "table")
+
+-- Regression: InputBoxTemplate on dark chrome must get light ink (v0.4.135).
+local whisper = _G.AscensionLFMWhisperEdit
+check("whisper EditBox created", type(whisper) == "table")
+check("whisper EditBox has light ink",
+    type(whisper._textColor) == "table"
+        and whisper._textColor[1] and whisper._textColor[1] > 0.5
+        and whisper._textColor[2] and whisper._textColor[2] > 0.5)
 
 local cats = { "general", "seeking", "hosting", "post", "queue", "kick", "log" }
 for i = 1, #cats do

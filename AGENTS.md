@@ -55,6 +55,20 @@ Repo: `Lzra2000/AscensionLFM`. Direct-pushes to `main`, no PR workflow.
    into `AscensionLFM-<version>.zip`, present it to the user - the repo
    isn't directly installable, only the zip is.
 
+## UI chrome rules (Season 10 bar)
+
+- **Never `PortraitFrameTemplate`** for windows that host EditBoxes /
+  multiline text. Buildschmiede hit empty / clipped export text after
+  PortraitFrame reparenting. Prefer DialogBox + `Chrome.CreateInset` +
+  `UIPanelButtonTemplate`.
+- Every `InputBoxTemplate` must go through `Chrome.StyleEditBox` (or
+  `CreateStyledEditBox` in MainWindow) so ink stays readable on DragonUI
+  rock. Do not rely on the template default.
+- User-facing German uses **du**, short sentences. No `string.upper` on
+  labels that may contain Umlaute.
+- Ascension APIs: prefer `AscensionLFM.Safe` / `pcall`; remember
+  **pcall success ≠ server acted** (see Sort Groups / UninviteUnit).
+
 ## Module map
 
 - `core/Database.lua` — SavedVariables schema + defaults +

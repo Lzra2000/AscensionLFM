@@ -8,8 +8,23 @@ if type(AscensionLFM) ~= "table" then
     _G.AscensionLFM = AscensionLFM
 end
 
-AscensionLFM.VERSION = "0.4.134"
+AscensionLFM.VERSION = "0.4.135"
 AscensionLFM.ADDON_NAME = "AscensionLFM"
+
+-- Safe lives in AscensionAPI.lua (loads first). Keep a late fallback if
+-- that file is missing from a partial install.
+if type(AscensionLFM.Safe) ~= "function" then
+    function AscensionLFM.Safe(fn, ...)
+        if type(fn) ~= "function" then
+            return nil
+        end
+        local ok, a, b, c, d, e = pcall(fn, ...)
+        if not ok then
+            return nil
+        end
+        return a, b, c, d, e
+    end
+end
 
 local function Print(msg)
     if DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
@@ -20,13 +35,13 @@ AscensionLFM.Print = Print
 
 local function ModeLabel(mode)
     if mode == "notify" then
-        return "Notify (Listening ON)"
+        return "Notify (Listening an)"
     elseif mode == "seeking" then
-        return "Seeking (Listening ON)"
+        return "Suchen (Listening an)"
     elseif mode == "hosting" then
-        return "Hosting (Listening ON)"
+        return "Hosten (Listening an)"
     end
-    return "Off (Listening OFF)"
+    return "Aus (Listening aus)"
 end
 
 local function OnOff(v)

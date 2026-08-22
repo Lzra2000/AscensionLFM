@@ -1,7 +1,13 @@
 -- AscensionLFM: ui/Chrome.lua
--- Shared DragonUI metal nineslice + rock background.
--- ONLY DragonUI textures when DragonUI is loaded. No WHITE8X8 gold edges.
--- Technique matches DragonUI bags_skin LayoutChrome / RealChrome.Apply.
+-- Shared window chrome: DragonUI metal nineslice when present, else classic
+-- DialogBox backdrop (+ optional header / UIPanelCloseButton).
+-- Content wells: InsetFrameTemplate (marble) with Tooltip backdrop fallback.
+--
+-- NEVER use PortraitFrameTemplate here — Buildschmiede hit empty EditBox /
+-- UI errors after PortraitFrame reparenting. Stick to InsetFrame,
+-- UIPanelButtonTemplate, DialogBox paths, and keep EditBoxes on content
+-- children (not the metal chrome host).
+-- Engine texture paths only — no proprietary FrameXML copied into the repo.
 
 local AscensionLFM = _G.AscensionLFM
 if type(AscensionLFM) ~= "table" then
@@ -18,8 +24,40 @@ Chrome.DUI_METAL_V = "Interface\\AddOns\\DragonUI\\Textures\\UI\\uiframemetalver
 Chrome.DUI_BG      = "Interface\\AddOns\\DragonUI\\Textures\\UI\\ui-background-rock"
 Chrome.DUI_CLOSE   = "Interface\\AddOns\\DragonUI\\Textures\\UI\\redbutton2x"
 
-Chrome.CLASSIC_BG   = "Interface\\DialogFrame\\UI-DialogBox-Background"
-Chrome.CLASSIC_EDGE = "Interface\\DialogFrame\\UI-DialogBox-Border"
+Chrome.CLASSIC_BG     = "Interface\\DialogFrame\\UI-DialogBox-Background"
+Chrome.CLASSIC_EDGE   = "Interface\\DialogFrame\\UI-DialogBox-Border"
+Chrome.CLASSIC_HEADER = "Interface\\DialogFrame\\UI-DialogBox-Header"
+Chrome.CLASSIC_CORNER = "Interface\\DialogFrame\\UI-DialogBox-Corner"
+
+-- Light ink for InputBoxTemplate on DragonUI rock / dark panels.
+-- InputBoxTemplate defaults to near-black text — invisible on rock
+-- (live: Appearance "Corner size" had no visible digits until SetTextColor).
+-- Do NOT parent EditBoxes under PortraitFrameTemplate title/portrait
+-- regions either — empty/clipped export text (Buildschmiede lesson).
+Chrome.EDIT_INK = { 0.96, 0.92, 0.82, 1 }
+
+--- Style an EditBox for dark chrome: AutoFocus off + readable ink.
+function Chrome.StyleEditBox(edit)
+    if type(edit) ~= "table" then
+        return edit
+    end
+    if edit.SetAutoFocus then
+        edit:SetAutoFocus(false)
+    end
+    if edit.SetTextColor then
+        local ink = Chrome.EDIT_INK
+        edit:SetTextColor(ink[1], ink[2], ink[3], ink[4] or 1)
+    end
+    return edit
+end
+Chrome.MARBLE_BG      = "Interface\\FrameGeneral\\UI-Background-Marble"
+
+Chrome.INSET_FALLBACK = {
+    bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+    edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+    tile = true, tileSize = 16, edgeSize = 16,
+    insets = { left = 4, right = 4, top = 4, bottom = 4 },
+}
 
 local hasDragonUICache = nil
 function Chrome.HasDragonUI()
@@ -139,10 +177,11 @@ function Chrome.ConfigureTexture(texture, path, width, height, left, right, top,
     end
 end
 
-function Chrome.ApplyClassicChrome(frame)
+function Chrome.ApplyClassicChrome(frame, opts)
     if type(frame) ~= "table" or type(frame.SetBackdrop) ~= "function" then
         return nil, nil
     end
+    opts = type(opts) == "table" and opts or {}
     frame:SetBackdrop({
         bgFile = Chrome.CLASSIC_BG,
         edgeFile = Chrome.CLASSIC_EDGE,
@@ -151,7 +190,114 @@ function Chrome.ApplyClassicChrome(frame)
     })
     if frame.SetBackdropColor then frame:SetBackdropColor(0, 0, 0, 1) end
     if frame.SetBackdropBorderColor then frame:SetBackdropBorderColor(1, 1, 1, 1) end
+
+    -- Optional DialogBox header banner (RaidInfo / AscFastRoll family).
+    -- Off by default — MiniHUD and other compact frames must not grow a
+    -- 64px banner. MainWindow passes header=true explicitly.
+    if opts.header == true and type(frame.CreateTexture) == "function" and not frame._alfmDialogHeader then
+        local header = frame:CreateTexture(nil, "ARTWORK")
+        header:SetTexture(Chrome.CLASSIC_HEADER)
+        header:SetWidth(opts.headerWidth or 360)
+        header:SetHeight(opts.headerHeight or 64)
+        header:SetPoint("TOP", 0, opts.headerY or 12)
+        frame._alfmDialogHeader = header
+        if opts.corner ~= false then
+            local corner = frame:CreateTexture(nil, "OVERLAY")
+            corner:SetTexture(Chrome.CLASSIC_CORNER)
+            corner:SetWidth(32)
+            corner:SetHeight(32)
+            corner:SetPoint("TOPRIGHT", -6, -7)
+            frame._alfmDialogCorner = corner
+        end
+    end
+
+    if opts.closeButton == true and not frame._alfmPanelClose then
+        Chrome.CreatePanelCloseButton(frame, opts.onClose)
+    end
     return nil, nil
+end
+
+--- Proven content well: InsetFrameTemplate + marble when the engine has it,
+--  else MacroFrame-style tooltip backdrop. Never PortraitFrame.
+--  Parent EditBoxes / ScrollFrames to the returned frame (or a child of it),
+--  never to a metal chrome host.
+function Chrome.CreateInset(parent, name)
+    if type(parent) ~= "table" or type(CreateFrame) ~= "function" then
+        return nil
+    end
+    local inset
+    local ok = pcall(function()
+        inset = CreateFrame("Frame", name, parent, "InsetFrameTemplate")
+    end)
+    if ok and type(inset) == "table" then
+        local bg = inset.Bg
+        if type(bg) == "table" and type(bg.SetTexture) == "function" then
+            pcall(function()
+                bg:SetTexture(Chrome.MARBLE_BG, true, true)
+                if type(bg.SetHorizTile) == "function" then
+                    bg:SetHorizTile(true)
+                    bg:SetVertTile(true)
+                end
+            end)
+            inset._alfmInsetKind = "InsetFrameTemplate"
+            return inset
+        end
+        -- Template name accepted but no Bg region (sandbox / stub) — fall through.
+    end
+
+    inset = CreateFrame("Frame", name, parent)
+    if inset.SetBackdrop then
+        inset:SetBackdrop(Chrome.INSET_FALLBACK)
+        local cr, cg, cb, ca = 0.09, 0.09, 0.11, 0.92
+        local br, bg, bb = 0.5, 0.5, 0.5
+        if TOOLTIP_DEFAULT_BACKGROUND_COLOR then
+            cr = TOOLTIP_DEFAULT_BACKGROUND_COLOR.r or cr
+            cg = TOOLTIP_DEFAULT_BACKGROUND_COLOR.g or cg
+            cb = TOOLTIP_DEFAULT_BACKGROUND_COLOR.b or cb
+        end
+        if TOOLTIP_DEFAULT_COLOR then
+            br = TOOLTIP_DEFAULT_COLOR.r or br
+            bg = TOOLTIP_DEFAULT_COLOR.g or bg
+            bb = TOOLTIP_DEFAULT_COLOR.b or bb
+        end
+        if inset.SetBackdropColor then inset:SetBackdropColor(cr, cg, cb, ca) end
+        if inset.SetBackdropBorderColor then inset:SetBackdropBorderColor(br, bg, bb, 1) end
+    end
+    inset._alfmInsetKind = "tooltip-fallback"
+    return inset
+end
+
+--- Standard engine close control (UIPanelCloseButton). Prefer this over
+--  inventing click regions. DragonUI main window still uses its own
+--  redbutton atlas when HasDragonUI(); this is the classic / HUD path.
+function Chrome.CreatePanelCloseButton(parent, onClick)
+    if type(parent) ~= "table" or type(CreateFrame) ~= "function" then
+        return nil
+    end
+    local btn
+    local ok = pcall(function()
+        btn = CreateFrame("Button", nil, parent, "UIPanelCloseButton")
+    end)
+    if not ok or type(btn) ~= "table" then
+        btn = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+        if btn.SetSize then btn:SetSize(24, 24) end
+        if btn.SetText then btn:SetText("X") end
+        Chrome.SkinActionButton(btn)
+    end
+    if btn.SetPoint then
+        btn:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -4, -4)
+    end
+    if btn.SetScript then
+        btn:SetScript("OnClick", function()
+            if type(onClick) == "function" then
+                onClick()
+            elseif parent.Hide then
+                parent:Hide()
+            end
+        end)
+    end
+    parent._alfmPanelClose = btn
+    return btn
 end
 
 function Chrome.ApplyMetalChrome(frame, profileNameOrOpts)
@@ -160,7 +306,7 @@ function Chrome.ApplyMetalChrome(frame, profileNameOrOpts)
     end
 
     if not Chrome.HasDragonUI() then
-        return Chrome.ApplyClassicChrome(frame)
+        return Chrome.ApplyClassicChrome(frame, { header = false, closeButton = false })
     end
 
     local opts = Chrome.ResolveOpts(profileNameOrOpts)

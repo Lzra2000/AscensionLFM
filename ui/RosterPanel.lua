@@ -245,7 +245,7 @@ local function ShowRolePicker(anchor, memberName)
     -- Reflect this member's current aura state on the toggle row.
     if f.auraFS then
         local on = HasAura(memberName)
-        f.auraFS:SetText(on and "Aura: ON (click to remove)" or "Aura: off (click to add)")
+        f.auraFS:SetText(on and "Aura: an (klicken zum Entfernen)" or "Aura: aus (klicken zum Hinzufuegen)")
         local col = ROLE_COLORS["aura"] or { 1, 1, 1 }
         if on then
             f.auraFS:SetTextColor(col[1], col[2], col[3], 1)
@@ -574,7 +574,7 @@ local function EnsureGroupPicker()
         row:SetPoint("TOPRIGHT", -6, -6 - (g - 1) * 22)
         local fs = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         fs:SetPoint("LEFT", 2, 0)
-        fs:SetText("Group " .. g)
+        fs:SetText("Gruppe " .. g)
         local hi = row:CreateTexture(nil, "HIGHLIGHT")
         hi:SetAllPoints()
         hi:SetTexture("Interface\\Buttons\\WHITE8X8")
@@ -607,10 +607,10 @@ local function ShowGroupPicker(anchor, memberName, currentGroup)
     for g, row in ipairs(f.rows) do
         if g == currentGroup then
             row.fs:SetTextColor(1, 0.82, 0.28)
-            row.fs:SetText("Group " .. g .. " (here)")
+            row.fs:SetText("Gruppe " .. g .. " (hier)")
         else
             row.fs:SetTextColor(0.9, 0.9, 0.9)
-            row.fs:SetText("Group " .. g)
+            row.fs:SetText("Gruppe " .. g)
         end
     end
     f:ClearAllPoints()
@@ -915,7 +915,7 @@ local function EnsureCards(parent)
 
         local title = card:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         title:SetPoint("TOPLEFT", 8, -6)
-        title:SetText("Group " .. g)
+        title:SetText("Gruppe " .. g)
         title:SetTextColor(1, 0.82, 0.28)
         card.titleFS = title
 
@@ -1103,14 +1103,14 @@ function RosterPanel.Attach(parent)
     summaryFS:SetPoint("TOPRIGHT", -166, -6)
     summaryFS:SetJustifyH("LEFT")
     summaryFS:SetTextColor(0.95, 0.88, 0.55)
-    summaryFS:SetText("Roster empty")
+    summaryFS:SetText("Roster leer")
     if summaryFS.SetWordWrap then summaryFS:SetWordWrap(false) end
 
     local rcBtn = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
     if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(rcBtn) end
     rcBtn:SetSize(70, 22)
     rcBtn:SetPoint("TOPRIGHT", -4, -4)
-    rcBtn:SetText("Ready")
+    rcBtn:SetText("Bereit")
     rcBtn:SetScript("OnClick", function()
         if RosterPanel.DoReadyCheck then
             RosterPanel.DoReadyCheck()
@@ -1127,16 +1127,16 @@ function RosterPanel.Attach(parent)
     -- Slots.lua comments).
     local sortBtn = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
     if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(sortBtn) end
-    sortBtn:SetSize(80, 22)
+    sortBtn:SetSize(88, 22)
     sortBtn:SetPoint("TOPRIGHT", rcBtn, "TOPLEFT", -4, 0)
-    sortBtn:SetText("Sort Groups")
+    sortBtn:SetText("Sortieren")
     sortBtn:SetScript("OnClick", function()
         local moved = 0
         if AscensionLFM.AuraBalance and AscensionLFM.AuraBalance.SortGroupsNow then
             moved = AscensionLFM.AuraBalance.SortGroupsNow() or 0
         end
         if AscensionLFM.Print then
-            AscensionLFM.Print(moved > 0 and ("Sort Groups: moved " .. moved) or "Sort Groups: already sorted")
+            AscensionLFM.Print(moved > 0 and ("Sortieren: " .. moved .. " verschoben") or "Sortieren: schon sortiert")
         end
         RosterPanel.Refresh()
     end)
@@ -1184,7 +1184,7 @@ function RosterPanel.Refresh()
                     card.auraFS:SetText("Aura x" .. auraN)
                     card.auraFS:SetTextColor(0.9, 0.75, 0.2)
                 else
-                    card.auraFS:SetText(#list > 0 and "no aura" or "")
+                    card.auraFS:SetText(#list > 0 and "keine Aura" or "")
                     card.auraFS:SetTextColor(0.6, 0.4, 0.35)
                 end
             end
@@ -1230,7 +1230,7 @@ function RosterPanel.Refresh()
                     SetRoleButton(row.roleBtn, "")
                     if i == 1 and #list == 0 then
                         row:Show()
-                        row.nameFS:SetText("|cff5a4a30Empty|r")
+                        row.nameFS:SetText("|cff5a4a30Leer|r")
                     else
                         row:Hide()
                     end

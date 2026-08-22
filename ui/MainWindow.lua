@@ -1,6 +1,8 @@
 -- AscensionLFM: ui/MainWindow.lua
--- Native DialogFrame settings with Categories sidebar (General / Seeking /
--- Hosting / Post / Queue / Kick / Log). Matches docs/sketch/ascension-lfm-mockup.html.
+-- Native DialogFrame settings with Categories sidebar (Allgemein / Suchen /
+-- Hosten / Post / …). Matches docs/sketch/ascension-lfm-mockup.html.
+-- Chrome: DragonUI metal when present; else DialogBox + InsetFrame wells.
+-- No PortraitFrame (EditBox parenting stays on scroll content children).
 
 local AscensionLFM = _G.AscensionLFM
 if type(AscensionLFM) ~= "table" then
@@ -32,36 +34,36 @@ local CAT_APPEARANCE = "appearance"
 local CAT_LOG = "log"
 
 local CATEGORIES = {
-    { id = CAT_GENERAL, label = "General",
-      title = "General",
-      sub = "Mode, Mini HUD, message delivery routing. Default Notify = Listening ON." },
-    { id = CAT_SEEKING, label = "Seeking",
-      title = "Seeking",
-      sub = "Roles, rotating whisper variants, leader blacklist, optional match sound." },
-    { id = CAT_HOSTING, label = "Hosting",
-      title = "Hosting",
-      sub = "Full Auto, slots, RW Role Check, reject re-whisper, presets, invite rules." },
-    { id = CAT_POST, label = "Post",
-      title = "Post",
-      sub = "LFM compose, scan fills, RW Role Check, auto-repost + optional FULL announce." },
-    { id = CAT_QUEUE, label = "Queue",
-      title = "Queue",
-      sub = "Recent applicant whispers - Invite or Reject+rewhisper." },
+    { id = CAT_GENERAL, label = "Allgemein",
+      title = "Allgemein",
+      sub = "Modus, Mini-HUD, Nachrichten-Routing. Standard Notify = Listening an." },
+    { id = CAT_SEEKING, label = "Suchen",
+      title = "Suchen",
+      sub = "Rollen, Whisper-Varianten, Leader-Blacklist, optional Match-Sound." },
+    { id = CAT_HOSTING, label = "Hosten",
+      title = "Hosten",
+      sub = "Full Auto, Slots, RW Role Check, Reject-Whisper, Presets, Invite-Regeln." },
+    { id = CAT_POST, label = "Posten",
+      title = "Posten",
+      sub = "LFM schreiben, Scan, RW Role Check, Auto-Repost + optional FULL-Ansage." },
+    { id = CAT_QUEUE, label = "Warteschlange",
+      title = "Warteschlange",
+      sub = "Aktuelle Bewerber-Whisper — Einladen oder Ablehnen + Whisper." },
     { id = CAT_ROSTER, label = "Roster",
       title = "Roster",
-      sub = "Groups 1-8: click role icon for popup, Ready check, Spec, X to remove." },
+      sub = "Gruppen 1–8: Rollen-Icon tippen, Ready-Check, Spec, X zum Entfernen." },
     { id = CAT_CONTENT, label = "LFG/LFM",
       title = "LFG/LFM",
-      sub = "Pick MS, Raid, or M+ - each keeps its own settings and tags the LFM post." },
+      sub = "MS, Raid oder M+ wählen — jeder Typ behält eigene Einstellungen und markiert den LFM-Post." },
     { id = CAT_KICK, label = "Kick",
       title = "Kick",
-      sub = "Level-59 kick + Aura buff scan (idle if buff hidden on others). Default OFF." },
-    { id = CAT_APPEARANCE, label = "Appearance",
-      title = "Appearance",
-      sub = "DragonUI chrome only: metal nineslice size/offsets. Requires /reload after changes." },
-    { id = CAT_LOG, label = "Log",
-      title = "Log",
-      sub = "Match history + activity (posts, invites, rejects, matches)." },
+      sub = "Level-59-Kick + Aura-Buff-Scan (idle, wenn Buffs bei anderen versteckt sind). Standard aus." },
+    { id = CAT_APPEARANCE, label = "Darstellung",
+      title = "Darstellung",
+      sub = "Nur DragonUI-Chrome: Metal-Nineslice Größe/Offsets. Danach /reload." },
+    { id = CAT_LOG, label = "Protokoll",
+      title = "Protokoll",
+      sub = "Match-Verlauf + Aktivität (Posts, Invites, Rejects, Matches)." },
 }
 
 local TOOLTIP_BACKDROP = {
@@ -226,6 +228,21 @@ local function SetInk(fs, rgba)
     end
 end
 
+-- InputBoxTemplate on DragonUI rock needs explicit light ink (Chrome.StyleEditBox).
+-- Never nest these under PortraitFrame title/portrait regions.
+local function CreateStyledEditBox(name, parent, template)
+    local edit = CreateFrame("EditBox", name, parent, template or "InputBoxTemplate")
+    if AscensionLFM.Chrome and AscensionLFM.Chrome.StyleEditBox then
+        AscensionLFM.Chrome.StyleEditBox(edit)
+    else
+        if edit.SetAutoFocus then edit:SetAutoFocus(false) end
+        if edit.SetTextColor then
+            edit:SetTextColor(INK[1], INK[2], INK[3], INK[4])
+        end
+    end
+    return edit
+end
+
 local function TruncateText(text, maxLen)
     text = tostring(text or "")
     maxLen = tonumber(maxLen) or 72
@@ -270,13 +287,13 @@ end
 
 local function ModeLabel(mode)
     if mode == "notify" then
-        return "Notify only"
+        return "Notify"
     elseif mode == "seeking" then
-        return "Seeking"
+        return "Suchen"
     elseif mode == "hosting" then
-        return "Hosting"
+        return "Hosten"
     end
-    return "Off"
+    return "Aus"
 end
 
 local function CategoryInfo(id)
@@ -765,7 +782,8 @@ end
 local function CreateSectionLabel(parent, text, y)
     local label = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     label:SetPoint("TOPLEFT", 4, y)
-    label:SetText(string.upper(text))
+    -- Kein string.upper: Chrome lässt Umlaute klein stehen.
+    label:SetText(text)
     SetInk(label, SECTION)
     return label
 end
@@ -823,7 +841,7 @@ local function MakeRoleCheck(parent, role, label, x, y, group)
 end
 
 local function MakeSlotEdit(parent, role)
-    local edit = CreateFrame("EditBox", "AscensionLFMSlot_" .. role, parent, "InputBoxTemplate")
+    local edit = CreateStyledEditBox( "AscensionLFMSlot_" .. role, parent, "InputBoxTemplate")
     edit:SetSize(32, 18)
     edit:SetAutoFocus(false)
     edit:SetMaxLetters(2)
@@ -974,7 +992,7 @@ local function BuildAppearanceCategory(pageHost)
         SetInk(fs, MUTED)
         return fs
     end
-    note(appearance, "Only DragonUI textures (rock + metal nineslice). Changes to sizes need /reload.", y)
+    note(appearance, "Nur DragonUI-Texturen (Rock + Metal-Nineslice). Groessen-Aenderungen brauchen /reload.", y)
     y = y - 28
 
     local metalRow = CreateFrame("Frame", nil, appearance)
@@ -991,13 +1009,13 @@ local function BuildAppearanceCategory(pageHost)
     end)
     local metalLbl = metalRow:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     metalLbl:SetPoint("LEFT", metalCb, "RIGHT", 4, 0)
-    metalLbl:SetText("Metal nineslice (outer frame)")
+    metalLbl:SetText("Metal-Nineslice (Aussenrahmen)")
     SetInk(metalLbl, INK)
     local metalDesc = metalRow:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     metalDesc:SetPoint("TOPLEFT", metalCb, "BOTTOMLEFT", 0, -2)
     metalDesc:SetPoint("RIGHT", metalRow, "RIGHT", -8, 0)
     metalDesc:SetJustifyH("LEFT")
-    metalDesc:SetText("Requires DragonUI. Off = rock background only. /reload after toggle.")
+    metalDesc:SetText("Braucht DragonUI. Aus = nur Rock-Hintergrund. Nach Umschalten /reload.")
     SetInk(metalDesc, MUTED)
     y = y - TOGGLE_STEP
 
@@ -1012,7 +1030,7 @@ local function BuildAppearanceCategory(pageHost)
         fs:SetPoint("LEFT", 10, 0)
         fs:SetText(label)
         SetInk(fs, INK)
-        local edit = CreateFrame("EditBox", nil, row, "InputBoxTemplate")
+        local edit = CreateStyledEditBox( nil, row, "InputBoxTemplate")
         edit:SetSize(64, 20)
         edit:SetPoint("RIGHT", -12, 0)
         edit:SetAutoFocus(false)
@@ -1226,7 +1244,7 @@ function MainWindow.Init()
 
     local sub = titleBg:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     sub:SetPoint("TOP", title, "BOTTOM", 0, -2)
-    sub:SetText("Manastorm Level Run LFM/LFG * v" .. tostring(AscensionLFM.VERSION or "0.4.16"))
+    sub:SetText("Manastorm Level-Run LFM/LFG · v" .. tostring(AscensionLFM.VERSION or "?"))
     SetInk(sub, { 0.88, 0.80, 0.55, 1 })
 
     local shell = CreateFrame("Frame", FRAME_NAME .. "Shell", frame)
@@ -1241,7 +1259,7 @@ function MainWindow.Init()
 
     local sideLabel = sidebar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     sideLabel:SetPoint("TOPLEFT", 10, -10)
-    sideLabel:SetText("CATEGORIES")
+    sideLabel:SetText("Kategorien")
     SetInk(sideLabel, { 1.00, 0.84, 0.35, 1 })
 
     local y = -26
@@ -1271,7 +1289,7 @@ function MainWindow.Init()
 
     categoryHeadTitle = main:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     categoryHeadTitle:SetPoint("TOPLEFT", 12, -10)
-    categoryHeadTitle:SetText("General")
+    categoryHeadTitle:SetText("Allgemein")
     SetInk(categoryHeadTitle, TITLE_INK)
 
     categoryHeadSub = main:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -1289,9 +1307,21 @@ function MainWindow.Init()
     end
     SetInk(categoryHeadSub, MUTED)
 
-    local pageHost = CreateFrame("Frame", FRAME_NAME .. "PageHost", main)
-    pageHost:SetPoint("TOPLEFT", 10, -54)
-    pageHost:SetPoint("BOTTOMRIGHT", -10, 8)
+    -- Content well: InsetFrame (marble) or tooltip fallback. EditBoxes live
+    -- on scroll children under pageHost — never on the metal chrome host.
+    local contentInset
+    if AscensionLFM.Chrome and AscensionLFM.Chrome.CreateInset then
+        contentInset = AscensionLFM.Chrome.CreateInset(main, FRAME_NAME .. "Inset")
+    else
+        contentInset = CreateFrame("Frame", FRAME_NAME .. "Inset", main)
+    end
+    contentInset:SetPoint("TOPLEFT", 8, -50)
+    contentInset:SetPoint("BOTTOMRIGHT", -8, 6)
+    frame._alfmContentInset = contentInset
+
+    local pageHost = CreateFrame("Frame", FRAME_NAME .. "PageHost", contentInset)
+    pageHost:SetPoint("TOPLEFT", 6, -6)
+    pageHost:SetPoint("BOTTOMRIGHT", -6, 6)
 
     local footer = CreateFrame("Frame", FRAME_NAME .. "Footer", shell)
     footer:SetPoint("TOPLEFT", main, "BOTTOMLEFT", 0, -4)
@@ -1305,9 +1335,9 @@ function MainWindow.Init()
 
     local closeBtn = CreateFrame("Button", nil, footer, "UIPanelButtonTemplate")
     if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(closeBtn) end
-    closeBtn:SetSize(72, 22)
+    closeBtn:SetSize(90, 22)
     closeBtn:SetPoint("RIGHT", 0, 0)
-    closeBtn:SetText("Close")
+    closeBtn:SetText("Schliessen")
     closeBtn:SetScript("OnClick", function()
         frame:Hide()
     end)
@@ -1316,7 +1346,7 @@ function MainWindow.Init()
     if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(clearBtn) end
     clearBtn:SetSize(72, 22)
     clearBtn:SetPoint("RIGHT", closeBtn, "LEFT", -6, 0)
-    clearBtn:SetText("Clear")
+    clearBtn:SetText("Leeren")
     clearBtn:Hide()
     clearBtn:SetScript("OnClick", function()
         if activeCategory == CAT_KICK then
@@ -1570,7 +1600,7 @@ function MainWindow.Init()
     msgLabel:SetText("Whisper message")
     SetInk(msgLabel, INK)
 
-    local edit = CreateFrame("EditBox", "AscensionLFMWhisperEdit", seeking, "InputBoxTemplate")
+    local edit = CreateStyledEditBox( "AscensionLFMWhisperEdit", seeking, "InputBoxTemplate")
     edit:SetSize(220, 20)
     edit:SetPoint("LEFT", msgLabel, "RIGHT", 8, 0)
     edit:SetAutoFocus(false)
@@ -1596,7 +1626,7 @@ function MainWindow.Init()
     v1l:SetPoint("TOPLEFT", 4, -326)
     v1l:SetText("V1")
     SetInk(v1l, INK)
-    local v1 = CreateFrame("EditBox", "AscensionLFMVariant1", seeking, "InputBoxTemplate")
+    local v1 = CreateStyledEditBox( "AscensionLFMVariant1", seeking, "InputBoxTemplate")
     v1:SetSize(200, 18)
     v1:SetPoint("LEFT", v1l, "RIGHT", 6, 0)
     v1:SetAutoFocus(false)
@@ -1614,7 +1644,7 @@ function MainWindow.Init()
     v2l:SetPoint("TOPLEFT", 4, -352)
     v2l:SetText("V2")
     SetInk(v2l, INK)
-    local v2 = CreateFrame("EditBox", "AscensionLFMVariant2", seeking, "InputBoxTemplate")
+    local v2 = CreateStyledEditBox( "AscensionLFMVariant2", seeking, "InputBoxTemplate")
     v2:SetSize(200, 18)
     v2:SetPoint("LEFT", v2l, "RIGHT", 6, 0)
     v2:SetAutoFocus(false)
@@ -1627,7 +1657,7 @@ function MainWindow.Init()
     v3l:SetPoint("TOPLEFT", 4, -378)
     v3l:SetText("V3")
     SetInk(v3l, INK)
-    local v3 = CreateFrame("EditBox", "AscensionLFMVariant3", seeking, "InputBoxTemplate")
+    local v3 = CreateStyledEditBox( "AscensionLFMVariant3", seeking, "InputBoxTemplate")
     v3:SetSize(200, 18)
     v3:SetPoint("LEFT", v3l, "RIGHT", 6, 0)
     v3:SetAutoFocus(false)
@@ -1648,7 +1678,7 @@ function MainWindow.Init()
     blLbl:SetPoint("TOPLEFT", 4, -480)
     blLbl:SetText("Blacklist leader")
     SetInk(blLbl, INK)
-    local blEdit = CreateFrame("EditBox", "AscensionLFMBlacklistEdit", seeking, "InputBoxTemplate")
+    local blEdit = CreateStyledEditBox( "AscensionLFMBlacklistEdit", seeking, "InputBoxTemplate")
     blEdit:SetSize(120, 18)
     blEdit:SetPoint("LEFT", blLbl, "RIGHT", 6, 0)
     blEdit:SetAutoFocus(false)
@@ -1856,7 +1886,7 @@ function MainWindow.Init()
     rtLbl:SetPoint("TOPLEFT", 4, rtY)
     rtLbl:SetText("Reject tmpl")
     SetInk(rtLbl, INK)
-    local rtEdit = CreateFrame("EditBox", "AscensionLFMRejectTmpl", hosting, "InputBoxTemplate")
+    local rtEdit = CreateStyledEditBox( "AscensionLFMRejectTmpl", hosting, "InputBoxTemplate")
     rtEdit:SetSize(320, 18)
     rtEdit:SetPoint("LEFT", rtLbl, "RIGHT", 6, 0)
     rtEdit:SetAutoFocus(false)
@@ -1903,7 +1933,7 @@ function MainWindow.Init()
         if AscensionLFM.Presets then AscensionLFM.Presets.Load("MS 2/2/2/7") end
         SyncWidgetsFromDB()
     end)
-    local pName = CreateFrame("EditBox", "AscensionLFMPresetName", presetRow, "InputBoxTemplate")
+    local pName = CreateStyledEditBox( "AscensionLFMPresetName", presetRow, "InputBoxTemplate")
     pName:SetSize(80, 18)
     pName:SetPoint("LEFT", loadSmall, "RIGHT", 8, 0)
     pName:SetAutoFocus(false)
@@ -1936,7 +1966,7 @@ function MainWindow.Init()
     maxLabel:SetText("Max size")
     SetInk(maxLabel, INK)
 
-    local maxEdit = CreateFrame("EditBox", "AscensionLFMMaxPartyEdit", slotRow, "InputBoxTemplate")
+    local maxEdit = CreateStyledEditBox( "AscensionLFMMaxPartyEdit", slotRow, "InputBoxTemplate")
     maxEdit:SetSize(36, 20)
     maxEdit:SetPoint("LEFT", maxLabel, "RIGHT", 6, 0)
     maxEdit:SetAutoFocus(false)
@@ -2035,7 +2065,7 @@ function MainWindow.Init()
     rcMsgLbl:SetPoint("TOPLEFT", 4, rcFieldsY)
     rcMsgLbl:SetText("RW message")
     SetInk(rcMsgLbl, INK)
-    local rcMsg = CreateFrame("EditBox", "AscensionLFMRoleCheckMsg", hosting, "InputBoxTemplate")
+    local rcMsg = CreateStyledEditBox( "AscensionLFMRoleCheckMsg", hosting, "InputBoxTemplate")
     rcMsg:SetSize(340, 18)
     rcMsg:SetPoint("LEFT", rcMsgLbl, "RIGHT", 6, 0)
     rcMsg:SetAutoFocus(false)
@@ -2053,7 +2083,7 @@ function MainWindow.Init()
     rcWinLbl:SetPoint("TOPLEFT", 4, rcFieldsY - 26)
     rcWinLbl:SetText("Window (sec)")
     SetInk(rcWinLbl, INK)
-    local rcWin = CreateFrame("EditBox", "AscensionLFMRoleCheckWindow", hosting, "InputBoxTemplate")
+    local rcWin = CreateStyledEditBox( "AscensionLFMRoleCheckWindow", hosting, "InputBoxTemplate")
     rcWin:SetSize(40, 18)
     rcWin:SetPoint("LEFT", rcWinLbl, "RIGHT", 6, 0)
     rcWin:SetAutoFocus(false)
@@ -2135,7 +2165,7 @@ function MainWindow.Init()
     previewBox:SetHeight(52)
     ApplyInset(previewBox)
 
-    postPreviewEdit = CreateFrame("EditBox", "AscensionLFMPostPreview", previewBox, "InputBoxTemplate")
+    postPreviewEdit = CreateStyledEditBox( "AscensionLFMPostPreview", previewBox, "InputBoxTemplate")
     postPreviewEdit:SetPoint("TOPLEFT", 8, -8)
     postPreviewEdit:SetPoint("BOTTOMRIGHT", -8, 8)
     postPreviewEdit:SetAutoFocus(false)
@@ -2194,7 +2224,7 @@ function MainWindow.Init()
     chNameLbl:SetText("Channel name")
     SetInk(chNameLbl, INK)
 
-    local chNameEdit = CreateFrame("EditBox", "AscensionLFMPostChannelName", post, "InputBoxTemplate")
+    local chNameEdit = CreateStyledEditBox( "AscensionLFMPostChannelName", post, "InputBoxTemplate")
     chNameEdit:SetSize(140, 20)
     chNameEdit:SetPoint("LEFT", chNameLbl, "RIGHT", 8, 0)
     chNameEdit:SetAutoFocus(false)
@@ -2350,7 +2380,7 @@ function MainWindow.Init()
     intLbl:SetText("Interval (sec, min 30)")
     SetInk(intLbl, INK)
 
-    local intEdit = CreateFrame("EditBox", "AscensionLFMRepostInterval", post, "InputBoxTemplate")
+    local intEdit = CreateStyledEditBox( "AscensionLFMRepostInterval", post, "InputBoxTemplate")
     intEdit:SetSize(40, 20)
     intEdit:SetPoint("LEFT", intLbl, "RIGHT", 8, 0)
     intEdit:SetAutoFocus(false)
@@ -2470,7 +2500,7 @@ function MainWindow.Init()
     favLbl:SetPoint("TOPLEFT", 4, -356)
     favLbl:SetText("Name")
     SetInk(favLbl, INK)
-    local favEdit = CreateFrame("EditBox", "AscensionLFMFavoriteEdit", queue, "InputBoxTemplate")
+    local favEdit = CreateStyledEditBox( "AscensionLFMFavoriteEdit", queue, "InputBoxTemplate")
     favEdit:SetSize(120, 18)
     favEdit:SetPoint("LEFT", favLbl, "RIGHT", 6, 0)
     favEdit:SetAutoFocus(false)
@@ -2671,7 +2701,7 @@ function MainWindow.Init()
             dLabel:SetText("Dungeon")
             SetInk(dLabel, MUTED)
 
-            local dEdit = CreateFrame("EditBox", "AscensionLFMMPlusDungeon", mplusPane, "InputBoxTemplate")
+            local dEdit = CreateStyledEditBox( "AscensionLFMMPlusDungeon", mplusPane, "InputBoxTemplate")
             dEdit:SetSize(220, 20)
             dEdit:SetPoint("TOPLEFT", 60, 2)
             dEdit:SetAutoFocus(false)
@@ -2684,7 +2714,7 @@ function MainWindow.Init()
             lLabel:SetText("Level")
             SetInk(lLabel, MUTED)
 
-            local lEdit = CreateFrame("EditBox", "AscensionLFMMPlusLevel", mplusPane, "InputBoxTemplate")
+            local lEdit = CreateStyledEditBox( "AscensionLFMMPlusLevel", mplusPane, "InputBoxTemplate")
             lEdit:SetSize(40, 20)
             lEdit:SetPoint("TOPLEFT", 60, -28)
             lEdit:SetAutoFocus(false)
@@ -2704,7 +2734,7 @@ function MainWindow.Init()
             minLabel:SetText("Min level to show")
             SetInk(minLabel, MUTED)
 
-            local minEdit = CreateFrame("EditBox", "AscensionLFMMPlusMinLevel", mplusPane, "InputBoxTemplate")
+            local minEdit = CreateStyledEditBox( "AscensionLFMMPlusMinLevel", mplusPane, "InputBoxTemplate")
             minEdit:SetSize(40, 20)
             minEdit:SetPoint("TOPLEFT", 120, -94)
             minEdit:SetAutoFocus(false)
@@ -2762,7 +2792,7 @@ function MainWindow.Init()
             end
             clearBtn2:SetSize(70, 22)
             clearBtn2:SetPoint("TOPLEFT", 110, -28)
-            clearBtn2:SetText("Clear")
+            clearBtn2:SetText("Leeren")
             clearBtn2:SetScript("OnClick", function()
                 dEdit:SetText("")
                 lEdit:SetText("0")
