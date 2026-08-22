@@ -125,6 +125,7 @@ local DEFAULTS = {
         ["no role"] = "Please whisper a role: tank/heal/aura/dps (or T/H/A/D).",
         ["no parse"] = "Please whisper a role: tank/heal/aura/dps (or T/H/A/D).",
         ["role filtered"] = "Not looking for {role} right now - thanks!",
+        ["ilvl low"] = "Sorry, dein ilvl liegt unter unserem Minimum ({ilvl} / min {min}).",
     },
     rejectCooldown = 30,
     rejectIgnoreList = {}, -- [nameLower] = true

@@ -61,6 +61,8 @@ local function PrintStatus()
     Print(string.format("autoWhisper=%s * variants=%s * Kick59=%s * announceFull=%s",
         OnOff(db.autoWhisper), OnOff(db.useWhisperVariants ~= false),
         OnOff(db.autoKickLevel59), OnOff(db.announceFull)))
+    Print(string.format("minIlvl=%s (0=aus; nur bekannte UnitAverageItemLevel)",
+        tostring(db.minIlvl or 0)))
     if AscensionLFM.Invite and AscensionLFM.Invite._GetPendingRetries then
         local pr = AscensionLFM.Invite._GetPendingRetries()
         Print(string.format("invite: cooldown=%ss * pending retries=%d",
@@ -332,9 +334,29 @@ local function RegisterSlash()
             return
         end
         if msg == "help" then
-            Print("/alfm | /mslfm - toggle UI")
-            Print("/alfm status | diag | test | applyspec | debugall | help")
-            Print("Full Auto Hosting: /alfm -> Hosting -> master toggle (default OFF)")
+            Print("/alfm | /mslfm - Fenster umschalten")
+            Print("/alfm status | diag | test | applyspec | debugall | minilvl | help")
+            Print("Full Auto: /alfm -> Hosten (Standard aus)")
+            Print("/alfm minilvl [n] - Min-ilvl fuer Invites (0 = aus; nur bei bekannter ilvl)")
+            return
+        end
+        local minIlvlArg = msg:match("^minilvl%s*(%d*)$")
+        if minIlvlArg ~= nil or msg == "minilvl" then
+            local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
+            if not db then
+                Print("Database not ready")
+                return
+            end
+            if minIlvlArg and minIlvlArg ~= "" then
+                local n = tonumber(minIlvlArg) or 0
+                if n < 0 then n = 0 end
+                if n > 999 then n = 999 end
+                db.minIlvl = n
+                Print("minIlvl = " .. tostring(n) .. (n == 0 and " (aus)" or ""))
+            else
+                Print("minIlvl = " .. tostring(db.minIlvl or 0)
+                    .. " (0 = aus; filtert nur bekannte UnitAverageItemLevel)")
+            end
             return
         end
         if AscensionLFM.MainWindow and AscensionLFM.MainWindow.Toggle then
