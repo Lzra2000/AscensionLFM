@@ -8,7 +8,7 @@ if type(AscensionLFM) ~= "table" then
     _G.AscensionLFM = AscensionLFM
 end
 
-AscensionLFM.VERSION = "0.4.138"
+AscensionLFM.VERSION = "0.4.139"
 AscensionLFM.ADDON_NAME = "AscensionLFM"
 
 -- Safe lives in AscensionAPI.lua (loads first). Keep a late fallback if
@@ -286,31 +286,9 @@ local function RegisterSlash()
             return
         end
         if msg == "debugall" then
-            -- Consolidated diagnostic: opens every DragonUI-reskinned
-            -- window it can (SpellBookFrame via the standard
-            -- ToggleSpellBook API; AscensionLFM's own MiniHUD/
-            -- MainWindow directly) and runs each one's atlas debug
-            -- command. SlashCmdList is a single global table shared
-            -- across ALL addons regardless of which one registered a
-            -- given command - DUITSDEBUG/DUISBDEBUG (DragonUI) are
-            -- reachable from here the same way ALFMHUDDEBUG/
-            -- ALFMMAINDEBUG (this addon) are, no cross-addon Lua
-            -- dependency needed beyond that shared table existing.
-            --
-            -- TradeSkillFrame is deliberately NOT force-opened: it only
-            -- exists once the player is actually at a trainer or
-            -- profession station, a real game-state precondition this
-            -- can't fake - run /duitsdebug yourself once it's open.
+            -- Opens MiniHUD + MainWindow and runs their atlas/layout debug
+            -- slash commands (ALFMHUDDEBUG / ALFMMAINDEBUG).
             Print("Running all UI diagnostics...")
-
-            if type(ToggleSpellBook) == "function" then
-                local okOpen = pcall(ToggleSpellBook, BOOKTYPE_SPELL)
-                if okOpen and type(SlashCmdList) == "table" and type(SlashCmdList["DUISBDEBUG"]) == "function" then
-                    pcall(SlashCmdList["DUISBDEBUG"])
-                else
-                    Print("  (SpellBookFrame: couldn't open or /duisbdebug not registered - is DragonUI installed?)")
-                end
-            end
 
             if AscensionLFM.MiniHUD and AscensionLFM.MiniHUD.SetShown then
                 pcall(AscensionLFM.MiniHUD.SetShown, true)
@@ -324,10 +302,6 @@ local function RegisterSlash()
             end
             if type(SlashCmdList) == "table" and type(SlashCmdList["ALFMMAINDEBUG"]) == "function" then
                 pcall(SlashCmdList["ALFMMAINDEBUG"])
-            end
-
-            if type(SlashCmdList) == "table" and type(SlashCmdList["DUITSDEBUG"]) == "function" then
-                Print("  (TradeSkillFrame: not opened automatically - needs an actual trainer/profession station. Open one, then run /duitsdebug yourself.)")
             end
 
             Print("Done. Copy the output above (or screenshots) back for a precise pass.")

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.139
+
+- **Verify: DragonUI fully out of runtime.** Grep-clean: no
+  `Interface\AddOns\DragonUI\…` paths, no `HasDragonUI`, no metal
+  nineslice. `debugall` no longer calls foreign `/dui*` slash commands.
+  MiniHUD uses `ApplyClassicChrome` only. INSTALL/README: no DragonUI
+  required; obsolete `/alfmchromeref` docs removed.
+- **Copy: Modus name stays Notify** (not „Hinweis“) in Allgemein radios,
+  mode hint, and category sub — matches Bootstrap/Minimap/README.
+
 ## 0.4.138
 
 - **German (du) Allgemein status / Modus / Mini-HUD / Footer.** Status line

@@ -36,7 +36,7 @@ local CAT_LOG = "log"
 local CATEGORIES = {
     { id = CAT_GENERAL, label = "Allgemein",
       title = "Allgemein",
-      sub = "Modus, Mini-HUD, Nachrichten-Routing. Standard Hinweis = Zuhören an." },
+      sub = "Modus, Mini-HUD, Nachrichten-Routing. Standard: Notify = Zuhören an." },
     { id = CAT_SEEKING, label = "Suchen",
       title = "Suchen",
       sub = "Rollen, Whisper-Varianten, Leader-Blacklist, optional Match-Sound." },
@@ -1230,7 +1230,7 @@ function MainWindow.Init()
 
     local modes = {
         { "off", "Aus", 0 },
-        { "notify", "Nur Hinweis", 70 },
+        { "notify", "Nur Notify", 70 },
         { "seeking", "Suchen", 190 },
         { "hosting", "Hosten", 280 },
     }
@@ -1255,7 +1255,7 @@ function MainWindow.Init()
     modeHint:SetPoint("RIGHT", -4, 0)
     modeHint:SetJustifyH("LEFT")
     modeHint:SetText("|cffc8a03cAus|r – Zuhören aus (kein Chat-Scan).\n"
-        .. "|cffc8a03cHinweis|r – Zuhören an: MS LFM/LFG in Chat und Protokoll (Standard).\n"
+        .. "|cffc8a03cNotify|r – Zuhören an: MS LFM/LFG in Chat und Protokoll (Standard).\n"
         .. "|cffc8a03cSuchen|r – offene Rollen matchen; optional Auto-Whisper an LFM-Leader.\n"
         .. "|cffc8a03cHosten|r – Rollen-Whisper → Invite nur bei akzeptierter Rolle und freiem Slot.\n"
         .. "|cffc8a03cFull Auto|r – Master unter Hosten (Standard aus): Invite, Scan, Repost und Reject.")

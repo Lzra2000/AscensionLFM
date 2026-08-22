@@ -1368,7 +1368,8 @@ local function BuildFrame()
     -- Ascension-native DialogBox chrome (ui/Chrome.lua). Compact: backdrop
     -- only, no header banner. chromeBorderPieces stays for SetExpanded()
     -- compatibility (empty under DialogBox — no nineslice textures).
-    local borderPieces = AscensionLFM.Chrome and AscensionLFM.Chrome.ApplyMetalChrome(f, "compact")
+    local borderPieces = AscensionLFM.Chrome and AscensionLFM.Chrome.ApplyClassicChrome
+        and AscensionLFM.Chrome.ApplyClassicChrome(f, { header = false, closeButton = false })
     f.chromeBorderPieces = borderPieces or {}
 
     local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -1513,15 +1514,9 @@ local function BuildFrame()
     place(buttons.mark)
 
     statusFS = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    -- Pushed further in than the original 8px so DialogBox bottom edge
-    -- does not clip the action row on this compact HUD height.
-    -- corner chrome pieces (16x16, positioned slightly outside the
-    -- frame edge) occupy roughly the first ~10px near each bottom
-    -- corner, both horizontally and vertically - 8px wasn't enough
-    -- clearance and the text visibly overlapped the corner art
-    -- (confirmed via a live screenshot this session).
-    statusFS:SetPoint("BOTTOMLEFT", 18, 5)
-    statusFS:SetPoint("BOTTOMRIGHT", -18, 5)
+    -- Inset from DialogBox edge so status text clears the border.
+    statusFS:SetPoint("BOTTOMLEFT", 12, 6)
+    statusFS:SetPoint("BOTTOMRIGHT", -12, 6)
     statusFS:SetJustifyH("LEFT")
     if statusFS.SetHeight then statusFS:SetHeight(16) end
     if statusFS.SetWordWrap then statusFS:SetWordWrap(false) end

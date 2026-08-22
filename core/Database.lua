@@ -104,10 +104,11 @@ local DEFAULTS = {
     miniHudRelPoint = "CENTER",
     miniHudX = 0,
     miniHudY = 180,
-    -- Appearance / DragonUI chrome (Appearance tab). Nil fields = profile defaults.
+    -- Appearance chrome prefs (legacy keys kept for SavedVariables compat;
+    -- native DialogBox chrome ignores metal nineslice sizing).
     uiChrome = {
-        metalEnabled = true, -- outer metal nineslice
-        topSize = 75,        -- corner size (bag-style)
+        metalEnabled = true,
+        topSize = 75,
         bottomSize = 32,
         topY = 16,
         bottomY = -3,
