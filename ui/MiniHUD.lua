@@ -62,7 +62,8 @@ function MiniHUD.BuildNeedMessage(role)
         return "LFM MS need Healer"
     end
     if role == "aura" then
-        return "LFM MS need Aura"
+        -- Coverage tag, not a fourth seat (v0.4.131+). Cosmetic broadcast only.
+        return "LFM MS need XP Aura"
     end
     if role == "dps" then
         return "LFM MS need DPS"
@@ -315,12 +316,12 @@ local function HostingHint()
     end
     local mode = (db and db.mode) or "notify"
     if mode == "seeking" then
-        return "SEEK"
+        return "SUCH"
     end
     if mode == "off" then
-        return "OFF"
+        return "AUS"
     end
-    return "LISTEN"
+    return "ZUHÖR"
 end
 
 --------------------------------------------------------------------
@@ -1364,10 +1365,9 @@ local function BuildFrame()
         SavePosition()
     end)
 
-    -- DragonUI chrome via shared helper (ui/Chrome.lua). Compact profile
-    -- scaled for this HUD's ~86px height. chromeBorderPieces is stored so
-    -- SetExpanded() can hide the fixed-size border textures on collapse
-    -- (collapsed frame is 56x28; 30x30 corners would overflow).
+    -- Ascension-native DialogBox chrome (ui/Chrome.lua). Compact: backdrop
+    -- only, no header banner. chromeBorderPieces stays for SetExpanded()
+    -- compatibility (empty under DialogBox — no nineslice textures).
     local borderPieces = AscensionLFM.Chrome and AscensionLFM.Chrome.ApplyMetalChrome(f, "compact")
     f.chromeBorderPieces = borderPieces or {}
 
@@ -1468,9 +1468,9 @@ local function BuildFrame()
         local roster = (db and db.regroupRoster) or {}
         return {
             "Regroup",
-            "Disbands the whole group and re-invites everyone on the watch list ("
-                .. #roster .. " remembered).",
-            "Click twice within " .. REGROUP_CONFIRM_WINDOW .. "s to confirm - the first click only previews it.",
+            "Löst die ganze Gruppe auf und lädt alle von der Merkliste neu ein ("
+                .. #roster .. " gemerkt).",
+            "Zweimal innerhalb von " .. REGROUP_CONFIRM_WINDOW .. "s klicken zum Bestätigen – der erste Klick zeigt nur die Vorschau.",
         }
     end)
     place(buttons.regrp)
@@ -1513,7 +1513,8 @@ local function BuildFrame()
     place(buttons.mark)
 
     statusFS = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    -- Pushed further in than the original 8px: the DragonUI bottom
+    -- Pushed further in than the original 8px so DialogBox bottom edge
+    -- does not clip the action row on this compact HUD height.
     -- corner chrome pieces (16x16, positioned slightly outside the
     -- frame edge) occupy roughly the first ~10px near each bottom
     -- corner, both horizontally and vertically - 8px wasn't enough
@@ -1567,7 +1568,7 @@ function MiniHUD.BuildSlotLine(snapshot)
         end
     end
     if #parts == 0 then
-        return "slots off"
+        return "Slots aus"
     end
     return table.concat(parts, "  ")
 end

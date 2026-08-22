@@ -169,10 +169,11 @@ ilvl for a remote LFM leader or whisper applicant by name. Without a unit
 token (`player` / `partyN` / `raidN` / inspect target), the addon cannot show
 or filter ilvl — and must not invent one. Display/filter therefore only apply
 when the player is already group-visible (or still in the short ItemLevel
-cache after leaving).
+cache after leaving). This gap remains intentional as of v0.4.138 (no invent).
 
 Shipped surface: `AscensionLFM.API.GetAverageItemLevel` + `core/ItemLevel.lua`
 (roster column `59·142`, queue badge `i142`, `db.minIlvl` / `/alfm minilvl`).
+Chat LFM Log/list rows stay without fake ilvl.
 
 ---
 

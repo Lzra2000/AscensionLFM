@@ -93,11 +93,9 @@ dofile("core/Slots.lua")
 dofile("core/Poster.lua")
 dofile("ui/Chrome.lua")
 dofile("ui/MiniHUD.lua")
--- Chrome.HasDragonUI() caches its result after the first check, so this
--- must be set before ANYTHING that could trigger chrome application
--- (MiniHUD.Ensure() below) - these tests assert on the DragonUI metal
--- nineslice path specifically (8 pieces), not the classic fallback.
-_G.IsAddOnLoaded = function(name) return name == "DragonUI" end
+-- Ascension-native chrome only (no DragonUI). IsAddOnLoaded stub kept
+-- harmless for any leftover callers.
+_G.IsAddOnLoaded = function(name) return false end
 
 AscensionLFM.Database.Init()
 local MiniHUD = assert(AscensionLFM.MiniHUD)
@@ -129,7 +127,7 @@ end
 
 check("need tank", MiniHUD.BuildNeedMessage("tank") == "LFM MS need Tank")
 check("need healer", MiniHUD.BuildNeedMessage("healer") == "LFM MS need Healer")
-check("need aura", MiniHUD.BuildNeedMessage("aura") == "LFM MS need Aura")
+check("need aura", MiniHUD.BuildNeedMessage("aura") == "LFM MS need XP Aura")
 check("need dps", MiniHUD.BuildNeedMessage("dps") == "LFM MS need DPS")
 check("need bad nil", MiniHUD.BuildNeedMessage("x") == nil)
 
@@ -380,31 +378,19 @@ MiniHUD.SetShown(true)
 check("show works", MiniHUD.IsShown() == true)
 
 --------------------------------------------------------------------
--- Chrome border pieces (v0.4.79's DragonUI reskin) must hide when
--- collapsed and show when expanded - the collapsed HUD actually
--- resizes the frame to 56x28, and these are fixed-size (30x30 etc.)
--- textures that don't auto-shrink with it; left visible at that size
--- they'd be wider than the whole collapsed HUD. Confirmed as a real
--- bug via a live /alfmhuddebug report this session before this fix.
+-- Chrome: Ascension DialogBox backdrop only — no nineslice border
+-- pieces. chromeBorderPieces remains an empty table for expand/collapse
+-- compatibility (SetExpanded still iterates it safely).
 --------------------------------------------------------------------
 local hudFrame = MiniHUD._GetFrame()
 check("chromeBorderPieces exists", type(hudFrame.chromeBorderPieces) == "table")
-check("chromeBorderPieces has all 8 pieces", #hudFrame.chromeBorderPieces == 8,
+check("chromeBorderPieces empty under DialogBox", #hudFrame.chromeBorderPieces == 0,
     tostring(#hudFrame.chromeBorderPieces))
 
 MiniHUD._SetExpanded(false)
-local allHidden = true
-for _, piece in ipairs(hudFrame.chromeBorderPieces) do
-    if piece:IsShown() then allHidden = false end
-end
-check("chrome border pieces hidden when collapsed", allHidden == true)
-
+check("collapse ok without border pieces", true)
 MiniHUD._SetExpanded(true)
-local allShown = true
-for _, piece in ipairs(hudFrame.chromeBorderPieces) do
-    if not piece:IsShown() then allShown = false end
-end
-check("chrome border pieces shown when expanded", allShown == true)
+check("expand ok without border pieces", true)
 
 --------------------------------------------------------------------
 -- Collapsed-state leader icon (this session): shown instead of the

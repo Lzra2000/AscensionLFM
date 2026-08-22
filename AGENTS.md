@@ -62,12 +62,15 @@ Repo: `Lzra2000/AscensionLFM`. Direct-pushes to `main`, no PR workflow.
   PortraitFrame reparenting. Prefer DialogBox + `Chrome.CreateInset` +
   `UIPanelButtonTemplate`.
 - Every `InputBoxTemplate` must go through `Chrome.StyleEditBox` (or
-  `CreateStyledEditBox` in MainWindow) so ink stays readable on DragonUI
-  rock. Do not rely on the template default.
+  `CreateStyledEditBox` in MainWindow) so ink stays readable on dark
+  DialogBox / inset panels. Do not rely on the template default.
 - User-facing German uses **du**, short sentences. No `string.upper` on
   labels that may contain Umlaute.
 - Ascension APIs: prefer `AscensionLFM.Safe` / `pcall`; remember
   **pcall success ≠ server acted** (see Sort Groups / UninviteUnit).
+- **No DragonUI.** Chrome is Ascension FrameXML DialogBox only
+  (`ui/Chrome.lua`). Do not reintroduce `Interface\AddOns\DragonUI\…`
+  texture paths, `HasDragonUI`, or metal nineslice.
 
 ## Module map
 
@@ -125,43 +128,17 @@ Repo: `Lzra2000/AscensionLFM`. Direct-pushes to `main`, no PR workflow.
   role icon → assign Tank/Healer/Aura/DPS/clear) already supports
   manual aura-seat assignment; don't rebuild this if asked for it.
 
-## DragonUI reskinning (cross-addon work)
+## Chrome (Ascension-native only)
 
-This addon's UI has been partially reskinned to visually match DragonUI
-(a separate, actual-Dragonflight-style addon Hasan also runs). Key
-things to know if continuing this work:
+As of v0.4.138 there is **no DragonUI** in this addon:
 
-- **AscensionLFM has no Lua-level dependency on DragonUI.** Its
-  textures are referenced by full path
-  (`Interface\AddOns\DragonUI\Textures\UI\...`), confirmed exact paths
-  and atlas texcoords via DragonUI's own `bags_skin.lua`. This only
-  needs DragonUI's texture files present on disk, not any load-order
-  or Lua-call dependency - more robust across two separately-updating
-  addons.
-- **Every reskinned window needs to account for resizing/hiding.** See
-  the MiniHUD collapse-state note above - this is the single most
-  common way a first-pass reskin breaks on the second interaction.
-- **Diagnostic commands exist for exactly this kind of work**:
-  `/alfmhuddebug` (MiniHUD), `/alfmmaindebug` (main window), and
-  `/alfm debugall` (runs those plus DragonUI's own `/duitsdebug`/
-  `/duisbdebug` if DragonUI is installed - `SlashCmdList` is a single
-  global table shared across all addons, so this works without any
-  other cross-addon coupling). These report real corrected/measured
-  texture region data (size, position, texcoords, shown state) and
-  auto-identify known DragonUI atlas pieces by matching coordinates -
-  **use them instead of guessing** when adjusting chrome sizing. This
-  is a measurement tool, not a guarantee: a screenshot + a debug-command
-  round trip is still needed to confirm a fix actually looks right, not
-  just that it was applied without erroring.
-- **DragonUI has no universal custom button texture.** Its own
-  `editor_mode.lua` uses plain `UIPanelButtonTemplate` for some of its
-  own buttons. Don't invent a custom button skin for this addon's
-  buttons in the name of "matching DragonUI" - leaving them on
-  `UIPanelButtonTemplate` already matches what DragonUI itself does.
-- Full DragonUI reskin work (the actual chrome-building code, atlas
-  coordinate catalog, `RealChrome.Debug` diagnostic system) lives in
-  DragonUI's own repo, not here - only the calling/reference code that
-  points at DragonUI's texture files lives in this repo.
+- `ui/Chrome.lua` — DialogBox backdrop, optional header / UIPanelCloseButton,
+  InsetFrame wells. `ApplyMetalChrome` is an alias that always calls
+  `ApplyClassicChrome`.
+- Do **not** reintroduce `Interface\AddOns\DragonUI\…` paths, `HasDragonUI`,
+  metal nineslice, or Appearance offset knobs for foreign textures.
+- Diagnostics: `/alfmchrome`, `/alfmhuddebug`, `/alfmmaindebug` measure
+  native chrome regions — use them instead of guessing.
 
 ## Testing conventions
 
@@ -207,6 +184,7 @@ Documented so nobody re-investigates these from scratch:
   Chat leaders and whisper applicants have none — do not invent. See
   `docs/NOTES-ascension-apis.md` → Item level; `core/ItemLevel.lua`
   shows/filters only when the API (or short cache) has a real value.
+  Still true as of v0.4.138: Log/chat LFM rows stay without fake ilvl.
 
 ## Where the Ascension/DragonUI source research lives
 

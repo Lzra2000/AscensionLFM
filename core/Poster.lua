@@ -13,10 +13,12 @@ AscensionLFM.Poster = Poster
 
 local MIN_INTERVAL = 30
 local DEFAULT_INTERVAL = 60
+-- Aura label is plural "Auras" = coverage count (tag), not a combat seat.
+-- Parser still matches via ROLE_PATTERNS.aura ("auras?").
 local ROLE_LABELS = {
     tank = "Tanks",
     healer = "Healers",
-    aura = "Aura",
+    aura = "Auras",
     dps = "DPS",
 }
 local ROLE_ORDER = { "tank", "healer", "aura", "dps" }

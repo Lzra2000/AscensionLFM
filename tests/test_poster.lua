@@ -39,7 +39,7 @@ local emptySnap = {
     dps = { filled = 0, max = 7 },
 }
 local msg = Poster.BuildMessage(emptySnap)
-check("empty build format", msg == "LFM MS | 0/2 Tanks | 0/3 Healers | 0/3 Aura | 0/7 DPS", msg)
+check("empty build format", msg == "LFM MS | 0/2 Tanks | 0/3 Healers | 0/3 Auras | 0/7 DPS", msg)
 
 local midSnap = {
     tank = { filled = 1, max = 2 },
@@ -48,7 +48,7 @@ local midSnap = {
     dps = { filled = 5, max = 7 },
 }
 msg = Poster.BuildMessage(midSnap)
-check("mid build format", msg == "LFM MS | 1/2 Tanks | 2/3 Healers | 0/3 Aura | 5/7 DPS", msg)
+check("mid build format", msg == "LFM MS | 1/2 Tanks | 2/3 Healers | 0/3 Auras | 5/7 DPS", msg)
 
 -- Full/disabled roles are omitted entirely, not shown as 0/0 or N/N
 local partialFullSnap = {
@@ -85,7 +85,7 @@ check("default (no 2nd arg) still omits full roles",
 check("showAll=false explicitly still omits full roles",
     Poster.BuildMessage(mixedSnap, false) == "LFM MS | 1/3 Healers | 4/7 DPS", Poster.BuildMessage(mixedSnap, false))
 check("showAll=true includes filled roles too",
-    Poster.BuildMessage(mixedSnap, true) == "LFM MS | 2/2 Tanks | 1/3 Healers | 3/3 Aura | 4/7 DPS",
+    Poster.BuildMessage(mixedSnap, true) == "LFM MS | 2/2 Tanks | 1/3 Healers | 3/3 Auras | 4/7 DPS",
     Poster.BuildMessage(mixedSnap, true))
 
 -- Mythic+ prefix (0.4.101 Raid+M+ tabs): only shown when BOTH dungeon and

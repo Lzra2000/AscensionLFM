@@ -116,7 +116,8 @@ raid roster still shows `0`. If nothing happens, `/alfm status` shows the last k
 
 Recognized (case-insensitive), among others:
 
-- `LFM MS 0/2 Tanks 0/3 Healers 0/3 Aura 0/7 DPS`
+- `LFM MS 0/2 Tanks 0/3 Healers 0/3 Auras 0/10 DPS` (also parses legacy `Aura`)
+- `LFM MS need XP Aura` (Mini HUD need — coverage tag, not a fourth seat)
 - `LFG MS tank` / `lfg manastorm need heals` / `lfg ms`
 - `lfm ms need tank and heals`
 - `LFM Manastorm 1/2 Tank 2/3 H 0/7 DPS`

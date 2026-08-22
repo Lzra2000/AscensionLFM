@@ -1,7 +1,7 @@
 -- AscensionLFM: ui/MainWindow.lua
 -- Native DialogFrame settings with Categories sidebar (Allgemein / Suchen /
 -- Hosten / Post / …). Matches docs/sketch/ascension-lfm-mockup.html.
--- Chrome: DragonUI metal when present; else DialogBox + InsetFrame wells.
+-- Chrome: Ascension-native DialogBox + InsetFrame wells only (no DragonUI).
 -- No PortraitFrame (EditBox parenting stays on scroll content children).
 
 local AscensionLFM = _G.AscensionLFM
@@ -36,7 +36,7 @@ local CAT_LOG = "log"
 local CATEGORIES = {
     { id = CAT_GENERAL, label = "Allgemein",
       title = "Allgemein",
-      sub = "Modus, Mini-HUD, Nachrichten-Routing. Standard Notify = Listening an." },
+      sub = "Modus, Mini-HUD, Nachrichten-Routing. Standard Hinweis = Zuhören an." },
     { id = CAT_SEEKING, label = "Suchen",
       title = "Suchen",
       sub = "Rollen, Whisper-Varianten, Leader-Blacklist, optional Match-Sound." },
@@ -60,7 +60,7 @@ local CATEGORIES = {
       sub = "Level-59-Kick + Aura-Buff-Scan (idle, wenn Buffs bei anderen versteckt sind). Standard aus." },
     { id = CAT_APPEARANCE, label = "Darstellung",
       title = "Darstellung",
-      sub = "Nur DragonUI-Chrome: Metal-Nineslice Größe/Offsets. Danach /reload." },
+      sub = "Ascension-natives DialogBox- und InsetFrame-Chrome. Debug: /alfmchrome." },
     { id = CAT_LOG, label = "Protokoll",
       title = "Protokoll",
       sub = "Match-Verlauf + Aktivität (Posts, Invites, Rejects, Matches)." },
@@ -84,7 +84,7 @@ local TOOLTIP_BACKDROP_TIGHT = {
     insets = { left = 2, right = 2, top = 2, bottom = 2 },
 }
 
--- High-contrast light-on-dark (readable on DragonUI rock panels).
+-- High-contrast light-on-dark (readable on DialogBox / inset panels).
 local INK = { 0.96, 0.92, 0.82, 1 }       -- primary body text
 local GOLD = { 1.00, 0.86, 0.28, 1 }      -- accents / highlights
 local MUTED = { 0.82, 0.76, 0.60, 1 }     -- secondary / descriptions
@@ -134,20 +134,16 @@ local function ApplyBackdrop(f, template, r, g, b, a, br, bg, bb, ba)
     end
 end
 
-local function RockPath()
+local function PanelBgPath()
     if AscensionLFM.Chrome and AscensionLFM.Chrome.BackgroundPath then
         return AscensionLFM.Chrome.BackgroundPath()
     end
-    -- Chrome module missing entirely (shouldn't happen given TOC load
-    -- order) - fall back to the classic Blizzard texture, never DragonUI.
     return "Interface\\DialogFrame\\UI-DialogBox-Background"
 end
 
---- Pure DragonUI rock fill. No WHITE8X8 overlays that paint over the
--- texture (that was hiding the rock and producing flat brown panels).
--- Optional 1px gold edge via SetBackdrop only — does not cover the fill.
-local function ApplyRockPanel(f, edgeA, _insetA, bgA)
-    -- Pure DragonUI rock fill. No WHITE8X8 / gold edges (outer metal nineslice only).
+--- DialogBox stone fill + gold-tinted tooltip border (Ascension CA-like,
+-- no DragonUI). Applied once per panel.
+local function ApplyStonePanel(f, borderA, bgA)
     if type(f) ~= "table" then
         return
     end
@@ -155,35 +151,45 @@ local function ApplyRockPanel(f, edgeA, _insetA, bgA)
         return
     end
     f._alfmRockApplied = true
-    local path = RockPath()
+    local path = PanelBgPath()
     if type(f.CreateTexture) == "function" then
         local bg = f:CreateTexture(nil, "BACKGROUND")
         bg:SetAllPoints(f)
         bg:SetTexture(path)
         bg:SetAlpha(type(bgA) == "number" and bgA or 0.97)
-        bg._duiOwned = true
         f._alfmRockBg = bg
     end
-    -- Clear any prior backdrop so no non-DragonUI edge remains.
     if f.SetBackdrop then
-        f:SetBackdrop(nil)
+        f:SetBackdrop({
+            bgFile = nil,
+            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+            tile = true, tileSize = 16, edgeSize = 12,
+            insets = { left = 3, right = 3, top = 3, bottom = 3 },
+        })
+        local a = type(borderA) == "number" and borderA or 0.75
+        if f.SetBackdropBorderColor then
+            f:SetBackdropBorderColor(0.72, 0.58, 0.28, a)
+        end
+        if f.SetBackdropColor then
+            f:SetBackdropColor(0, 0, 0, 0)
+        end
     end
 end
 
 local function ApplyParchment(f)
-    ApplyRockPanel(f, 0.45, nil, 0.97)
+    ApplyStonePanel(f, 0.55, 0.97)
 end
 
 local function ApplySidebar(f)
-    ApplyRockPanel(f, 0.40, nil, 0.97)
+    ApplyStonePanel(f, 0.50, 0.97)
 end
 
 local function ApplyInset(f)
-    ApplyRockPanel(f, 0.50, nil, 0.95)
+    ApplyStonePanel(f, 0.70, 0.95)
 end
 
 local function ApplyToggleRow(f)
-    ApplyRockPanel(f, 0.40, nil, 0.94)
+    ApplyStonePanel(f, 0.45, 0.94)
 end
 
 local function ApplyNavButton(f, selected)
@@ -194,18 +200,17 @@ local function ApplyNavButton(f, selected)
         f._alfmNavBg = f:CreateTexture(nil, "BACKGROUND")
         f._alfmNavBg:SetPoint("TOPLEFT", 1, -1)
         f._alfmNavBg:SetPoint("BOTTOMRIGHT", -1, 1)
-        f._alfmNavBg:SetTexture(RockPath())
-        f._alfmNavBg._duiOwned = true
+        f._alfmNavBg:SetTexture(PanelBgPath())
     end
     if type(f._alfmNavBg) == "table" and f._alfmNavBg.SetAlpha then
-        f._alfmNavBg:SetAlpha(0.97)
+        f._alfmNavBg:SetAlpha(selected and 1.0 or 0.92)
     end
     if f.SetBackdrop then
         f:SetBackdrop({
             bgFile = nil,
-            -- edgeFile WHITE8X8 removed (DragonUI only)
-            edgeSize = 1,
-            insets = { left = 1, right = 1, top = 1, bottom = 1 },
+            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+            tile = true, tileSize = 12, edgeSize = 10,
+            insets = { left = 2, right = 2, top = 2, bottom = 2 },
         })
         if selected then
             if f.SetBackdropBorderColor then
@@ -228,7 +233,7 @@ local function SetInk(fs, rgba)
     end
 end
 
--- InputBoxTemplate on DragonUI rock needs explicit light ink (Chrome.StyleEditBox).
+-- InputBoxTemplate on dark DialogBox needs explicit light ink (Chrome.StyleEditBox).
 -- Never nest these under PortraitFrame title/portrait regions.
 local function CreateStyledEditBox(name, parent, template)
     local edit = CreateFrame("EditBox", name, parent, template or "InputBoxTemplate")
@@ -296,6 +301,14 @@ local function ModeLabel(mode)
     return "Aus"
 end
 
+local function ListeningLabel(on)
+    return on and "|cff2a7a3aZuhören an|r" or "|cffff6b52Zuhören aus|r"
+end
+
+local function ListeningPlain(on)
+    return on and "Zuhören an" or "Zuhören aus"
+end
+
 local function CategoryInfo(id)
     for i = 1, #CATEGORIES do
         if CATEGORIES[i].id == id then
@@ -311,30 +324,30 @@ local function RefreshStatus()
     end
     local db = AscensionLFM.Database.Get()
     local listeningOn = db.mode ~= "off"
-    local listening = listeningOn and "|cff2a7a3aListening ON|r" or "|cffff6b52Listening OFF|r"
+    local listening = ListeningLabel(listeningOn)
     local last = ""
     if db.matchHistory and db.matchHistory[1] then
         local m = db.matchHistory[1]
-        last = "  |  Last: " .. TruncateText(
+        last = "  |  Zuletzt: " .. TruncateText(
             tostring(m.leader or "") .. " - " .. tostring(m.summary or m.text or ""), 40)
     end
-    local kickBit = db.autoKickLevel59 and " * |cffff6060Kick59 ON|r" or ""
-    local fullBit = db.fullAutoHosting and " * |cff2a7a3aFull Auto ON|r" or ""
-    statusFS:SetText(TruncateText(string.format("Status: %s  *  Mode: |cffc8a03c%s|r%s%s%s",
+    local kickBit = db.autoKickLevel59 and " * |cffff6060Kick59 an|r" or ""
+    local fullBit = db.fullAutoHosting and " * |cff2a7a3aFull Auto an|r" or ""
+    statusFS:SetText(TruncateText(string.format("Status: %s  *  Modus: |cffc8a03c%s|r%s%s%s",
         listening, ModeLabel(db.mode), fullBit, kickBit, last), 110))
 
     if footerStatus then
-        local kick = db.autoKickLevel59 and "Kick59 ON" or "Kick59 off"
+        local kick = db.autoKickLevel59 and "Kick59 an" or "Kick59 aus"
         if activeCategory == CAT_KICK then
-            footerStatus:SetText("Kick log * Clear removes kick history")
+            footerStatus:SetText("Kick-Protokoll · Leeren löscht den Kick-Verlauf")
         elseif activeCategory == CAT_LOG then
-            footerStatus:SetText("Match + activity * Clear removes both")
+            footerStatus:SetText("Matches und Aktivität · Leeren löscht beides")
         elseif activeCategory == CAT_QUEUE then
-            footerStatus:SetText("Applicant queue * Clear empties queue")
+            footerStatus:SetText("Bewerber-Warteschlange · Leeren leert die Warteschlange")
         else
-            local fa = db.fullAutoHosting and "FullAuto ON" or "FullAuto off"
-            footerStatus:SetText(TruncateText(string.format("%s * Mode %s * %s * %s",
-                listeningOn and "Listening ON" or "Listening OFF",
+            local fa = db.fullAutoHosting and "Full Auto an" or "Full Auto aus"
+            footerStatus:SetText(TruncateText(string.format("%s · Modus %s · %s · %s",
+                ListeningPlain(listeningOn),
                 ModeLabel(db.mode), fa, kick), 72))
         end
         SetInk(footerStatus, MUTED)
@@ -358,7 +371,7 @@ function MainWindow.RefreshSlots()
             table.insert(bits, string.format("%s %d/%d", label, s.filled, s.max))
         end
     end
-    slotsFS:SetText(TruncateText("Filled: " .. table.concat(bits, "  *  "), 90))
+    slotsFS:SetText(TruncateText("Belegt: " .. table.concat(bits, "  *  "), 90))
     RefreshStatus()
     MainWindow.RefreshRoleCheck()
 end
@@ -655,10 +668,10 @@ local function SyncWidgetsFromDB()
         local routing = type(db.messageRouting) == "table" and db.messageRouting or {}
         local labels = {
             auto = "Auto",
-            raidwarning = "RW only",
-            raid = "Raid/Party",
-            ["local"] = "Local",
-            disabled = "Off",
+            raidwarning = "Nur RW",
+            raid = "Raid/Gruppe",
+            ["local"] = "Lokal",
+            disabled = "Aus",
         }
         for kind, btn in pairs(widgets.routeButtons) do
             if btn and btn.SetText then
@@ -978,8 +991,8 @@ function MainWindow.SelectCategory(id)
 end
 
 local function CreateMainFrame()
-    -- Plain frame only — UIPanelDialogTemplate fights DragonUI chrome
-    -- (baked regions + clipping). Rock + metal nineslice come from Chrome.lua.
+    -- Plain frame — DialogBox chrome from Chrome.ApplyClassicChrome.
+    -- Never PortraitFrameTemplate (EditBox parenting stays on content).
     local f = CreateFrame("Frame", FRAME_NAME, UIParent)
     return f
 end
@@ -987,14 +1000,8 @@ end
 
 -- Appearance category (module-level to stay under Lua 5.1 60-upvalue limit in Init).
 local function BuildAppearanceCategory(pageHost)
-    local appearance = BuildCategoryPage(pageHost, CAT_APPEARANCE, 420)
+    local appearance = BuildCategoryPage(pageHost, CAT_APPEARANCE, 180)
     local y = -8
-    local function uiChrome()
-        local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
-        if type(db) ~= "table" then return {} end
-        if type(db.uiChrome) ~= "table" then db.uiChrome = {} end
-        return db.uiChrome
-    end
     local function note(parent, text, yy)
         local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         fs:SetPoint("TOPLEFT", 8, yy)
@@ -1004,101 +1011,11 @@ local function BuildAppearanceCategory(pageHost)
         SetInk(fs, MUTED)
         return fs
     end
-    note(appearance, "Nur DragonUI-Texturen (Rock + Metal-Nineslice). Groessen-Aenderungen brauchen /reload.", y)
-    y = y - 28
-
-    local metalRow = CreateFrame("Frame", nil, appearance)
-    metalRow:SetPoint("TOPLEFT", 4, y)
-    metalRow:SetPoint("RIGHT", appearance, "RIGHT", -4, 0)
-    metalRow:SetHeight(TOGGLE_ROW_H)
-    ApplyToggleRow(metalRow)
-    local metalCb = CreateFrame("CheckButton", nil, metalRow, "UICheckButtonTemplate")
-    metalCb:SetPoint("TOPLEFT", 6, -8)
-    metalCb:SetChecked(uiChrome().metalEnabled ~= false)
-    metalCb:SetScript("OnClick", function(self)
-        uiChrome().metalEnabled = self:GetChecked() and true or false
-        if AscensionLFM.Print then AscensionLFM.Print("Metal chrome: " .. (uiChrome().metalEnabled and "ON" or "OFF") .. " — /reload to apply") end
-    end)
-    local metalLbl = metalRow:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    metalLbl:SetPoint("LEFT", metalCb, "RIGHT", 4, 0)
-    metalLbl:SetText("Metal-Nineslice (Aussenrahmen)")
-    SetInk(metalLbl, INK)
-    local metalDesc = metalRow:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    metalDesc:SetPoint("TOPLEFT", metalCb, "BOTTOMLEFT", 0, -2)
-    metalDesc:SetPoint("RIGHT", metalRow, "RIGHT", -8, 0)
-    metalDesc:SetJustifyH("LEFT")
-    metalDesc:SetText("Braucht DragonUI. Aus = nur Rock-Hintergrund. Nach Umschalten /reload.")
-    SetInk(metalDesc, MUTED)
-    y = y - TOGGLE_STEP
-
-    local chromeEdits = {}
-    local function numRow(label, key, default, lo, hi)
-        local row = CreateFrame("Frame", nil, appearance)
-        row:SetPoint("TOPLEFT", 4, y)
-        row:SetPoint("RIGHT", appearance, "RIGHT", -4, 0)
-        row:SetHeight(36)
-        ApplyInset(row)
-        local fs = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        fs:SetPoint("LEFT", 10, 0)
-        fs:SetText(label)
-        SetInk(fs, INK)
-        local edit = CreateStyledEditBox( nil, row, "InputBoxTemplate")
-        edit:SetSize(64, 20)
-        edit:SetPoint("RIGHT", -12, 0)
-        edit:SetAutoFocus(false)
-        -- Explicit, not relying on InputBoxTemplate's own default (reported
-        -- live: the "Corner size (topSize)" box specifically rendered with
-        -- no visible text against its dark background).
-        edit:SetTextColor(INK[1], INK[2], INK[3], INK[4])
-        local cur = tonumber(uiChrome()[key]) or default
-        edit:SetText(tostring(cur))
-        edit:SetScript("OnEnterPressed", function(self)
-            local n = tonumber(self:GetText())
-            if not n then self:SetText(tostring(uiChrome()[key] or default)); self:ClearFocus(); return end
-            if n < lo then n = lo end
-            if n > hi then n = hi end
-            uiChrome()[key] = n
-            self:SetText(tostring(n))
-            self:ClearFocus()
-            if AscensionLFM.Print then AscensionLFM.Print(label .. " = " .. n .. " — /reload to apply") end
-        end)
-        edit:SetScript("OnEscapePressed", function(self)
-            self:SetText(tostring(uiChrome()[key] or default))
-            self:ClearFocus()
-        end)
-        chromeEdits[key] = edit
-        y = y - 42
-    end
-
-    numRow("Corner size (topSize)", "topSize", 75, 24, 96)
-    numRow("Bottom corner size", "bottomSize", 32, 12, 64)
-    numRow("Top offset (topY)", "topY", 16, -20, 40)
-    numRow("Bottom offset (bottomY)", "bottomY", -3, -20, 20)
-    numRow("Left offset", "leftOffset", -8, -24, 24)
-    numRow("Right offset", "rightOffset", 4, -24, 24)
-
-    note(appearance, "Tips: /alfmchrome • /alfmchromeref • /alfmchromeside. Enter value then /reload.", y - 4)
-
-    local resetBtn = CreateFrame("Button", nil, appearance, "UIPanelButtonTemplate")
-    if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(resetBtn) end
-    resetBtn:SetSize(160, 24)
-    resetBtn:SetPoint("BOTTOMLEFT", 8, 12)
-    resetBtn:SetText("Reset chrome defaults")
-    resetBtn:SetScript("OnClick", function()
-        local u = uiChrome()
-        u.metalEnabled = true
-        u.topSize = 75
-        u.bottomSize = 32
-        u.topY = 16
-        u.bottomY = -3
-        u.leftOffset = -8
-        u.rightOffset = 4
-        metalCb:SetChecked(true)
-        for key, edit in pairs(chromeEdits) do
-            edit:SetText(tostring(u[key]))
-        end
-        if AscensionLFM.Print then AscensionLFM.Print("Chrome defaults restored — /reload") end
-    end)
+    note(appearance,
+        "Fenster nutzen Ascension-natives DialogBox- und InsetFrame-Chrome "
+            .. "(WoW 3.3.5a FrameXML). Keine Fremd-Addon-Texturen. "
+            .. "Debug: /alfmchrome oder /alfmchrome hud",
+        y)
 end
 
 function MainWindow.Init()
@@ -1121,45 +1038,17 @@ function MainWindow.Init()
         tinsert(UISpecialFrames, FRAME_NAME)
     end
 
-    -- Real DragonUI chrome (background + metal nineslice border), same
-    -- approach and same confirmed texture paths/atlas coordinates as
-    -- DragonUI's own bag/bank windows and this session's
-    -- TradeSkillFrame/SpellBookFrame reskins. AscensionLFM is a
-    -- separate addon from DragonUI, so these are full-path texture
-    -- references (no Lua-level dependency on DragonUI's code having
-    -- run - only needs the texture files present).
-    --
-    -- CreateMainFrame() falls back between UIPanelDialogTemplate (has
-    -- its own baked-in border/background texture regions) and a manual
-    -- SetBackdrop version - "neuter" (Show->Hide override, same
-    -- technique as DragonUI's own characterpanel/chrome.lua) whichever
-    -- vanilla texture regions exist directly on `frame` so DragonUI's
-    -- own code can't bring them back, then layer the real chrome on
-    -- top. This only sweeps frame:GetRegions() (direct texture
-    -- children) - titleBg below is a separate child FRAME (restyled in
-    -- v0.4.87 to rock + gold edge so it matches the DragonUI chrome).
-    for _, region in ipairs({ frame:GetRegions() }) do
-        if region.GetObjectType and region:GetObjectType() == "Texture" and not region._duiOwned then
-            region._duiShow = region.Show
-            region.Show = region.Hide
-            region:Hide()
-        end
-    end
-    if frame.SetBackdrop then
-        frame:SetBackdrop(nil)
-    end
-
-    -- DragonUI chrome via shared helper (ui/Chrome.lua). Full-size profile
-    -- (75/75/32) matches bag/bank/TradeSkillFrame sizing used previously.
-    -- Without DragonUI: DialogBox backdrop + header + UIPanelCloseButton
-    -- (proven AscFastRoll / RaidInfo path — never PortraitFrame).
-    local hasDUI = AscensionLFM.Chrome and AscensionLFM.Chrome.HasDragonUI
-        and AscensionLFM.Chrome.HasDragonUI()
-    if AscensionLFM.Chrome and AscensionLFM.Chrome.ApplyMetalChrome then
-        AscensionLFM.Chrome.ApplyMetalChrome(frame, "full")
-    end
-    if not hasDUI and AscensionLFM.Chrome and AscensionLFM.Chrome.ApplyClassicChrome then
+    -- Ascension-native DialogBox + header + UIPanelCloseButton (AscFastRoll /
+    -- RaidInfo path). Never PortraitFrame; no DragonUI textures.
+    if AscensionLFM.Chrome and AscensionLFM.Chrome.ApplyClassicChrome then
         AscensionLFM.Chrome.ApplyClassicChrome(frame, {
+            header = true,
+            headerWidth = 420,
+            closeButton = true,
+            onClose = function() frame:Hide() end,
+        })
+    elseif AscensionLFM.Chrome and AscensionLFM.Chrome.ApplyMetalChrome then
+        AscensionLFM.Chrome.ApplyMetalChrome(frame, {
             header = true,
             headerWidth = 420,
             closeButton = true,
@@ -1167,89 +1056,12 @@ function MainWindow.Init()
         })
     end
 
-    -- Hide the oversized UIPanelDialogTemplate close button, then place a
-    -- DragonUI-sized (18x18) X in the top-right metal corner so it sits
-    -- 1:1 inside the chrome piece (same redbutton2x atlas as bags/bank).
-    -- Skipped without DragonUI: classic UIPanelCloseButton from
-    -- ApplyClassicChrome above stays as-is.
-    if hasDUI then
-        local function hideClose(btn)
-            if not btn then return end
-            btn:Hide()
-            if btn.EnableMouse then btn:EnableMouse(false) end
-            if btn.SetScript then
-                btn:SetScript("OnClick", nil)
-            end
-        end
-        hideClose(_G[FRAME_NAME .. "Close"])
-        hideClose(_G[FRAME_NAME .. "CloseButton"])
-        if frame.GetChildren then
-            for _, child in ipairs({ frame:GetChildren() }) do
-                local n = child.GetName and child:GetName()
-                if n and (n:find("Close") or n:find("close")) then
-                    hideClose(child)
-                end
-            end
-        end
-
-        local closeBtn = CreateFrame("Button", FRAME_NAME .. "DUIClose", frame)
-        closeBtn:SetSize(18, 18)
-        -- Sit inside the top-right metal corner (full profile rightOffset=4, topY=16).
-        closeBtn:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -6, -6)
-        if closeBtn.SetFrameLevel and frame.GetFrameLevel then
-            closeBtn:SetFrameLevel((frame:GetFrameLevel() or 0) + 25)
-        end
-        closeBtn:EnableMouse(true)
-        closeBtn:RegisterForClicks("AnyUp")
-
-        local path = (AscensionLFM.Chrome and AscensionLFM.Chrome.DUI_CLOSE)
-            or "Interface\\AddOns\\DragonUI\\Textures\\UI\\redbutton2x"
-        local function tex(parent, layer)
-            local t = parent:CreateTexture(nil, layer or "ARTWORK")
-            t:SetAllPoints(parent)
-            t:SetTexture(path)
-            return t
-        end
-        local normal = tex(closeBtn, "ARTWORK")
-        normal:SetTexCoord(0.152344, 0.292969, 0.0078125, 0.304688)
-        closeBtn:SetNormalTexture(normal)
-        local pushed = tex(closeBtn, "ARTWORK")
-        pushed:SetTexCoord(0.152344, 0.292969, 0.632812, 0.929688)
-        closeBtn:SetPushedTexture(pushed)
-        local highlight = tex(closeBtn, "HIGHLIGHT")
-        highlight:SetTexCoord(0.449219, 0.589844, 0.0078125, 0.304688)
-        if highlight.SetBlendMode then
-            highlight:SetBlendMode("ADD")
-        end
-        closeBtn:SetHighlightTexture(highlight)
-        local disabled = tex(closeBtn, "ARTWORK")
-        disabled:SetTexCoord(0.152344, 0.292969, 0.320312, 0.617188)
-        closeBtn:SetDisabledTexture(disabled)
-
-        closeBtn:SetScript("OnClick", function()
-            frame:Hide()
-        end)
-        frame._alfmCloseBtn = closeBtn
-    end
-
     local titleBg = CreateFrame("Frame", nil, frame)
     titleBg:SetPoint("TOP", frame, "TOP", 0, -2)
     titleBg:SetSize(260, 34)
     if titleBg.SetFrameLevel and frame.GetFrameLevel then
-        -- Above chrome host (+20) so title text is not covered by metal.
         titleBg:SetFrameLevel((frame:GetFrameLevel() or 0) + 22)
     end
-    -- No separate background texture here at all - titleBg is purely a
-    -- positioning anchor for the title/subtitle text, which sits directly
-    -- on the main window's own rock background instead. A second rock
-    -- layer used to be drawn here under DragonUI (own alpha 0.97, drawn
-    -- above the chrome host) - since it's the SAME texture as the window
-    -- background layered a second time on top of it, the double alpha
-    -- compositing made this exact 260x34 rectangle visibly lighter than
-    -- its surroundings, a seam reported live via screenshot ("not
-    -- uniform"). Without DragonUI, stretching that same full-dialog
-    -- texture across this small box also warped it into a distorted
-    -- gold/tan capsule - so removing it fixes both cases at once.
     if titleBg.SetBackdrop then
         titleBg:SetBackdrop(nil)
     end
@@ -1260,8 +1072,6 @@ function MainWindow.Init()
     title:SetDrawLayer("OVERLAY")
     title:SetPoint("TOP", titleBg, "TOP", 0, -6)
     title:SetText("AscensionLFM")
-    -- Light gold on dark rock titleBg (INK/MUTED are dark parchment colours
-    -- and would be nearly invisible after the v0.4.87 titleBg restyle).
     SetInk(title, { 1.00, 0.90, 0.35, 1 })
 
     local sub = titleBg:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -1411,7 +1221,7 @@ function MainWindow.Init()
     statusFS:SetJustifyH("LEFT")
     SetInk(statusFS, INK)
 
-    CreateSectionLabel(general, "Mode", -58)
+    CreateSectionLabel(general, "Modus", -58)
 
     local modeRow = CreateFrame("Frame", nil, general)
     modeRow:SetPoint("TOPLEFT", 0, -76)
@@ -1419,10 +1229,10 @@ function MainWindow.Init()
     modeRow:SetHeight(28)
 
     local modes = {
-        { "off", "Off", 0 },
-        { "notify", "Notify only", 70 },
-        { "seeking", "Seeking", 190 },
-        { "hosting", "Hosting", 280 },
+        { "off", "Aus", 0 },
+        { "notify", "Nur Hinweis", 70 },
+        { "seeking", "Suchen", 190 },
+        { "hosting", "Hosten", 280 },
     }
     for _, m in ipairs(modes) do
         local key, label, x = m[1], m[2], m[3]
@@ -1444,17 +1254,17 @@ function MainWindow.Init()
     modeHint:SetPoint("TOPLEFT", 4, -116)
     modeHint:SetPoint("RIGHT", -4, 0)
     modeHint:SetJustifyH("LEFT")
-    modeHint:SetText("|cff5a4010Off|r - Listening OFF (no chat scan).\n"
-        .. "|cff5a4010Notify|r - Listening ON: print MS LFM/LFG to chat + Log (default).\n"
-        .. "|cff5a4010Seeking|r - match open roles; optional auto-whisper LFM leaders.\n"
-        .. "|cff5a4010Hosting|r - role whispers -> invite only if accepted role + open slot.\n"
-        .. "|cff5a4010Full Auto|r - Hosting category master (default OFF): invite + scan + repost + reject.")
+    modeHint:SetText("|cffc8a03cAus|r – Zuhören aus (kein Chat-Scan).\n"
+        .. "|cffc8a03cHinweis|r – Zuhören an: MS LFM/LFG in Chat und Protokoll (Standard).\n"
+        .. "|cffc8a03cSuchen|r – offene Rollen matchen; optional Auto-Whisper an LFM-Leader.\n"
+        .. "|cffc8a03cHosten|r – Rollen-Whisper → Invite nur bei akzeptierter Rolle und freiem Slot.\n"
+        .. "|cffc8a03cFull Auto|r – Master unter Hosten (Standard aus): Invite, Scan, Repost und Reject.")
     SetInk(modeHint, MUTED)
 
-    CreateSectionLabel(general, "Mini Quick HUD", -210)
+    CreateSectionLabel(general, "Mini-HUD", -210)
     widgets.miniHud = CreateToggleRow(general, -228,
-        "Show floating quick bar",
-        "LFM / RW / Sync / Wipe / Mobs / FULL / Regrp / Need - no /alfm. Drag to move. Default ON.",
+        "Schwebende Schnellleiste zeigen",
+        "LFM / RW / Sync / Wipe / Mobs / FULL / Regrp / Need – ohne /alfm. Zum Verschieben ziehen. Standard an.",
         false,
         function(on)
             if AscensionLFM.MiniHUD and AscensionLFM.MiniHUD.SetShown then
@@ -1465,30 +1275,30 @@ function MainWindow.Init()
         end)
 
     -- Message delivery routing (backend since 0.4.42; UI picker now)
-    CreateSectionLabel(general, "Message delivery (Mini HUD)", -300)
+    CreateSectionLabel(general, "Nachrichten-Routing (Mini-HUD)", -300)
     local routeHint = general:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     routeHint:SetPoint("TOPLEFT", 4, -318)
     routeHint:SetPoint("RIGHT", -4, 0)
     routeHint:SetJustifyH("LEFT")
-    routeHint:SetText("Per-message route for group announces. Click a button to cycle. "
-        .. "|cff5a4010Auto|r smart cascade * |cff5a4010RW only|r * |cff5a4010Raid/Party|r * |cff5a4010Local|r * |cff5a4010Off|r")
+    routeHint:SetText("Route je Gruppen-Ansage. Klick wechselt die Route. "
+        .. "|cffc8a03cAuto|r smarte Kaskade · |cffc8a03cNur RW|r · |cffc8a03cRaid/Gruppe|r · |cffc8a03cLokal|r · |cffc8a03cAus|r")
     SetInk(routeHint, MUTED)
 
     local ROUTE_CYCLE = { "auto", "raidwarning", "raid", "local", "disabled" }
     local ROUTE_LABEL = {
         auto = "Auto",
-        raidwarning = "RW only",
-        raid = "Raid/Party",
-        ["local"] = "Local",
-        disabled = "Off",
+        raidwarning = "Nur RW",
+        raid = "Raid/Gruppe",
+        ["local"] = "Lokal",
+        disabled = "Aus",
     }
     local ROUTE_KINDS = {
-        { "rw", "Role Check" },
+        { "rw", "Rollen-Check" },
         { "wipe", "Wipe" },
-        { "shield", "Mobs/Shield" },
-        { "regroup", "Regroup" },
+        { "shield", "Mobs/Schild" },
+        { "regroup", "Neu sammeln" },
         { "full", "FULL" },
-        { "need", "Need T/H/A/D" },
+        { "need", "Brauche T/H/A/D" },
     }
     widgets.routeButtons = {}
     local function CurrentRoute(kind)
@@ -1549,8 +1359,8 @@ function MainWindow.Init()
 
     CreateSectionLabel(general, "Chat", ry - 6)
     widgets.chatFilter = CreateToggleRow(general, ry - 24,
-        "Hide MS LFM/LFG spam from chat",
-        "Removes public Manastorm LFM/LFG listings from Trade/General/Say/Yell/Guild once matched - they're still logged in the Log tab. Off by default.",
+        "MS-LFM/LFG-Spam im Chat ausblenden",
+        "Öffentliche Manastorm-LFM/LFG-Zeilen aus Handel, Allgemein, Sagen, Schreien und Gilde entfernen, sobald sie matchen – sie stehen weiter im Protokoll. Standard aus.",
         false,
         function(on)
             if AscensionLFM.ChatFilter and AscensionLFM.ChatFilter.SetEnabled then
@@ -1562,8 +1372,8 @@ function MainWindow.Init()
 
     CreateSectionLabel(general, "Minimap", ry - 100)
     widgets.minimapIcon = CreateToggleRow(general, ry - 118,
-        "Show minimap icon",
-        "Draggable icon near the minimap. Left-click: open settings. Right-click: toggle Mini HUD. Hover: mode + session activity + pending applicants. Default ON.",
+        "Minimap-Icon zeigen",
+        "Ziehbares Icon neben der Minimap. Linksklick: Einstellungen. Rechtsklick: Mini-HUD umschalten. Hover: Modus, Session-Aktivität und offene Bewerber. Standard an.",
         false,
         function(on)
             if AscensionLFM.MinimapButton and AscensionLFM.MinimapButton.SetShown then
@@ -1573,10 +1383,10 @@ function MainWindow.Init()
             end
         end)
 
-    CreateSectionLabel(general, "Chat Tab", ry - 194)
+    CreateSectionLabel(general, "Chat-Tab", ry - 194)
     widgets.lfmChatTab = CreateToggleRow(general, ry - 212,
-        "Dedicated LFM/LFG chat tab",
-        "Creates a separate chat tab that only receives matched Manastorm LFM/LFG lines - inspired by GroupBulletinBoard. Uses this client's normal chat-window API; if it doesn't behave as expected, disable and use the Log tab instead. Off by default.",
+        "Eigener LFM/LFG-Chat-Tab",
+        "Legt einen eigenen Chat-Tab an, der nur gematchte Manastorm-LFM/LFG-Zeilen zeigt. Nutzt die normale Chat-Fenster-API dieses Clients; wenn es hakt, aus und Protokoll nutzen. Standard aus.",
         false,
         function(on)
             if AscensionLFM.LfmChatTab and AscensionLFM.LfmChatTab.SetEnabled then
@@ -1590,7 +1400,7 @@ function MainWindow.Init()
     -- Seeking
     --------------------------------------------------------------------
     local seeking = BuildCategoryPage(pageHost, CAT_SEEKING, 620)
-    CreateSectionLabel(seeking, "My roles", -4)
+    CreateSectionLabel(seeking, "Meine Rollen", -4)
 
     local seekRoles = CreateFrame("Frame", nil, seeking)
     seekRoles:SetPoint("TOPLEFT", 0, -22)
@@ -1598,20 +1408,20 @@ function MainWindow.Init()
     seekRoles:SetHeight(28)
     MakeRoleCheck(seekRoles, "tank", "Tank", 0, 0, widgets.roleButtons)
     MakeRoleCheck(seekRoles, "healer", "Healer", 90, 0, widgets.roleButtons)
-    MakeRoleCheck(seekRoles, "aura", "Aura", 190, 0, widgets.roleButtons)
+    MakeRoleCheck(seekRoles, "aura", "XP-Aura", 190, 0, widgets.roleButtons)
     MakeRoleCheck(seekRoles, "dps", "DPS", 280, 0, widgets.roleButtons)
 
-    CreateSectionLabel(seeking, "Seeking options", -62)
+    CreateSectionLabel(seeking, "Suchen-Optionen", -62)
     widgets.scanLfg = CreateToggleRow(seeking, -80,
-        "Scan LFG MS lines",
-        "Also notify on LFG Manastorm seekers (no auto-whisper to them).",
+        "LFG-MS-Zeilen scannen",
+        "Auch bei LFG-Manastorm-Suchern benachrichtigen (kein Auto-Whisper an sie).",
         false,
         function(on)
             AscensionLFM.Database.Get().scanLfg = on and true or false
         end)
     widgets.autoWhisper = CreateToggleRow(seeking, -80 - TOGGLE_STEP,
-        "Auto-whisper LFM leader",
-        "Rate-limited whisper when needed, plus best-effort replies to their level/role/aura follow-ups. Off by default.",
+        "LFM-Leader automatisch anwhispern",
+        "Rate-limitierter Whisper bei Treffer, plus Antworten auf Level-/Rollen-/Aura-Nachfragen. Standard aus.",
         false,
         function(on)
             AscensionLFM.Database.Get().autoWhisper = on and true or false
@@ -1619,7 +1429,7 @@ function MainWindow.Init()
 
     local msgLabel = seeking:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     msgLabel:SetPoint("TOPLEFT", 4, -228)
-    msgLabel:SetText("Whisper message")
+    msgLabel:SetText("Whisper-Text")
     SetInk(msgLabel, INK)
 
     local edit = CreateStyledEditBox( "AscensionLFMWhisperEdit", seeking, "InputBoxTemplate")
@@ -1637,8 +1447,8 @@ function MainWindow.Init()
     widgets.whisperEdit = edit
 
     widgets.useVariants = CreateToggleRow(seeking, -256,
-        "Rotate whisper variants ({role})",
-        "Cycles 2-3 templates below. {role} becomes tank/healer/aura/dps. Default ON.",
+        "Whisper-Varianten rotieren ({role})",
+        "{role} wird zu tank/healer/dps. Aura ist ein Tag (kein Sitz). Standard an.",
         false,
         function(on)
             AscensionLFM.Database.Get().useWhisperVariants = on and true or false
@@ -1689,8 +1499,8 @@ function MainWindow.Init()
     widgets.variant3 = v3
 
     widgets.soundMatch = CreateToggleRow(seeking, -406,
-        "Sound on new match",
-        "Play a sound when a Manastorm listing is logged. Opt-in OFF.",
+        "Sound bei neuem Match",
+        "Spielt einen Sound, wenn ein Manastorm-Listing geloggt wird. Opt-in, Standard aus.",
         false,
         function(on)
             AscensionLFM.Database.Get().soundOnMatch = on and true or false
@@ -1698,7 +1508,7 @@ function MainWindow.Init()
 
     local blLbl = seeking:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     blLbl:SetPoint("TOPLEFT", 4, -480)
-    blLbl:SetText("Blacklist leader")
+    blLbl:SetText("Leader-Blacklist")
     SetInk(blLbl, INK)
     local blEdit = CreateStyledEditBox( "AscensionLFMBlacklistEdit", seeking, "InputBoxTemplate")
     blEdit:SetSize(120, 18)
@@ -1710,7 +1520,7 @@ function MainWindow.Init()
     if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(blAdd) end
     blAdd:SetSize(50, 20)
     blAdd:SetPoint("LEFT", blEdit, "RIGHT", 4, 0)
-    blAdd:SetText("Add")
+    blAdd:SetText("Hinzufuegen")
     blAdd:SetScript("OnClick", function()
         local name = blEdit:GetText() or ""
         if AscensionLFM.Database.AddLeaderBlacklist(name) then
@@ -1722,17 +1532,17 @@ function MainWindow.Init()
     if AscensionLFM.Chrome and AscensionLFM.Chrome.SkinActionButton then AscensionLFM.Chrome.SkinActionButton(blRem) end
     blRem:SetSize(64, 20)
     blRem:SetPoint("LEFT", blAdd, "RIGHT", 4, 0)
-    blRem:SetText("Remove")
+    blRem:SetText("Entfernen")
     blRem:SetScript("OnClick", function()
         local name = blEdit:GetText() or ""
         AscensionLFM.Database.RemoveLeaderBlacklist(name)
         blEdit:SetText("")
     end)
 
-    CreateSectionLabel(seeking, "Invites", -520)
+    CreateSectionLabel(seeking, "Einladungen", -520)
     widgets.autoAcceptInvite = CreateToggleRow(seeking, -538,
-        "Auto-accept invite from a seen LFM leader",
-        "Only accepts a party/raid invite from someone whose LFM post you saw in the last 10 min - never accepts blind invites from strangers. Off by default.",
+        "Invite von gesehenem LFM-Leader annehmen",
+        "Nur von jemandem, dessen LFM-Post du in den letzten 10 Min. gesehen hast — nie blind von Fremden. Standard aus.",
         false,
         function(on)
             AscensionLFM.Database.Get().autoAcceptInvite = on and true or false
@@ -1744,14 +1554,14 @@ function MainWindow.Init()
     local hosting = BuildCategoryPage(pageHost, CAT_HOSTING, 1510)
     CreateSectionLabel(hosting, "Full Auto", -4)
     widgets.fullAuto = CreateToggleRow(hosting, -22,
-        "Full Auto Hosting (master)",
-        "ON: Hosting + accept T/H/A/D + whisper invite + LFG invite + scan + repost + reject-rewhisper. Default OFF.",
+        "Full Auto Hosting (Master)",
+        "An: Hosten + akzeptiere T/H/D + Aura-Reserve + Whisper-Invite + LFG-Invite + Scan + Repost + Reject. Standard aus.",
         false,
         function(on)
             AscensionLFM.Database.SetFullAutoHosting(on)
         end)
 
-    CreateSectionLabel(hosting, "Accept roles", -96)
+    CreateSectionLabel(hosting, "Akzeptierte Rollen", -96)
     local hostRoles = CreateFrame("Frame", nil, hosting)
     hostRoles:SetPoint("TOPLEFT", 0, -114)
     hostRoles:SetPoint("TOPRIGHT", 0, -114)
@@ -1764,13 +1574,13 @@ function MainWindow.Init()
     MakeRoleCheck(hostRoles, "tank", "Tank", 0, 0, widgets.roleButtonsHost)
     MakeRoleCheck(hostRoles, "healer", "Healer", 90, 0, widgets.roleButtonsHost)
     MakeRoleCheck(hostRoles, "dps", "DPS", 190, 0, widgets.roleButtonsHost)
-    MakeRoleCheck(hostRoles, "aura", "Reserve for Aura", 280, 0, widgets.roleButtonsHost)
+    MakeRoleCheck(hostRoles, "aura", "Aura-Reserve", 280, 0, widgets.roleButtonsHost)
 
     -- My host role: which role YOU take (Slots.EnsureHostAssigned picks this
     -- when set, instead of guessing). Applies to your own slot immediately -
     -- not just a preference for the next auto-assign. "Auto" clears it and
     -- lets the host auto-pick an open accepted role again (default).
-    CreateSectionLabel(hosting, "My host role", -156)
+    CreateSectionLabel(hosting, "Meine Host-Rolle", -156)
     local hostRoleRow = CreateFrame("Frame", nil, hosting)
     hostRoleRow:SetPoint("TOPLEFT", 0, -174)
     hostRoleRow:SetPoint("TOPRIGHT", 0, -174)
@@ -1849,23 +1659,23 @@ function MainWindow.Init()
     hostRoleHint:SetPoint("TOPLEFT", 4, -210)
     hostRoleHint:SetPoint("RIGHT", -4, 0)
     hostRoleHint:SetJustifyH("LEFT")
-    hostRoleHint:SetText("Sets your own slot immediately.\n"
-        .. "Auto lets the host auto-pick an open accepted role again (default).")
+    hostRoleHint:SetText("Setzt deinen eigenen Slot sofort.\n"
+        .. "Auto laesst den Host wieder eine offene, akzeptierte Rolle waehlen (Standard).")
     SetInk(hostRoleHint, MUTED)
 
-    CreateSectionLabel(hosting, "Invite + reject", -258)
+    CreateSectionLabel(hosting, "Einladen + Ablehnen", -258)
     local hy = -276
     widgets.autoInvite = CreateToggleRow(hosting, hy,
-        "Auto-invite matching role whispers",
-        "InviteUnit when role accepted + slot open. Full Auto turns this on.",
+        "Passende Rollen-Whisper einladen",
+        "InviteUnit bei akzeptierter Rolle und freiem Slot. Full Auto schaltet das an.",
         false,
         function(on)
             AscensionLFM.Database.Get().autoInvite = on and true or false
         end)
     hy = hy - TOGGLE_STEP
     widgets.autoInviteLfg = CreateToggleRow(hosting, hy,
-        "Auto-invite LFG seekers (chat)",
-        "When someone posts LFG MS with a role you need + open slot -> InviteUnit. Default ON while Hosting.",
+        "LFG-Sucher aus dem Chat einladen",
+        "Wenn jemand LFG MS mit einer Rolle postet, die du brauchst und einen freien Slot hast → InviteUnit. Standard an beim Hosten.",
         false,
         function(on)
             AscensionLFM.Database.Get().autoInviteLfg = on and true or false
@@ -1923,24 +1733,24 @@ function MainWindow.Init()
     hy = hy - 52
 
     widgets.rejectRewhisper = CreateToggleRow(hosting, hy,
-        "Reject re-whisper (slot/group full / no role)",
-        "Whisper templates with {role} {filled} {max}. Rate-limited; ignore list. Default OFF.",
+        "Reject-Whisper (Slot/Gruppe voll / keine Rolle)",
+        "Whisper-Vorlagen mit {role} {filled} {max}. Rate-limitiert; Ignore-Liste. Standard aus.",
         false,
         function(on)
             AscensionLFM.Database.Get().rejectRewhisper = on and true or false
         end)
     hy = hy - TOGGLE_STEP
     widgets.pauseInviteInInstance = CreateToggleRow(hosting, hy,
-        "Pause auto-invite while inside the instance",
-        "A fresh invite can't join a run already underway. Covers whisper + LFG-chat invites. Default ON.",
+        "Auto-Invite in der Instanz pausieren",
+        "Ein frischer Invite kommt in einen laufenden Run ohnehin nicht rein. Whisper- und LFG-Chat-Invites. Standard an.",
         false,
         function(on)
             AscensionLFM.Database.Get().pauseInviteInInstance = on and true or false
         end)
     hy = hy - TOGGLE_STEP
     widgets.pauseRepostInInstance = CreateToggleRow(hosting, hy,
-        "Pause LFM auto-repost while inside the instance",
-        "No point re-advertising a run you're already deep into. Default ON.",
+        "LFM-Auto-Repost in der Instanz pausieren",
+        "Kein Sinn, einen Run nachzuwerben, in dem du schon tief drin bist. Standard an.",
         false,
         function(on)
             AscensionLFM.Database.Get().pauseRepostInInstance = on and true or false
@@ -1967,8 +1777,8 @@ function MainWindow.Init()
 
     hy = rtY - 28
     widgets.soundApplicant = CreateToggleRow(hosting, hy,
-        "Sound on applicant whisper",
-        "Play TellMessage when a hosting whisper arrives. Opt-in OFF.",
+        "Sound bei Bewerber-Whisper",
+        "Spielt TellMessage, wenn ein Hosting-Whisper ankommt. Opt-in, Standard aus.",
         false,
         function(on)
             AscensionLFM.Database.Get().soundOnApplicant = on and true or false
@@ -2081,8 +1891,8 @@ function MainWindow.Init()
     local rcY = slotsY - 72
     CreateSectionLabel(hosting, "Role Check", rcY)
     widgets.autoMoveTank = CreateToggleRow(hosting, rcY - 18,
-        "Auto-move Tanks (1 per raid group, fills g1/g2 first)",
-        "Keep at most one Tank in each raid group (1-8), filling the lowest-numbered empty group first. Default ON.",
+        "Tanks auto-verschieben (1 pro Raid-Gruppe, g1/g2 zuerst)",
+        "Hoechstens ein Tank pro Raid-Gruppe (1-8), zuerst die niedrigste freie Gruppe. Standard an.",
         false,
         function(on)
             AscensionLFM.Database.Get().autoMoveTank = on and true or false
@@ -2091,8 +1901,8 @@ function MainWindow.Init()
             end
         end)
     widgets.autoMoveHealer = CreateToggleRow(hosting, rcY - 18 - TOGGLE_STEP,
-        "Auto-move Healers (1 per raid group)",
-        "Keep at most one Healer in each raid group. Won't displace a placed Tank unless a full group leaves no other choice. Default ON.",
+        "Healer auto-verschieben (1 pro Raid-Gruppe)",
+        "Hoechstens ein Healer pro Raid-Gruppe. Verschiebt keinen platzierten Tank, ausser die Gruppe ist voll. Standard an.",
         false,
         function(on)
             AscensionLFM.Database.Get().autoMoveHealer = on and true or false
@@ -2101,8 +1911,8 @@ function MainWindow.Init()
             end
         end)
     widgets.autoMoveAura = CreateToggleRow(hosting, rcY - 18 - TOGGLE_STEP * 2,
-        "Auto-move Auras (1 per raid group)",
-        "Keep at most one Aura player in each raid group (1-8). Extra Auras are moved to empty groups. Default ON.",
+        "XP-Auras auto-verschieben (1 pro Raid-Gruppe)",
+        "Hoechstens ein XP-Aura-Traeger pro Raid-Gruppe (1-8). Extra-Auras wandern in freie Gruppen. Standard an.",
         false,
         function(on)
             AscensionLFM.Database.Get().autoMoveAura = on and true or false
@@ -2111,15 +1921,15 @@ function MainWindow.Init()
             end
         end)
     widgets.roleCheckAutoResync = CreateToggleRow(hosting, rcY - 18 - TOGGLE_STEP * 3,
-        "Auto-resync after listening window",
-        "When the window ends: remove leavers, apply whispered roles, refresh filled counts. Default ON.",
+        "Auto-Resync nach dem Listen-Fenster",
+        "Wenn das Fenster endet: Leavers entfernen, Whisper-Rollen anwenden, Filled-Zaehler aktualisieren. Standard an.",
         false,
         function(on)
             AscensionLFM.Database.Get().roleCheckAutoResync = on and true or false
         end)
     widgets.passiveRoleDetect = CreateToggleRow(hosting, rcY - 18 - TOGGLE_STEP * 4,
-        "Catch role words in raid/party chat anytime",
-        "Assign a role the moment someone types exactly 'heal'/'tank'/'dps'/'aura' in group chat - no active Role Check needed. Default ON.",
+        "Rollenworte in Raid/Party-Chat jederzeit erkennen",
+        "Weist zu, sobald jemand genau 'heal'/'tank'/'dps'/'aura' im Gruppenchat tippt — ohne aktiven Role Check. Aura ist ein Tag. Standard an.",
         false,
         function(on)
             AscensionLFM.Database.Get().passiveRoleDetect = on and true or false
@@ -2486,7 +2296,7 @@ function MainWindow.Init()
     postHint:SetPoint("TOPLEFT", 4, intY - 50)
     postHint:SetPoint("RIGHT", -4, 0)
     postHint:SetJustifyH("LEFT")
-    postHint:SetText("Example: LFM MS | 2/3 Healers | 1/3 Aura - full roles omitted, filled from Hosting slots + Scan.")
+    postHint:SetText("Beispiel: LFM MS | 2/3 Healers | 1/3 Auras — volle Rollen entfallen; Fill aus Hosten-Slots + Scan.")
     SetInk(postHint, MUTED)
 
     --------------------------------------------------------------------
@@ -3039,7 +2849,7 @@ if type(SlashCmdList) == "table" then
                 local w, h = region:GetWidth(), region:GetHeight()
                 local okPoint, rPoint, rRel, rRelPoint, rX, rY = pcall(region.GetPoint, region, 1)
                 local shown = (region.IsShown and region:IsShown()) and " shown" or " hidden"
-                local owned = region._duiOwned and " [DragonUI-added]" or ""
+                local owned = ""
 
                 local coordLine, identified = "", ""
                 if region.GetTexCoord then

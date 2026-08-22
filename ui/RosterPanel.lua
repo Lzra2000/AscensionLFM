@@ -889,8 +889,7 @@ local function EnsureCards(parent)
         card:SetSize(colW, cardH)
         card:SetPoint("TOPLEFT", parent, "TOPLEFT", 4 + col * (colW + 10), -36 - row * (cardH + 10))
 
-        -- DragonUI rock card when available, classic dialog fill otherwise
-        -- (no opaque overlays hiding either texture).
+        -- DialogBox fill (Ascension-native BackgroundPath).
         local bgPath = (AscensionLFM.Chrome and AscensionLFM.Chrome.BackgroundPath and AscensionLFM.Chrome.BackgroundPath())
             or "Interface\\DialogFrame\\UI-DialogBox-Background"
         local bg = card:CreateTexture(nil, "BACKGROUND")

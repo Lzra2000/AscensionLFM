@@ -8,7 +8,7 @@ if type(AscensionLFM) ~= "table" then
     _G.AscensionLFM = AscensionLFM
 end
 
-AscensionLFM.VERSION = "0.4.137"
+AscensionLFM.VERSION = "0.4.138"
 AscensionLFM.ADDON_NAME = "AscensionLFM"
 
 -- Safe lives in AscensionAPI.lua (loads first). Keep a late fallback if
@@ -35,13 +35,13 @@ AscensionLFM.Print = Print
 
 local function ModeLabel(mode)
     if mode == "notify" then
-        return "Notify (Listening an)"
+        return "Notify (Zuhören an)"
     elseif mode == "seeking" then
-        return "Suchen (Listening an)"
+        return "Suchen (Zuhören an)"
     elseif mode == "hosting" then
-        return "Hosten (Listening an)"
+        return "Hosten (Zuhören an)"
     end
-    return "Aus (Listening aus)"
+    return "Aus (Zuhören aus)"
 end
 
 local function OnOff(v)
@@ -55,7 +55,7 @@ local function PrintStatus()
         return
     end
     local mode = db.mode or "notify"
-    Print("v" .. AscensionLFM.VERSION .. " * mode=" .. ModeLabel(mode))
+    Print("v" .. AscensionLFM.VERSION .. " * Modus=" .. ModeLabel(mode))
     Print(string.format("Full Auto Hosting=%s * autoInvite=%s * autoRepost=%s * rejectRewhisper=%s",
         OnOff(db.fullAutoHosting), OnOff(db.autoInvite), OnOff(db.autoRepost), OnOff(db.rejectRewhisper)))
     Print(string.format("autoWhisper=%s * variants=%s * Kick59=%s * announceFull=%s",
@@ -399,9 +399,9 @@ local function StartModules()
     SafeStart("RosterPanel.Start", AscensionLFM.RosterPanel and AscensionLFM.RosterPanel.Start)
     local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
     local mode = (db and db.mode) or "notify"
-    Print("v" .. tostring(AscensionLFM.VERSION) .. " - mode=" .. ModeLabel(mode))
+    Print("v" .. tostring(AscensionLFM.VERSION) .. " - Modus=" .. ModeLabel(mode))
     Print("/alfm * /mslfm * /alfm status * /alfm diag")
-    Print("Mini HUD ON by default * Full Auto OFF * Kick59 opt-in OFF")
+    Print("Mini-HUD standard an · Full Auto aus · Kick59 opt-in aus")
 end
 
 local bootFrame = CreateFrame("Frame")

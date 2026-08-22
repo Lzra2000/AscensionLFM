@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.4.138
+
+- **German (du) Allgemein status / Modus / Mini-HUD / Footer.** Status line
+  and footer use *Zuhören an/aus*, *Modus*, *an/aus* (Full Auto, Kick59).
+  Footer context hints for Kick / Protokoll / Warteschlange. Modus radios +
+  hint, Mini-HUD toggle, Nachrichten-Routing labels, Chat/Minimap/Chat-Tab
+  copy. Mini-HUD chips `ZUHÖR`/`SUCH`/`AUS`/`HOST`, slot line `Slots aus`,
+  Regroup-Tooltip. Slash/login ModeLabel: Notify/Suchen/Hosten/Aus + Zuhören.
+  Mode name **Notify** stays (product term); no `string.upper` on Umlaut labels.
+- **German (du) on Suchen / Hosten toggles.** Seeking/Hosting toggle titles
+  and descriptions, Aura UI labels (`XP-Aura`, `Aura-Reserve`), Role-Check
+  auto-move copy.
+- **Cosmetic aura-as-tag LFM labels (not seat logic):** Mini HUD need
+  broadcast `LFM MS need XP Aura`; Poster column `Auras` (parser still
+  accepts legacy `Aura` via `auras?`).
+- **ilvl gap unchanged:** chat LFM/LFG names still have no unit token —
+  no invent. Documented in `docs/NOTES-ascension-apis.md` and `AGENTS.md`.
+- **Chrome lane:** Ascension-native DialogBox only — `ui/Chrome.lua` strip,
+  MainWindow `ApplyClassicChrome` (header + close), Darstellung note,
+  MiniHUD empty `chromeBorderPieces` tests. No DragonUI texture paths.
+
 ## 0.4.137
 
 - **Fixed: stock Role Check / reject copy still listed aura as a fourth seat.**

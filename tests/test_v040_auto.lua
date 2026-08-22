@@ -246,7 +246,7 @@ local built = Poster.BuildMessage({
     aura = { filled = 0, max = 3 },
     dps = { filled = 0, max = 7 },
 })
-check("poster build still green", built == "LFM MS | 0/2 Tanks | 0/3 Healers | 0/3 Aura | 0/7 DPS", built)
+check("poster build still green", built == "LFM MS | 0/2 Tanks | 0/3 Healers | 0/3 Auras | 0/7 DPS", built)
 
 db.mode = "hosting"
 db.autoRepost = true
