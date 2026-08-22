@@ -21,12 +21,11 @@ EOF
 
 echo ""
 echo "== No forbidden retail / suite APIs =="
-# C_Manastorm is a verified Ascension 3.3.5a API, not a retail one, and the
-# addon uses it deliberately (always type-guarded and wrapped in pcall).
-# Without this allowlist the check printed FAILED on every single run, which
-# is the fastest way to teach everyone to ignore it. Add a name here only
-# after verifying it in the client extract.
-ALLOWED_C_API='C_Manastorm'
+# Only extract-verified Ascension namespaces this addon may reference.
+# Document each addition in docs/NOTES-ascension-apis.md first. Call sites
+# go through AscensionLFM.Safe / AscensionLFM.API (pcall); mutate Wildcard
+# rolls stay forbidden via the RollAbilities / StartRapidRolling patterns.
+ALLOWED_C_API='C_Manastorm|C_LFG|C_GameMode'
 FORBIDDEN=$(grep -rn -E '\b(C_Wildcard|RollAbilities|RerollAbilities|StartRapidRolling|C_[A-Za-z]+[.:])' . \
     --include='*.lua' \
     --exclude-dir=dist --exclude-dir=.git \

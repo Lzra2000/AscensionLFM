@@ -822,17 +822,19 @@ local function DisbandGroup()
     return n
 end
 
--- Same signal Poster.lua/Invite.lua use to detect an active Manastorm run
--- (confirmed real via Ascension's own client source). Regroup's disband
--- step can leave a re-invited member unresolvable ("Cannot find player")
--- if they're still deep inside the instance when uninvited - observed
--- live, and matches how the competing "Manastormer" addon's own
--- coordinated regroup explicitly asks non-users to leave the instance and
--- whisper for a manual invite instead of trusting a blind reinvite.
+-- Same signal Poster/Invite use (AscensionLFM.API.IsInManastorm). Regroup's
+-- disband can leave a re-invited member unresolvable if they're still deep
+-- inside the instance — prefer not Regrouping mid-run.
 local function IsInsideManastorm()
+    local api = AscensionLFM.API
+    if api and api.IsInManastorm then
+        return api.IsInManastorm() and true or false
+    end
     if type(C_Manastorm) == "table" and type(C_Manastorm.IsInManastorm) == "function" then
         local ok, inManastorm = pcall(C_Manastorm.IsInManastorm)
-        return ok and inManastorm and true or false
+        if ok then
+            return inManastorm and true or false
+        end
     end
     return false
 end

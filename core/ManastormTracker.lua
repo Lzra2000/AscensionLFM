@@ -76,11 +76,15 @@ if type(CreateFrame) == "function" then
             -- API zeroes the instant you're ejected, so this must happen
             -- synchronously inside this same handler, not deferred).
             local level = a1
-            if not level and type(_G.C_Manastorm) == "table"
-                and type(_G.C_Manastorm.GetActiveLevel) == "function" then
-                local ok, lvl = pcall(_G.C_Manastorm.GetActiveLevel)
-                if ok then
-                    level = lvl
+            if not level then
+                local api = AscensionLFM.API
+                if api and api.GetActiveLevel then
+                    level = api.GetActiveLevel()
+                elseif type(_G.C_Manastorm) == "table" and type(_G.C_Manastorm.GetActiveLevel) == "function" then
+                    local ok, lvl = pcall(_G.C_Manastorm.GetActiveLevel)
+                    if ok then
+                        level = lvl
+                    end
                 end
             end
             ManastormTracker.HandleFailed(level)

@@ -21,13 +21,13 @@ local ROLE_LABELS = {
 }
 local ROLE_ORDER = { "tank", "healer", "aura", "dps" }
 
--- Same logic as Invite.lua's IsHostInsideInstance() - prefers the precise
--- C_Manastorm.IsInManastorm() signal (confirmed real via Ascension's own
--- client source) over the generic IsInInstance(), so re-advertising an
--- LFM only pauses for an actual Manastorm run, not any unrelated instance
--- the host might briefly step into. Falls back to IsInInstance() if
--- C_Manastorm isn't available.
+-- Same logic as Invite.lua — AscensionLFM.API.IsHostInsideInstance
+-- (C_Manastorm.IsInManastorm when present, else IsInInstance).
 local function IsHostInsideInstance()
+    local api = AscensionLFM.API
+    if api and api.IsHostInsideInstance then
+        return api.IsHostInsideInstance() and true or false
+    end
     if type(C_Manastorm) == "table" and type(C_Manastorm.IsInManastorm) == "function" then
         local ok, inManastorm = pcall(C_Manastorm.IsInManastorm)
         if ok then
