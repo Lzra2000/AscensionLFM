@@ -337,7 +337,7 @@ local function LooksLikeApplicationAttempt(message)
     return false
 end
 
-local function AfterHostResult(sender, message, role, ok, reason)
+local function AfterHostResult(sender, message, role, ok, reason, extra)
     local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
     local status = ok and "invited" or "blocked"
     if AscensionLFM.Queue and AscensionLFM.Queue.Push then
@@ -346,8 +346,27 @@ local function AfterHostResult(sender, message, role, ok, reason)
     local skipAutoReject = NO_AUTO_REJECT_REASONS[tostring(reason or "")]
         and not LooksLikeApplicationAttempt(message)
     if not ok and not skipAutoReject and AscensionLFM.Reject and AscensionLFM.Reject.TryRewhisper then
-        AscensionLFM.Reject.TryRewhisper(sender, reason, role)
+        AscensionLFM.Reject.TryRewhisper(sender, reason, role, extra)
     end
+end
+
+-- minIlvl filter: only blocks when UnitAverageItemLevel (or cache) is known
+-- and below the threshold. Unknown → allow (never invent a reject).
+local function CheckMinIlvl(name)
+    local db = AscensionLFM.Database and AscensionLFM.Database.Get and AscensionLFM.Database.Get()
+    local minIlvl = db and tonumber(db.minIlvl) or 0
+    if minIlvl <= 0 then
+        return true
+    end
+    local IL = AscensionLFM.ItemLevel
+    if not IL or not IL.GetForName or not IL.PassesMin then
+        return true
+    end
+    local avg = IL.GetForName(name)
+    if IL.PassesMin(avg, minIlvl) then
+        return true
+    end
+    return false, avg, minIlvl
 end
 
 -- Moved above TryHostInvite (Lua locals aren't visible before their
@@ -551,6 +570,16 @@ function Invite.TryHostInvite(sender, message, retryAttempts)
         AfterHostResult(sender, message, role, false, "role filtered")
         return false, "role filtered"
     end
+    do
+        local okIlvl, avg, minIlvl = CheckMinIlvl(sender)
+        if not okIlvl then
+            AfterHostResult(sender, message, role, false, "ilvl low", {
+                ilvl = avg and math.floor(avg + 0.5) or "?",
+                minIlvl = minIlvl,
+            })
+            return false, "ilvl low"
+        end
+    end
     if AscensionLFM.Slots and AscensionLFM.Slots.HasOpenSlotFor then
         if not AscensionLFM.Slots.HasOpenSlotFor(role, hasAura) then
             -- Dual-role fallback: someone who offered e.g. both tank and dps
@@ -733,6 +762,16 @@ function Invite.TryLfgInvite(leader, message, parsed, retryAttempts)
     if not (db.roles and db.roles[role]) then
         AfterHostResult(leader, message, role, false, "role filtered")
         return false, "role filtered"
+    end
+    do
+        local okIlvl, avg, minIlvl = CheckMinIlvl(leader)
+        if not okIlvl then
+            AfterHostResult(leader, message, role, false, "ilvl low", {
+                ilvl = avg and math.floor(avg + 0.5) or "?",
+                minIlvl = minIlvl,
+            })
+            return false, "ilvl low"
+        end
     end
     if AscensionLFM.Slots and AscensionLFM.Slots.HasOpenSlotFor then
         if not AscensionLFM.Slots.HasOpenSlotFor(role, hasAura) then

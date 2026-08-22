@@ -1066,7 +1066,9 @@ local function EnsureCards(parent)
 
             local lvlFS = rowF:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
             lvlFS:SetPoint("RIGHT", moveBtn, "LEFT", -4, 0)
-            lvlFS:SetWidth(22)
+            -- Wide enough for "59·142" when UnitAverageItemLevel is known;
+            -- stays level-only ("59") when the API has nothing.
+            lvlFS:SetWidth(44)
             lvlFS:SetJustifyH("RIGHT")
             lvlFS:SetTextColor(0.85, 0.78, 0.58)
 
@@ -1156,6 +1158,9 @@ function RosterPanel.Refresh()
         return
     end
     EnsureCards(hostFrame)
+    if AscensionLFM.ItemLevel and AscensionLFM.ItemLevel.RefreshGroupCache then
+        AscensionLFM.ItemLevel.RefreshGroupCache()
+    end
     local groups, counts = RosterPanel.BuildData()
     local slotMax = {}
     if AscensionLFM.Slots and AscensionLFM.Slots.GetMax then
@@ -1206,7 +1211,13 @@ function RosterPanel.Refresh()
                     end
                     row.nameFS:SetText(m.name)
                     row.nameFS:SetTextColor(cc[1], cc[2], cc[3])
-                    row.lvlFS:SetText(m.level > 0 and tostring(m.level) or "")
+                    local avg = AscensionLFM.ItemLevel and AscensionLFM.ItemLevel.GetForName
+                        and AscensionLFM.ItemLevel.GetForName(m.name)
+                    if AscensionLFM.ItemLevel and AscensionLFM.ItemLevel.FormatRoster then
+                        row.lvlFS:SetText(AscensionLFM.ItemLevel.FormatRoster(m.level, avg))
+                    else
+                        row.lvlFS:SetText(m.level > 0 and tostring(m.level) or "")
+                    end
                     row.kickBtn:Show()
                     -- Moving between subgroups only exists in a raid (a
                     -- party has none) - TryMoveGroup already rejects it
